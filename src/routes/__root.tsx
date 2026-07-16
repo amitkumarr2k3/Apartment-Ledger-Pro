@@ -1,0 +1,190 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import {
+  Outlet,
+  Link,
+  createRootRouteWithContext,
+  useRouter,
+  useRouterState,
+  useNavigate,
+  HeadContent,
+  Scripts,
+  retainSearchParams,
+} from "@tanstack/react-router";
+import { zodValidator, fallback } from "@tanstack/zod-adapter";
+import { z } from "zod";
+import { useEffect, type ReactNode } from "react";
+
+import appCss from "../styles.css?url";
+import { reportLovableError } from "../lib/lovable-error-reporting";
+import { Toaster } from "@/components/ui/sonner";
+import { getSession, canAccess } from "@/lib/session";
+import { AUTH_ENABLED } from "@/lib/feature-flags";
+
+// Public routes accessible without a session. Everything else requires OTP login.
+const PUBLIC_PATHS = new Set<string>(["/login"]);
+
+function RouteGuard() {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    // Feature flag: login disabled → skip every guard. If the user lands on
+    // /login (e.g. an old bookmark), bounce them into the app.
+    if (!AUTH_ENABLED) {
+      if (pathname === "/login") navigate({ to: "/", replace: true });
+      return;
+    }
+    const check = () => {
+      const session = getSession();
+      if (PUBLIC_PATHS.has(pathname)) return;
+      if (!session) {
+        if (pathname === "/") return; // landing stays public
+        navigate({ to: "/login", search: { redirect: pathname } as never, replace: true });
+        return;
+      }
+      if (!canAccess(pathname, session.role)) {
+        // Resident tried to open an /admin/* route → send them home.
+        navigate({ to: "/resident/overview", replace: true });
+      }
+    };
+    check();
+    window.addEventListener("apf-session-change", check);
+    window.addEventListener("storage", check);
+    return () => {
+      window.removeEventListener("apf-session-change", check);
+      window.removeEventListener("storage", check);
+    };
+  }, [pathname, navigate]);
+
+  return null;
+}
+
+const rootSearchSchema = z.object({
+  period: fallback(z.string(), "range-6m").default("range-6m"),
+  view: fallback(z.string(), "chart").default("chart"),
+  head: fallback(z.string().optional(), undefined),
+  category: fallback(z.string().optional(), undefined),
+  vendor: fallback(z.string().optional(), undefined),
+  line: fallback(z.string().optional(), undefined),
+});
+
+function NotFoundComponent() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+      <div className="max-w-md text-center">
+        <h1 className="text-7xl font-bold text-foreground">404</h1>
+        <h2 className="mt-4 text-xl font-semibold text-foreground">Page not found</h2>
+        <p className="mt-2 text-sm text-muted-foreground">
+          The page you're looking for doesn't exist or has been moved.
+        </p>
+        <div className="mt-6">
+          <Link
+            to="/"
+            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+          >
+            Go home
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
+  console.error(error);
+  const router = useRouter();
+  useEffect(() => {
+    reportLovableError(error, { boundary: "tanstack_root_error_component" });
+  }, [error]);
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+      <div className="max-w-md text-center">
+        <h1 className="text-xl font-semibold tracking-tight text-foreground">
+          This page didn't load
+        </h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Something went wrong on our end. You can try refreshing or head back home.
+        </p>
+        <div className="mt-6 flex flex-wrap justify-center gap-2">
+          <button
+            onClick={() => {
+              router.invalidate();
+              reset();
+            }}
+            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+          >
+            Try again
+          </button>
+          <a
+            href="/"
+            className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+          >
+            Go home
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
+  head: () => ({
+    meta: [
+      { charSet: "utf-8" },
+      { name: "viewport", content: "width=device-width, initial-scale=1" },
+      { title: "Apartment Ledger Pro — Prototype Index" },
+      { name: "description", content: "Index of prototype screens covering every requirement in the Apartment Ledger Pro Phase 2 document." },
+      { property: "og:title", content: "Apartment Ledger Pro — Prototype Index" },
+      { property: "og:description", content: "Index of prototype screens covering every requirement in the Apartment Ledger Pro Phase 2 document." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "Apartment Ledger Pro — Prototype Index" },
+      { name: "twitter:description", content: "Index of prototype screens covering every requirement in the Apartment Ledger Pro Phase 2 document." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/9bd5624d-5aaf-45a3-b3ed-271beacb5f0c/id-preview-bfc9bbc8--5f4910d9-cc7e-478e-a2c6-2827c8a63769.lovable.app-1783860026025.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/9bd5624d-5aaf-45a3-b3ed-271beacb5f0c/id-preview-bfc9bbc8--5f4910d9-cc7e-478e-a2c6-2827c8a63769.lovable.app-1783860026025.png" },
+    ],
+    links: [
+      {
+        rel: "stylesheet",
+        href: appCss,
+      },
+      { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+    ],
+  }),
+  shellComponent: RootShell,
+  component: RootComponent,
+  notFoundComponent: NotFoundComponent,
+  errorComponent: ErrorComponent,
+  validateSearch: zodValidator(rootSearchSchema),
+  search: {
+    middlewares: [retainSearchParams(["period", "view"])],
+  },
+});
+
+function RootShell({ children }: { children: ReactNode }) {
+  return (
+    <html lang="en">
+      <head>
+        <HeadContent />
+      </head>
+      <body>
+        {children}
+        <Scripts />
+      </body>
+    </html>
+  );
+}
+
+function RootComponent() {
+  const { queryClient } = Route.useRouteContext();
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <RouteGuard />
+      {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+      <Outlet />
+      <Toaster richColors position="top-right" />
+    </QueryClientProvider>
+  );
+}

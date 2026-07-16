@@ -1,0 +1,46 @@
+name: ci
+on: [push, pull_request]
+jobs:
+  api-tests:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: apf
+          POSTGRES_PASSWORD: apf
+          POSTGRES_DB: apartment_finance
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd="pg_isready -U apf -d apartment_finance"
+          --health-interval=5s --health-timeout=5s --health-retries=10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: Install
+        working-directory: backend
+        run: npm install
+      - name: Build
+        working-directory: backend
+        run: npx tsc -p tsconfig.json
+      - name: Migrate + seed
+        working-directory: backend
+        env:
+          DATABASE_URL: postgres://apf:apf@localhost:5432/apartment_finance
+          SEED_ON_MIGRATE: "true"
+          SUPERADMIN_EMAIL: admin@example.com
+        run: node dist/scripts/migrate.js
+      - name: Test
+        working-directory: backend
+        env:
+          DATABASE_URL: postgres://apf:apf@localhost:5432/apartment_finance
+        run: npx vitest run --coverage
+
+  web-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install
+      - run: bun run build

@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Apartment Ledger Pro — Architecture</title>
+<style>
+  :root { color-scheme: light dark; --bd: #d0d7de; --mut: #57606a; --acc: #0969da; }
+  * { box-sizing: border-box; }
+  body { font: 15px/1.55 -apple-system, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 32px; max-width: 1080px; margin-inline: auto; color: #1f2328; }
+  h1 { font-size: 28px; margin: 0 0 4px; }
+  h2 { margin-top: 40px; border-bottom: 1px solid var(--bd); padding-bottom: 6px; }
+  h3 { margin-top: 26px; }
+  .sub { color: var(--mut); }
+  code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
+  pre { background: #f6f8fa; border: 1px solid var(--bd); border-radius: 6px; padding: 14px; overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0 20px; }
+  th, td { border: 1px solid var(--bd); padding: 8px 10px; text-align: left; vertical-align: top; }
+  th { background: #f6f8fa; font-weight: 600; }
+  .tag { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 999px; background: #dff2ff; color: #0550ae; margin-right: 6px; }
+  .tag.warn { background: #fff8c5; color: #6b5900; }
+  .tag.ok { background: #dafbe1; color: #116329; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+  .card { border: 1px solid var(--bd); border-radius: 8px; padding: 14px; background: #fff; }
+  .card h4 { margin: 0 0 6px; font-size: 14px; }
+  .card p { margin: 0; color: var(--mut); font-size: 13px; }
+  a { color: var(--acc); }
+  @media (prefers-color-scheme: dark) {
+    body { background: #0d1117; color: #e6edf3; }
+    pre, th { background: #161b22; }
+    .card { background: #161b22; }
+    :root { --bd: #30363d; --mut: #8b949e; }
+  }
+</style>
+</head>
+<body>
+
+  <h1>Apartment Ledger Pro</h1>
+<p class="sub">Architecture overview · Docker · Postgres · Fastify · TanStack Start</p>
+
+<h2>1. Personas & surfaces</h2>
+<div class="grid">
+  <div class="card">
+    <h4><span class="tag">Resident</span> Dashboards</h4>
+    <p>Read-only analytics: Overview, Head Drill-down, Cashflow, Income, Balance. Content is filtered by <code>dashboard_settings</code>.</p>
+  </div>
+  <div class="card">
+    <h4><span class="tag">Admin</span> Dashboards</h4>
+    <p>Same analytics at community scope + Action Needed queue, Cost Alerts, Vendor Insights, Collections, Income Optimisation.</p>
+  </div>
+  <div class="card">
+    <h4><span class="tag warn">Admin</span> Controls</h4>
+    <p>Transactions CRUD, Residents & whitelist, Dashboard toggles, Audit trail, CSV imports. Separated from dashboards in nav.</p>
+  </div>
+</div>
+
+<h2>2. Container topology</h2>
+<pre>
+  browser ──▶ web (nginx + Vite build)
+                 │  /api/* proxy
+                 ▼
+              api (Fastify / Node 20)
+                 │
+                 ├──▶ db  (Postgres 16, pgdata volume)
+                 └──▶ mailhog  (dev SMTP; captures OTP)
+</pre>
+
+<h2>3. Component diagram</h2>
+<pre>
+┌─────────────────────────── Frontend (React 19 / TanStack) ──────────────────────────┐
+│  src/routes/*                                                                       │
+│    resident.*        admin.actions|alerts|vendors|collections|income                │
+│    admin.transactions|residents|settings|audit|imports  (Controls)                  │
+│                                                                                     │
+│  src/components/portal-shell.tsx  (sidebar, tabs, period, view, ⌘K, CSV/print)      │
+│  src/lib/api.ts    ── fetches → falls back to finance-mock                          │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+                                    │  HTTP + JWT
+┌─────────────────────────── API (Fastify) ───────────────────────────────────────────┐
+│  /api/auth/{request-otp,verify-otp}                                                 │
+│  /api/dashboard/*   /api/expenses/*   /api/income/*   /api/vendors/* (read-only)    │
+│  /api/admin/transactions    /api/admin/residents                                    │
+│  /api/admin/settings/*      /api/admin/audit          /api/admin/imports            │
+│                                                                                     │
+│  middleware: auth (JWT verify) → requireRole([...])                                 │
+│  audit(): writes audit_log in the same tx as every mutation                         │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+                                    │
+┌─────────────────────────── Postgres 16 ─────────────────────────────────────────────┐
+│  communities · flats · allowed_emails · users · user_roles                          │
+│  heads · categories · vendors · line_items                                          │
+│  transactions · balances · collections_dues                                         │
+│  dashboard_settings · audit_log · otp_codes                                         │
+│  import_batches · import_staging · import_rules                                     │
+│  mv_monthly_totals · mv_category_monthly (rollups)                                  │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+</pre>
+
+<h2>4. Auth</h2>
+<p>
+OTP over email, whitelisted addresses only. No clickable magic link.
+Requesting an OTP for an unknown or revoked email returns <code>200 { ok: true }</code>
+silently (no enumeration). See <a href="AUTH.md">AUTH.md</a> for the full sequence.
+</p>
+
+<h2>5. Vendor handling</h2>
+<p>
+Vendors are surfaced only through insight dashboards
+(<code>/admin/vendors</code>, expense drill-downs). There is no admin vendor
+CRUD screen and no <code>/api/admin/vendors</code> endpoint. Vendor rows are
+populated by CSV imports or created on the fly during transaction ingest;
+cleanup happens through <code>import_rules</code> during the map step.
+</p>
+
+<h2>6. Sparse-data strategy</h2>
+<p>Line items are non-uniform month to month. Every time-series read
+left-joins a generated month spine so absent months still render as
+<code>0</code>. See <a href="DATA-MODEL.md">DATA-MODEL.md → Sparse data</a>.</p>
+
+<h2>7. Deployment</h2>
+<table>
+  <tr><th>Environment</th><th>How</th></tr>
+  <tr><td>Local / society office</td><td><code>docker compose up -d --build</code></td></tr>
+  <tr><td>Cheap VPS (₹300–500/mo)</td><td>Same compose, behind Caddy for TLS</td></tr>
+  <tr><td>Managed</td><td>Swap <code>db</code> for RDS/Neon; run <code>api</code>/<code>web</code> on Fly.io / Railway</td></tr>
+</table>
+
+<p class="sub">Companion docs: <a href="ARCHITECTURE.md">ARCHITECTURE.md</a> · <a href="AUTH.md">AUTH.md</a> · <a href="DATA-MODEL.md">DATA-MODEL.md</a> · <a href="ADMIN-CONTROLS.md">ADMIN-CONTROLS.md</a> · <a href="TDD.md">TDD.md</a></p>
+
+</body>
+</html>

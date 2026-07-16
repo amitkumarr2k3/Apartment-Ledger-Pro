@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Apartment Ledger Pro — Requirements</title>
+<style>
+  :root { color-scheme: light dark; --bd: #d0d7de; --mut: #57606a; --acc: #0969da; }
+  body { font: 15px/1.55 -apple-system, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 32px; max-width: 1080px; margin-inline: auto; color: #1f2328; }
+  h1 { font-size: 28px; margin: 0 0 4px; }
+  h2 { margin-top: 40px; border-bottom: 1px solid var(--bd); padding-bottom: 6px; }
+  h3 { margin-top: 24px; }
+  .sub { color: var(--mut); }
+  table { border-collapse: collapse; width: 100%; margin: 10px 0 24px; font-size: 14px; }
+  th, td { border: 1px solid var(--bd); padding: 8px 10px; text-align: left; vertical-align: top; }
+  th { background: #f6f8fa; font-weight: 600; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; background: #f6f8fa; padding: 1px 5px; border-radius: 4px; font-size: 12.5px; }
+  .tag { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 999px; margin-right: 4px; }
+  .r { background: #dff2ff; color: #0550ae; }
+  .a { background: #f0e6ff; color: #4a2a8b; }
+  .c { background: #fff1cc; color: #7a5b00; }
+  @media (prefers-color-scheme: dark) {
+    body { background: #0d1117; color: #e6edf3; }
+    th, code { background: #161b22; }
+    :root { --bd: #30363d; --mut: #8b949e; }
+  }
+</style>
+</head>
+<body>
+
+  <h1>Apartment Ledger Pro — Requirements</h1>
+<p class="sub">Consolidated requirements for Resident and Admin personas. IDs match the ones shown in each screen header (also in <code>src/lib/finance-mock.ts</code>).</p>
+
+<h2>Legend</h2>
+<p><span class="tag r">RD</span> Resident dashboards &nbsp;
+<span class="tag a">AD</span> Admin dashboards &nbsp;
+<span class="tag c">AC</span> Admin controls</p>
+
+<h2>Resident dashboards</h2>
+<table>
+  <tr><th>ID</th><th>Screen</th><th>Requirement</th></tr>
+  <tr><td>RD-01</td><td>Overview</td><td>Show current month opening/closing balance, income, expense at a glance.</td></tr>
+  <tr><td>RD-02</td><td>Overview</td><td>KPI cards must display % change vs previous comparable period.</td></tr>
+  <tr><td>RD-03</td><td>Overview</td><td>Top-5 expense categories, top-3 income sources, with drill-through links.</td></tr>
+  <tr><td>RD-04</td><td>Overview</td><td>All figures must respect the global period selector.</td></tr>
+  <tr><td>RD-05</td><td>Overview</td><td>Export to CSV and print-friendly rendering.</td></tr>
+  <tr><td>RD-10</td><td>Head Drill-down</td><td>Explode any head → category → line item with month presence bands.</td></tr>
+  <tr><td>RD-11</td><td>Head Drill-down</td><td>Deep-linkable via URL search params (<code>head</code>, <code>category</code>, <code>vendor</code>).</td></tr>
+  <tr><td>RD-12</td><td>Head Drill-down</td><td>Handle sparse line items (not every item appears every month).</td></tr>
+  <tr><td>RD-13</td><td>Head Drill-down</td><td>Show vendor attribution alongside amounts.</td></tr>
+  <tr><td>RD-14</td><td>Head Drill-down</td><td>Chart and table views for the same data set.</td></tr>
+  <tr><td>RD-15</td><td>Head Drill-down</td><td>Tooltip must show period + exact value (mobile-tap safe).</td></tr>
+  <tr><td>RD-20</td><td>Cashflow Health</td><td>Monthly inflow/outflow/net over selected period.</td></tr>
+  <tr><td>RD-21</td><td>Cashflow Health</td><td>Runway indicator (months of cash at current burn).</td></tr>
+  <tr><td>RD-22</td><td>Cashflow Health</td><td>Highlight months with negative net.</td></tr>
+  <tr><td>RD-23</td><td>Cashflow Health</td><td>Configurable widgets — admin can hide runway via <code>dashboard_settings</code>.</td></tr>
+  <tr><td>RD-30</td><td>Income Visibility</td><td>Composition pie + monthly stacked bars.</td></tr>
+  <tr><td>RD-31</td><td>Income Visibility</td><td>Distinguish recurring maintenance vs one-off collections.</td></tr>
+  <tr><td>RD-32</td><td>Income Visibility</td><td>Responsive: pie + legend stack on mobile.</td></tr>
+  <tr><td>RD-40</td><td>Balance Continuity</td><td>Opening + net = closing check per month; flag mismatches.</td></tr>
+  <tr><td>RD-41</td><td>Balance Continuity</td><td>Rolling balance line over the selected range.</td></tr>
+  <tr><td>RD-42</td><td>Balance Continuity</td><td>Support FY (Apr–Mar) as a period option.</td></tr>
+  <tr><td>RD-43</td><td>Balance Continuity</td><td>Print header includes period + generated timestamp.</td></tr>
+  <tr><td>RD-44</td><td>Balance Continuity</td><td>Values in INR paise-precision, displayed with Indian grouping.</td></tr>
+</table>
+
+<h2>Admin · Dashboards</h2>
+<table>
+  <tr><th>ID</th><th>Screen</th><th>Requirement</th></tr>
+  <tr><td>AD-01…05</td><td>Cost Alerts</td><td>Category spend anomalies (Z-score / % vs 6-month mean); deep-link into drill-down with pre-filled filters.</td></tr>
+  <tr><td>AD-10…14</td><td>Vendor Insights</td><td>Rank vendors by spend, concentration risk, on-time payments; read-only (no CRUD).</td></tr>
+  <tr><td>AD-20…24</td><td>Collections</td><td>Dues vs collected, overdue flats, ageing buckets.</td></tr>
+  <tr><td>AD-30…33</td><td>Income Optimisation</td><td>Underperforming income streams, seasonality, growth opportunities.</td></tr>
+  <tr><td>AD-40…43</td><td>Action Needed</td><td>Actionable queue: unclassified transactions, missing months, imports with errors.</td></tr>
+</table>
+
+<h2>Admin · Controls</h2>
+<table>
+  <tr><th>ID</th><th>Screen</th><th>Requirement</th></tr>
+  <tr><td>AC-01</td><td>Transactions</td><td>List transactions filtered by month and head.</td></tr>
+  <tr><td>AC-02</td><td>Transactions</td><td>Create/edit/delete individual rows.</td></tr>
+  <tr><td>AC-03</td><td>Transactions</td><td>Every mutation writes an audit entry in the same DB transaction.</td></tr>
+  <tr><td>AC-04</td><td>Transactions</td><td>Support attaching a vendor / line item on the fly.</td></tr>
+  <tr><td>AC-05</td><td>Transactions</td><td>Running totals per applied filter.</td></tr>
+  <tr><td>AC-10</td><td>Residents</td><td>Only whitelisted emails can log in (OTP flow).</td></tr>
+  <tr><td>AC-11</td><td>Residents</td><td>Add, edit role, assign flat, revoke, reactivate.</td></tr>
+  <tr><td>AC-12</td><td>Residents</td><td>Bulk upload via CSV.</td></tr>
+  <tr><td>AC-13</td><td>Residents</td><td>Superadmin-only deletion.</td></tr>
+  <tr><td>AC-30</td><td>Dashboard Controls</td><td>Enable/disable each resident dashboard.</td></tr>
+  <tr><td>AC-31</td><td>Dashboard Controls</td><td>Hide specific widgets while keeping the dashboard visible.</td></tr>
+  <tr><td>AC-32</td><td>Dashboard Controls</td><td>Preview as resident.</td></tr>
+  <tr><td>AC-40</td><td>Audit</td><td>Immutable log of all mutations and logins.</td></tr>
+  <tr><td>AC-41</td><td>Audit</td><td>Search by actor, action, entity, time range; view before/after JSON.</td></tr>
+  <tr><td>AC-50</td><td>CSV Imports</td><td>Upload → Map → Preview → Commit wizard.</td></tr>
+  <tr><td>AC-51</td><td>CSV Imports</td><td>Reusable transformation rules for non-canonical vendor/category names.</td></tr>
+  <tr><td>AC-52</td><td>CSV Imports</td><td>Idempotent re-import via <code>UNIQUE(source, source_ref)</code>.</td></tr>
+</table>
+
+<h2>Non-functional</h2>
+<ul>
+  <li>Docker-first deployment; single <code>docker compose up</code> starts db + api + web + mailhog.</li>
+  <li>Low Capex/Opex: runs on a ₹300–500/mo VPS.</li>
+  <li>Automated test coverage target ≥ 80% on backend (vitest + Postgres testcontainer).</li>
+  <li>Responsive down to 320px width; automated Playwright regression across 10 widths.</li>
+  <li>All amounts in <code>paise</code> (BIGINT) to avoid float error.</li>
+  <li>Multi-tenant-ready via <code>community_id</code> on every table.</li>
+</ul>
+
+<p class="sub">Related: <a href="ARCHITECTURE.md">ARCHITECTURE.md</a> · <a href="ADMIN-CONTROLS.md">ADMIN-CONTROLS.md</a> · <a href="TDD.md">TDD.md</a></p>
+
+</body>
+</html>

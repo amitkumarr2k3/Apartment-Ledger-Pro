@@ -1,0 +1,153 @@
+date,head,category,vendor,vendor_kind,line_item,amount,direction,flat_code,source_ref
+2025-08-15,expense,Utilities,Bescom,company,Common area electricity,48000,D,,D|Utilities|Bescom|Common area electricity|2025-08
+2025-09-15,expense,Utilities,Bescom,company,Common area electricity,51366,D,,D|Utilities|Bescom|Common area electricity|2025-09
+2025-10-15,expense,Utilities,Bescom,company,Common area electricity,51637,D,,D|Utilities|Bescom|Common area electricity|2025-10
+2025-11-15,expense,Utilities,Bescom,company,Common area electricity,48564,D,,D|Utilities|Bescom|Common area electricity|2025-11
+2025-12-15,expense,Utilities,Bescom,company,Common area electricity,44973,D,,D|Utilities|Bescom|Common area electricity|2025-12
+2026-01-15,expense,Utilities,Bescom,company,Common area electricity,44164,D,,D|Utilities|Bescom|Common area electricity|2026-01
+2026-02-15,expense,Utilities,Bescom,company,Common area electricity,46882,D,,D|Utilities|Bescom|Common area electricity|2026-02
+2026-03-15,expense,Utilities,Bescom,company,Common area electricity,50628,D,,D|Utilities|Bescom|Common area electricity|2026-03
+2026-04-15,expense,Utilities,Bescom,company,Common area electricity,51957,D,,D|Utilities|Bescom|Common area electricity|2026-04
+2026-05-15,expense,Utilities,Bescom,company,Common area electricity,49648,D,,D|Utilities|Bescom|Common area electricity|2026-05
+2026-06-15,expense,Utilities,Bescom,company,Common area electricity,45824,D,,D|Utilities|Bescom|Common area electricity|2026-06
+2026-07-15,expense,Utilities,Bescom,company,Common area electricity,44000,D,,D|Utilities|Bescom|Common area electricity|2026-07
+2025-08-15,expense,Utilities,Bescom,company,Backup usage,12000,D,,D|Utilities|Bescom|Backup usage|2025-08
+2025-09-15,expense,Utilities,Bescom,company,Backup usage,14945,D,,D|Utilities|Bescom|Backup usage|2025-09
+2025-11-15,expense,Utilities,Bescom,company,Backup usage,12494,D,,D|Utilities|Bescom|Backup usage|2025-11
+2025-12-15,expense,Utilities,Bescom,company,Backup usage,9351,D,,D|Utilities|Bescom|Backup usage|2025-12
+2026-01-15,expense,Utilities,Bescom,company,Backup usage,8644,D,,D|Utilities|Bescom|Backup usage|2026-01
+2026-02-15,expense,Utilities,Bescom,company,Backup usage,11022,D,,D|Utilities|Bescom|Backup usage|2026-02
+2026-03-15,expense,Utilities,Bescom,company,Backup usage,14299,D,,D|Utilities|Bescom|Backup usage|2026-03
+2026-05-15,expense,Utilities,Bescom,company,Backup usage,13442,D,,D|Utilities|Bescom|Backup usage|2026-05
+2026-06-15,expense,Utilities,Bescom,company,Backup usage,10096,D,,D|Utilities|Bescom|Backup usage|2026-06
+2026-07-15,expense,Utilities,Bescom,company,Backup usage,8500,D,,D|Utilities|Bescom|Backup usage|2026-07
+2025-08-15,expense,Utilities,BWSSB,company,Water charges,32000,D,,D|Utilities|BWSSB|Water charges|2025-08
+2025-09-15,expense,Utilities,BWSSB,company,Water charges,33683,D,,D|Utilities|BWSSB|Water charges|2025-09
+2025-10-15,expense,Utilities,BWSSB,company,Water charges,33819,D,,D|Utilities|BWSSB|Water charges|2025-10
+2025-11-15,expense,Utilities,BWSSB,company,Water charges,32282,D,,D|Utilities|BWSSB|Water charges|2025-11
+2025-12-15,expense,Utilities,BWSSB,company,Water charges,30486,D,,D|Utilities|BWSSB|Water charges|2025-12
+2026-01-15,expense,Utilities,BWSSB,company,Water charges,30082,D,,D|Utilities|BWSSB|Water charges|2026-01
+2026-02-15,expense,Utilities,BWSSB,company,Water charges,31441,D,,D|Utilities|BWSSB|Water charges|2026-02
+2026-03-15,expense,Utilities,BWSSB,company,Water charges,33314,D,,D|Utilities|BWSSB|Water charges|2026-03
+2026-04-15,expense,Utilities,BWSSB,company,Water charges,33979,D,,D|Utilities|BWSSB|Water charges|2026-04
+2026-05-15,expense,Utilities,BWSSB,company,Water charges,32824,D,,D|Utilities|BWSSB|Water charges|2026-05
+2026-06-15,expense,Utilities,BWSSB,company,Water charges,30912,D,,D|Utilities|BWSSB|Water charges|2026-06
+2026-07-15,expense,Utilities,BWSSB,company,Water charges,30000,D,,D|Utilities|BWSSB|Water charges|2026-07
+2025-08-15,expense,Maintenance,ABC Enterprise,company,Labour charges,65000,D,,D|Maintenance|ABC Enterprise|Labour charges|2025-08
+2025-09-15,expense,Maintenance,ABC Enterprise,company,Labour charges,67524,D,,D|Maintenance|ABC Enterprise|Labour charges|2025-09
+2025-10-15,expense,Maintenance,ABC Enterprise,company,Labour charges,67728,D,,D|Maintenance|ABC Enterprise|Labour charges|2025-10
+2025-11-15,expense,Maintenance,ABC Enterprise,company,Labour charges,65423,D,,D|Maintenance|ABC Enterprise|Labour charges|2025-11
+2025-12-15,expense,Maintenance,ABC Enterprise,company,Labour charges,62730,D,,D|Maintenance|ABC Enterprise|Labour charges|2025-12
+2026-01-15,expense,Maintenance,ABC Enterprise,company,Labour charges,62123,D,,D|Maintenance|ABC Enterprise|Labour charges|2026-01
+2026-02-15,expense,Maintenance,ABC Enterprise,company,Labour charges,64162,D,,D|Maintenance|ABC Enterprise|Labour charges|2026-02
+2026-03-15,expense,Maintenance,ABC Enterprise,company,Labour charges,66971,D,,D|Maintenance|ABC Enterprise|Labour charges|2026-03
+2026-04-15,expense,Maintenance,ABC Enterprise,company,Labour charges,67968,D,,D|Maintenance|ABC Enterprise|Labour charges|2026-04
+2026-05-15,expense,Maintenance,ABC Enterprise,company,Labour charges,66236,D,,D|Maintenance|ABC Enterprise|Labour charges|2026-05
+2026-06-15,expense,Maintenance,ABC Enterprise,company,Labour charges,63368,D,,D|Maintenance|ABC Enterprise|Labour charges|2026-06
+2026-07-15,expense,Maintenance,ABC Enterprise,company,Labour charges,62000,D,,D|Maintenance|ABC Enterprise|Labour charges|2026-07
+2025-08-15,expense,Maintenance,ABC Enterprise,company,Spare parts,18000,D,,D|Maintenance|ABC Enterprise|Spare parts|2025-08
+2025-10-15,expense,Maintenance,ABC Enterprise,company,Spare parts,23456,D,,D|Maintenance|ABC Enterprise|Spare parts|2025-10
+2025-11-15,expense,Maintenance,ABC Enterprise,company,Spare parts,18847,D,,D|Maintenance|ABC Enterprise|Spare parts|2025-11
+2026-01-15,expense,Maintenance,ABC Enterprise,company,Spare parts,12246,D,,D|Maintenance|ABC Enterprise|Spare parts|2026-01
+2026-02-15,expense,Maintenance,ABC Enterprise,company,Spare parts,16324,D,,D|Maintenance|ABC Enterprise|Spare parts|2026-02
+2026-04-15,expense,Maintenance,ABC Enterprise,company,Spare parts,23936,D,,D|Maintenance|ABC Enterprise|Spare parts|2026-04
+2026-05-15,expense,Maintenance,ABC Enterprise,company,Spare parts,20473,D,,D|Maintenance|ABC Enterprise|Spare parts|2026-05
+2026-06-15,expense,Maintenance,ABC Enterprise,company,Spare parts,14736,D,,D|Maintenance|ABC Enterprise|Spare parts|2026-06
+2026-07-15,expense,Maintenance,ABC Enterprise,company,Spare parts,12000,D,,D|Maintenance|ABC Enterprise|Spare parts|2026-07
+2025-10-15,expense,Maintenance,ABC Enterprise,company,STP salt purchase,9455,D,,D|Maintenance|ABC Enterprise|STP salt purchase|2025-10
+2026-01-15,expense,Maintenance,ABC Enterprise,company,STP salt purchase,8521,D,,D|Maintenance|ABC Enterprise|STP salt purchase|2026-01
+2026-04-15,expense,Maintenance,ABC Enterprise,company,STP salt purchase,9495,D,,D|Maintenance|ABC Enterprise|STP salt purchase|2026-04
+2026-07-15,expense,Maintenance,ABC Enterprise,company,STP salt purchase,8500,D,,D|Maintenance|ABC Enterprise|STP salt purchase|2026-07
+2025-09-15,expense,Maintenance,John (Plumber),individual,Plumbing repair,7445,D,,D|Maintenance|John (Plumber)|Plumbing repair|2025-09
+2025-11-15,expense,Maintenance,John (Plumber),individual,Plumbing repair,4994,D,,D|Maintenance|John (Plumber)|Plumbing repair|2025-11
+2025-12-15,expense,Maintenance,John (Plumber),individual,Plumbing repair,1851,D,,D|Maintenance|John (Plumber)|Plumbing repair|2025-12
+2026-03-15,expense,Maintenance,John (Plumber),individual,Plumbing repair,6799,D,,D|Maintenance|John (Plumber)|Plumbing repair|2026-03
+2026-05-15,expense,Maintenance,John (Plumber),individual,Plumbing repair,5942,D,,D|Maintenance|John (Plumber)|Plumbing repair|2026-05
+2026-06-15,expense,Maintenance,John (Plumber),individual,Plumbing repair,2596,D,,D|Maintenance|John (Plumber)|Plumbing repair|2026-06
+2025-08-15,expense,Security,SafeGuard Services,company,Guard salaries,120000,D,,D|Security|SafeGuard Services|Guard salaries|2025-08
+2025-09-15,expense,Security,SafeGuard Services,company,Guard salaries,121683,D,,D|Security|SafeGuard Services|Guard salaries|2025-09
+2025-10-15,expense,Security,SafeGuard Services,company,Guard salaries,121819,D,,D|Security|SafeGuard Services|Guard salaries|2025-10
+2025-11-15,expense,Security,SafeGuard Services,company,Guard salaries,120282,D,,D|Security|SafeGuard Services|Guard salaries|2025-11
+2025-12-15,expense,Security,SafeGuard Services,company,Guard salaries,118486,D,,D|Security|SafeGuard Services|Guard salaries|2025-12
+2026-01-15,expense,Security,SafeGuard Services,company,Guard salaries,118082,D,,D|Security|SafeGuard Services|Guard salaries|2026-01
+2026-02-15,expense,Security,SafeGuard Services,company,Guard salaries,119441,D,,D|Security|SafeGuard Services|Guard salaries|2026-02
+2026-03-15,expense,Security,SafeGuard Services,company,Guard salaries,121314,D,,D|Security|SafeGuard Services|Guard salaries|2026-03
+2026-04-15,expense,Security,SafeGuard Services,company,Guard salaries,121979,D,,D|Security|SafeGuard Services|Guard salaries|2026-04
+2026-05-15,expense,Security,SafeGuard Services,company,Guard salaries,120824,D,,D|Security|SafeGuard Services|Guard salaries|2026-05
+2026-06-15,expense,Security,SafeGuard Services,company,Guard salaries,118912,D,,D|Security|SafeGuard Services|Guard salaries|2026-06
+2026-07-15,expense,Security,SafeGuard Services,company,Guard salaries,118000,D,,D|Security|SafeGuard Services|Guard salaries|2026-07
+2025-08-15,expense,Housekeeping,CleanCo,company,Staff wages,58000,D,,D|Housekeeping|CleanCo|Staff wages|2025-08
+2025-09-15,expense,Housekeeping,CleanCo,company,Staff wages,59262,D,,D|Housekeeping|CleanCo|Staff wages|2025-09
+2025-10-15,expense,Housekeeping,CleanCo,company,Staff wages,59364,D,,D|Housekeeping|CleanCo|Staff wages|2025-10
+2025-11-15,expense,Housekeeping,CleanCo,company,Staff wages,58212,D,,D|Housekeeping|CleanCo|Staff wages|2025-11
+2025-12-15,expense,Housekeeping,CleanCo,company,Staff wages,56865,D,,D|Housekeeping|CleanCo|Staff wages|2025-12
+2026-01-15,expense,Housekeeping,CleanCo,company,Staff wages,56562,D,,D|Housekeeping|CleanCo|Staff wages|2026-01
+2026-02-15,expense,Housekeeping,CleanCo,company,Staff wages,57581,D,,D|Housekeeping|CleanCo|Staff wages|2026-02
+2026-03-15,expense,Housekeeping,CleanCo,company,Staff wages,58985,D,,D|Housekeeping|CleanCo|Staff wages|2026-03
+2026-04-15,expense,Housekeeping,CleanCo,company,Staff wages,59484,D,,D|Housekeeping|CleanCo|Staff wages|2026-04
+2026-05-15,expense,Housekeeping,CleanCo,company,Staff wages,58618,D,,D|Housekeeping|CleanCo|Staff wages|2026-05
+2026-06-15,expense,Housekeeping,CleanCo,company,Staff wages,57184,D,,D|Housekeeping|CleanCo|Staff wages|2026-06
+2026-07-15,expense,Housekeeping,CleanCo,company,Staff wages,56500,D,,D|Housekeeping|CleanCo|Staff wages|2026-07
+2025-08-15,expense,Housekeeping,CleanCo,company,Cleaning supplies,7500,D,,D|Housekeeping|CleanCo|Cleaning supplies|2025-08
+2025-09-15,expense,Housekeeping,CleanCo,company,Cleaning supplies,8762,D,,D|Housekeeping|CleanCo|Cleaning supplies|2025-09
+2025-10-15,expense,Housekeeping,CleanCo,company,Cleaning supplies,8864,D,,D|Housekeeping|CleanCo|Cleaning supplies|2025-10
+2025-11-15,expense,Housekeeping,CleanCo,company,Cleaning supplies,7712,D,,D|Housekeeping|CleanCo|Cleaning supplies|2025-11
+2025-12-15,expense,Housekeeping,CleanCo,company,Cleaning supplies,6365,D,,D|Housekeeping|CleanCo|Cleaning supplies|2025-12
+2026-01-15,expense,Housekeeping,CleanCo,company,Cleaning supplies,6062,D,,D|Housekeeping|CleanCo|Cleaning supplies|2026-01
+2026-02-15,expense,Housekeeping,CleanCo,company,Cleaning supplies,7081,D,,D|Housekeeping|CleanCo|Cleaning supplies|2026-02
+2026-03-15,expense,Housekeeping,CleanCo,company,Cleaning supplies,8485,D,,D|Housekeeping|CleanCo|Cleaning supplies|2026-03
+2026-04-15,expense,Housekeeping,CleanCo,company,Cleaning supplies,8984,D,,D|Housekeeping|CleanCo|Cleaning supplies|2026-04
+2026-05-15,expense,Housekeeping,CleanCo,company,Cleaning supplies,8118,D,,D|Housekeeping|CleanCo|Cleaning supplies|2026-05
+2026-06-15,expense,Housekeeping,CleanCo,company,Cleaning supplies,6684,D,,D|Housekeeping|CleanCo|Cleaning supplies|2026-06
+2026-07-15,expense,Housekeeping,CleanCo,company,Cleaning supplies,6000,D,,D|Housekeeping|CleanCo|Cleaning supplies|2026-07
+2025-08-15,expense,Petty Cash,Office petty cash,individual,Ad-hoc expenses,6000,D,,D|Petty Cash|Office petty cash|Ad-hoc expenses|2025-08
+2025-09-15,expense,Petty Cash,Office petty cash,individual,Ad-hoc expenses,10628,D,,D|Petty Cash|Office petty cash|Ad-hoc expenses|2025-09
+2025-10-15,expense,Petty Cash,Office petty cash,individual,Ad-hoc expenses,11001,D,,D|Petty Cash|Office petty cash|Ad-hoc expenses|2025-10
+2025-11-15,expense,Petty Cash,Office petty cash,individual,Ad-hoc expenses,6776,D,,D|Petty Cash|Office petty cash|Ad-hoc expenses|2025-11
+2025-12-15,expense,Petty Cash,Office petty cash,individual,Ad-hoc expenses,1838,D,,D|Petty Cash|Office petty cash|Ad-hoc expenses|2025-12
+2026-01-15,expense,Petty Cash,Office petty cash,individual,Ad-hoc expenses,726,D,,D|Petty Cash|Office petty cash|Ad-hoc expenses|2026-01
+2026-02-15,expense,Petty Cash,Office petty cash,individual,Ad-hoc expenses,4463,D,,D|Petty Cash|Office petty cash|Ad-hoc expenses|2026-02
+2026-03-15,expense,Petty Cash,Office petty cash,individual,Ad-hoc expenses,9613,D,,D|Petty Cash|Office petty cash|Ad-hoc expenses|2026-03
+2026-04-15,expense,Petty Cash,Office petty cash,individual,Ad-hoc expenses,11441,D,,D|Petty Cash|Office petty cash|Ad-hoc expenses|2026-04
+2026-05-15,expense,Petty Cash,Office petty cash,individual,Ad-hoc expenses,8267,D,,D|Petty Cash|Office petty cash|Ad-hoc expenses|2026-05
+2026-06-15,expense,Petty Cash,Office petty cash,individual,Ad-hoc expenses,3008,D,,D|Petty Cash|Office petty cash|Ad-hoc expenses|2026-06
+2026-07-15,expense,Petty Cash,Office petty cash,individual,Ad-hoc expenses,500,D,,D|Petty Cash|Office petty cash|Ad-hoc expenses|2026-07
+2025-08-15,income,Maintenance Collections,Monthly maintenance,company,Flat maintenance dues,340000,C,,C|Maintenance Collections|Monthly maintenance|Flat maintenance dues|2025-08
+2025-09-15,income,Maintenance Collections,Monthly maintenance,company,Flat maintenance dues,352622,C,,C|Maintenance Collections|Monthly maintenance|Flat maintenance dues|2025-09
+2025-10-15,income,Maintenance Collections,Monthly maintenance,company,Flat maintenance dues,353639,C,,C|Maintenance Collections|Monthly maintenance|Flat maintenance dues|2025-10
+2025-11-15,income,Maintenance Collections,Monthly maintenance,company,Flat maintenance dues,342117,C,,C|Maintenance Collections|Monthly maintenance|Flat maintenance dues|2025-11
+2025-12-15,income,Maintenance Collections,Monthly maintenance,company,Flat maintenance dues,328648,C,,C|Maintenance Collections|Monthly maintenance|Flat maintenance dues|2025-12
+2026-01-15,income,Maintenance Collections,Monthly maintenance,company,Flat maintenance dues,325616,C,,C|Maintenance Collections|Monthly maintenance|Flat maintenance dues|2026-01
+2026-02-15,income,Maintenance Collections,Monthly maintenance,company,Flat maintenance dues,335809,C,,C|Maintenance Collections|Monthly maintenance|Flat maintenance dues|2026-02
+2026-03-15,income,Maintenance Collections,Monthly maintenance,company,Flat maintenance dues,349855,C,,C|Maintenance Collections|Monthly maintenance|Flat maintenance dues|2026-03
+2026-04-15,income,Maintenance Collections,Monthly maintenance,company,Flat maintenance dues,354840,C,,C|Maintenance Collections|Monthly maintenance|Flat maintenance dues|2026-04
+2026-05-15,income,Maintenance Collections,Monthly maintenance,company,Flat maintenance dues,346182,C,,C|Maintenance Collections|Monthly maintenance|Flat maintenance dues|2026-05
+2026-06-15,income,Maintenance Collections,Monthly maintenance,company,Flat maintenance dues,331840,C,,C|Maintenance Collections|Monthly maintenance|Flat maintenance dues|2026-06
+2026-07-15,income,Maintenance Collections,Monthly maintenance,company,Flat maintenance dues,325000,C,,C|Maintenance Collections|Monthly maintenance|Flat maintenance dues|2026-07
+2025-08-15,income,Other Income,Community Hall,company,Hall rental,18000,C,,C|Other Income|Community Hall|Hall rental|2025-08
+2025-10-15,income,Other Income,Community Hall,company,Hall rental,25274,C,,C|Other Income|Community Hall|Hall rental|2025-10
+2025-11-15,income,Other Income,Community Hall,company,Hall rental,19129,C,,C|Other Income|Community Hall|Hall rental|2025-11
+2025-12-15,income,Other Income,Community Hall,company,Hall rental,11946,C,,C|Other Income|Community Hall|Hall rental|2025-12
+2026-02-15,income,Other Income,Community Hall,company,Hall rental,15765,C,,C|Other Income|Community Hall|Hall rental|2026-02
+2026-03-15,income,Other Income,Community Hall,company,Hall rental,23256,C,,C|Other Income|Community Hall|Hall rental|2026-03
+2026-04-15,income,Other Income,Community Hall,company,Hall rental,25915,C,,C|Other Income|Community Hall|Hall rental|2026-04
+2026-06-15,income,Other Income,Community Hall,company,Hall rental,13648,C,,C|Other Income|Community Hall|Hall rental|2026-06
+2026-07-15,income,Other Income,Community Hall,company,Hall rental,10000,C,,C|Other Income|Community Hall|Hall rental|2026-07
+2025-09-15,income,Other Income,Community Hall,company,Event usage charges,9787,C,,C|Other Income|Community Hall|Event usage charges|2025-09
+2025-11-15,income,Other Income,Community Hall,company,Event usage charges,6635,C,,C|Other Income|Community Hall|Event usage charges|2025-11
+2026-01-15,income,Other Income,Community Hall,company,Event usage charges,1685,C,,C|Other Income|Community Hall|Event usage charges|2026-01
+2026-03-15,income,Other Income,Community Hall,company,Event usage charges,8956,C,,C|Other Income|Community Hall|Event usage charges|2026-03
+2026-05-15,income,Other Income,Community Hall,company,Event usage charges,7855,C,,C|Other Income|Community Hall|Event usage charges|2026-05
+2026-07-15,income,Other Income,Community Hall,company,Event usage charges,1500,C,,C|Other Income|Community Hall|Event usage charges|2026-07
+2025-08-15,income,Other Income,Signage Rental,individual,Billboard fee,12000,C,,C|Other Income|Signage Rental|Billboard fee|2025-08
+2025-09-15,income,Other Income,Signage Rental,individual,Billboard fee,12421,C,,C|Other Income|Signage Rental|Billboard fee|2025-09
+2025-10-15,income,Other Income,Signage Rental,individual,Billboard fee,12455,C,,C|Other Income|Signage Rental|Billboard fee|2025-10
+2025-11-15,income,Other Income,Signage Rental,individual,Billboard fee,12071,C,,C|Other Income|Signage Rental|Billboard fee|2025-11
+2025-12-15,income,Other Income,Signage Rental,individual,Billboard fee,11622,C,,C|Other Income|Signage Rental|Billboard fee|2025-12
+2026-01-15,income,Other Income,Signage Rental,individual,Billboard fee,11521,C,,C|Other Income|Signage Rental|Billboard fee|2026-01
+2026-02-15,income,Other Income,Signage Rental,individual,Billboard fee,11860,C,,C|Other Income|Signage Rental|Billboard fee|2026-02
+2026-03-15,income,Other Income,Signage Rental,individual,Billboard fee,12328,C,,C|Other Income|Signage Rental|Billboard fee|2026-03
+2026-04-15,income,Other Income,Signage Rental,individual,Billboard fee,12495,C,,C|Other Income|Signage Rental|Billboard fee|2026-04
+2026-05-15,income,Other Income,Signage Rental,individual,Billboard fee,12206,C,,C|Other Income|Signage Rental|Billboard fee|2026-05
+2026-06-15,income,Other Income,Signage Rental,individual,Billboard fee,11728,C,,C|Other Income|Signage Rental|Billboard fee|2026-06
+2026-07-15,income,Other Income,Signage Rental,individual,Billboard fee,11500,C,,C|Other Income|Signage Rental|Billboard fee|2026-07

@@ -1,0 +1,548 @@
+import { Link, useRouterState, useNavigate, useSearch } from "@tanstack/react-router";
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { navSections, monthlyTotals, months12, inr, expenseTree, incomeTree } from "@/lib/finance-mock";
+import { getSession, signOut, type Session } from "@/lib/session";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetHeader } from "@/components/ui/sheet";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator,
+} from "@/components/ui/command";
+import { Home, BarChart3, Table2, Menu, ChevronLeft, Printer, Download, LogOut } from "lucide-react";
+
+// ─── Period context ──────────────────────────────────────────────────────
+export type PeriodValue = "month-jul" | "range-3m" | "range-6m" | "range-12m" | "fy";
+const periodConfig: Record<PeriodValue, { label: string; count: number }> = {
+  "month-jul": { label: "Jul 2026 only", count: 1 },
+  "range-3m": { label: "Last 3 months", count: 3 },
+  "range-6m": { label: "Last 6 months", count: 6 },
+  "range-12m": { label: "Last 12 months", count: 12 },
+  "fy": { label: "FY 2025-26", count: 12 },
+};
+type PeriodCtx = {
+  value: PeriodValue;
+  count: number;
+  label: string;
+  sliceMonthly: <T>(arr: T[]) => T[];
+  priorSliceMonthly: <T>(arr: T[]) => T[];
+  view: "chart" | "number";
+  setView: (v: "chart" | "number") => void;
+};
+const Ctx = createContext<PeriodCtx | null>(null);
+export function usePeriod(): PeriodCtx {
+  return useContext(Ctx) ?? {
+    value: "range-12m", count: 12, label: "Last 12 months",
+    sliceMonthly: (a) => a,
+    priorSliceMonthly: () => [],
+    view: "chart", setView: () => {},
+  };
+}
+
+
+function SidebarNav({
+  pathname,
+  persona,
+  switchPersona,
+  onNavigate,
+  session,
+  visibleSections,
+}: {
+  pathname: string;
+  persona: "resident" | "admin";
+  switchPersona: (p: "resident" | "admin") => void;
+  onNavigate?: () => void;
+  session: Session | null;
+  visibleSections: typeof navSections;
+}) {
+  const isAdmin = session?.role === "admin";
+  return (
+    <>
+      <div className="p-5 border-b border-border space-y-3">
+        <Link to="/" onClick={onNavigate} className="flex items-center gap-2 text-sm font-semibold">
+          <Home className="h-4 w-4" />
+          Apartment Finance
+        </Link>
+        {isAdmin && (
+          <div>
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">
+              Viewing as
+            </div>
+            <ToggleGroup
+              type="single"
+              value={persona}
+              onValueChange={(v) => v && (switchPersona(v as "resident" | "admin"), onNavigate?.())}
+              className="w-full grid grid-cols-2"
+              aria-label="Switch persona"
+            >
+              <ToggleGroupItem
+                value="resident"
+                size="sm"
+                className="text-xs data-[state=on]:bg-cyan-500/10 data-[state=on]:text-cyan-700 dark:data-[state=on]:text-cyan-400 data-[state=on]:border-cyan-500/40"
+              >
+                🏠 Resident
+              </ToggleGroupItem>
+              <ToggleGroupItem
+                value="admin"
+                size="sm"
+                className="text-xs data-[state=on]:bg-violet-500/10 data-[state=on]:text-violet-700 dark:data-[state=on]:text-violet-400 data-[state=on]:border-violet-500/40"
+              >
+                🔧 Admin
+              </ToggleGroupItem>
+            </ToggleGroup>
+          </div>
+        )}
+      </div>
+      <nav className="p-3 space-y-6">
+        {visibleSections.map((s) => {
+          const isCurrent = s.tone === persona;
+          const dot = s.tone === "resident" ? "bg-cyan-500" : "bg-violet-500";
+          const activeTint =
+            s.tone === "resident"
+              ? "bg-cyan-500/10 text-cyan-800 dark:text-cyan-300 border-l-2 border-cyan-500"
+              : "bg-violet-500/10 text-violet-800 dark:text-violet-300 border-l-2 border-violet-500";
+          return (
+            <div key={s.label} className={isCurrent ? "" : "opacity-50"}>
+              <div className="px-2 mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                <span className={`h-2 w-2 rounded-full ${dot}`} />
+                {s.label}
+                {isCurrent && (
+                  <span className="ml-auto text-[9px] font-medium text-foreground/70 border border-border rounded px-1">
+                    current
+                  </span>
+                )}
+              </div>
+              <ul className="space-y-1">
+                {s.items.map((it) => {
+                  const active = pathname === it.to;
+                  return (
+                    <li key={it.to}>
+                      <Link
+                        to={it.to}
+                        search={(((prev: any) => ({ period: prev.period, view: prev.view })) as any)}
+                        onClick={onNavigate}
+                        aria-current={active ? "page" : undefined}
+                        className={`block rounded-md px-3 py-2 text-sm transition-colors ${
+                          active
+                            ? `${activeTint} font-medium`
+                            : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"
+                        }`}
+                      >
+                        <div>{it.label}</div>
+                        <div className="text-[10px] font-mono opacity-70">{it.req}</div>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          );
+        })}
+      </nav>
+      {session && (
+        <div className="mt-auto p-4 border-t border-border sticky bottom-0 bg-card">
+          <div className="text-[11px] text-muted-foreground">Signed in as</div>
+          <div className="text-sm font-medium truncate">{session.name}</div>
+          <div className="text-[11px] font-mono text-muted-foreground truncate">{session.email}</div>
+          <div className="mt-1"><Badge variant="outline" className="text-[10px] capitalize">{session.role}</Badge></div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-3 w-full"
+            onClick={() => { signOut(); onNavigate?.(); }}
+          >
+            <LogOut className="h-3.5 w-3.5 mr-1" /> Sign out
+          </Button>
+        </div>
+      )}
+    </>
+  );
+}
+
+
+function downloadCSV(period: PeriodCtx, title: string) {
+  const rows = period.sliceMonthly(monthlyTotals);
+  const header = ["Month", "Collection (INR)", "Expense (INR)", "Net (INR)"];
+  const body = rows.map((r) => [r.month, r.collection, r.expense, r.net]);
+  const csv = [header, ...body].map((r) => r.join(",")).join("\n");
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  a.href = url;
+  a.download = `${slug}-${period.value}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ⌘K palette — jump to any screen, head, category, or vendor
+function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
+  const navigate = useNavigate();
+  const go = (opts: Parameters<typeof navigate>[0]) => {
+    onOpenChange(false);
+    navigate(opts);
+  };
+  return (
+    <CommandDialog open={open} onOpenChange={onOpenChange}>
+      <CommandInput placeholder="Jump to a screen, head, category, or vendor…" />
+      <CommandList>
+        <CommandEmpty>No matches.</CommandEmpty>
+        {navSections.map((s) => (
+          <CommandGroup key={s.label} heading={s.label}>
+            {s.items.map((it) => (
+              <CommandItem
+                key={it.to}
+                value={`${s.label} ${it.label} ${it.req}`}
+                onSelect={() => go({ to: it.to, search: ((prev: any) => ({ period: prev.period, view: prev.view })) as any })}
+              >
+                <span className={`mr-2 h-2 w-2 rounded-full ${s.tone === "resident" ? "bg-cyan-500" : "bg-violet-500"}`} />
+                <span>{it.label}</span>
+                <span className="ml-auto text-[10px] font-mono opacity-60">{it.req}</span>
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        ))}
+        <CommandSeparator />
+        <CommandGroup heading="Drill into expense">
+          {expenseTree.map((c) => (
+            <CommandItem
+              key={`e-${c.name}`}
+              value={`expense ${c.name}`}
+              onSelect={() => go({ to: "/resident/drilldown", search: ((prev: any) => ({ ...prev, head: "expense", category: c.name, vendor: undefined, line: undefined })) as any })}
+            >
+              <span className="text-xs text-rose-500 mr-2">expense</span>
+              {c.name}
+            </CommandItem>
+          ))}
+        </CommandGroup>
+        <CommandGroup heading="Drill into income">
+          {incomeTree.map((c) => (
+            <CommandItem
+              key={`i-${c.name}`}
+              value={`income ${c.name}`}
+              onSelect={() => go({ to: "/resident/drilldown", search: ((prev: any) => ({ ...prev, head: "income", category: c.name, vendor: undefined, line: undefined })) as any })}
+            >
+              <span className="text-xs text-emerald-500 mr-2">income</span>
+              {c.name}
+            </CommandItem>
+          ))}
+        </CommandGroup>
+        <CommandGroup heading="Vendors">
+          {expenseTree.flatMap((c) => c.vendors.map((v) => ({ v, c }))).map(({ v, c }) => (
+            <CommandItem
+              key={v.name}
+              value={`vendor ${v.name} ${c.name}`}
+              onSelect={() => go({ to: "/resident/drilldown", search: ((prev: any) => ({ ...prev, head: "expense", category: c.name, vendor: v.name, line: undefined })) as any })}
+            >
+              <span className="text-xs text-muted-foreground mr-2">{c.name}</span>
+              {v.name}
+            </CommandItem>
+          ))}
+        </CommandGroup>
+      </CommandList>
+    </CommandDialog>
+  );
+}
+
+export function PortalShell({
+  title,
+  reqIds,
+  persona,
+  children,
+  showViewToggle = true,
+}: {
+  title: string;
+  reqIds: string;
+  persona: "resident" | "admin";
+  children: ReactNode;
+  showViewToggle?: boolean;
+}) {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const navigate = useNavigate();
+  const search = useSearch({ strict: false }) as { period?: string; view?: string };
+  const period = (search.period as PeriodValue) in periodConfig ? (search.period as PeriodValue) : "range-6m";
+  const view: "chart" | "number" = search.view === "number" ? "number" : "chart";
+  const setPeriod = (v: PeriodValue) => navigate({ to: pathname, search: (((prev: any) => ({ ...prev, period: v })) as any), replace: false });
+  const setView = (v: "chart" | "number") => navigate({ to: pathname, search: (((prev: any) => ({ ...prev, view: v })) as any), replace: true });
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setPaletteOpen((v) => !v);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  const periodCtx = useMemo<PeriodCtx>(() => {
+    const { count, label } = periodConfig[period];
+    return {
+      value: period,
+      count,
+      label,
+      sliceMonthly: <T,>(arr: T[]) => (count >= arr.length ? arr : arr.slice(-count)),
+      priorSliceMonthly: <T,>(arr: T[]) => {
+        if (count >= arr.length) return [];
+        const end = arr.length - count;
+        const start = Math.max(0, end - count);
+        return arr.slice(start, end);
+      },
+      view,
+      setView,
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [period, view]);
+
+
+  // ── Session-driven RBAC: residents never see admin sections. Admins see both
+  // and can flip persona via the sidebar toggle to preview the resident view.
+  const [session, setSession] = useState<Session | null>(null);
+  useEffect(() => {
+    const refresh = () => setSession(getSession());
+    refresh();
+    window.addEventListener("apf-session-change", refresh);
+    window.addEventListener("storage", refresh);
+    return () => {
+      window.removeEventListener("apf-session-change", refresh);
+      window.removeEventListener("storage", refresh);
+    };
+  }, []);
+  const isAdmin = session?.role === "admin";
+  const visibleNavSections = isAdmin
+    ? navSections
+    : navSections.filter((s) => s.tone === "resident");
+
+  const personaSections = visibleNavSections.filter((s) => s.tone === persona);
+  const personaItems = personaSections.flatMap((s) => s.items);
+  const accent = persona === "resident"
+    ? "border-cyan-500 text-cyan-700 dark:text-cyan-400"
+    : "border-violet-500 text-violet-700 dark:text-violet-400";
+
+  const residentFirst = navSections.find((s) => s.tone === "resident")?.items[0]?.to ?? "/";
+  const adminFirst = navSections.find((s) => s.tone === "admin")?.items[0]?.to ?? "/";
+  const switchPersona = (next: "resident" | "admin") => {
+    if (next === persona) return;
+    if (next === "admin" && !isAdmin) return; // guard: residents cannot become admin
+    const currentIdx = personaItems.findIndex((it) => it.to === pathname);
+    const otherItems = navSections.filter((s) => s.tone === next).flatMap((s) => s.items);
+    const target = otherItems[currentIdx]?.to ?? (next === "resident" ? residentFirst : adminFirst);
+    navigate({ to: target as string, search: ((prev: any) => ({ period: prev.period, view: prev.view })) as any });
+  };
+
+  return (
+    <Ctx.Provider value={periodCtx}>
+    <TooltipProvider delayDuration={200}>
+    <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
+    <div className="min-h-screen bg-background text-foreground">
+      <aside className="hidden lg:flex lg:flex-col fixed inset-y-0 left-0 w-64 border-r border-border bg-card overflow-y-auto no-print">
+        <SidebarNav pathname={pathname} persona={persona} switchPersona={switchPersona} session={session} visibleSections={visibleNavSections} />
+      </aside>
+
+      <main className="lg:pl-64">
+        <header className="sticky top-0 z-10 border-b border-border bg-background/80 backdrop-blur no-print">
+          <div className="px-4 sm:px-8 pt-2 sm:pt-3 flex items-center justify-between gap-2 text-xs">
+            <Link to="/" className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors">
+              <ChevronLeft className="h-3.5 w-3.5" /> All screens
+            </Link>
+            <span className="text-muted-foreground truncate hidden sm:inline">
+              Viewing: <span className="text-foreground">{periodCtx.label}</span>
+            </span>
+          </div>
+          <div className="px-4 sm:px-8 py-2 sm:py-3 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 sm:gap-4">
+            <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+              <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="icon" className="lg:hidden shrink-0" aria-label="Open navigation menu">
+                    <Menu className="h-5 w-5" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="left" className="p-0 w-72 overflow-y-auto">
+                  <SheetHeader className="sr-only">
+                    <SheetTitle>Navigation</SheetTitle>
+                  </SheetHeader>
+                  <SidebarNav
+                    pathname={pathname}
+                    persona={persona}
+                    switchPersona={switchPersona}
+                    session={session}
+                    visibleSections={visibleNavSections}
+                    onNavigate={() => setMobileOpen(false)}
+                  />
+                </SheetContent>
+              </Sheet>
+              <h1 className="sr-only">{title}</h1>
+            </div>
+            <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+              {/* Persona switcher: admin-only, visible md–lg (no sidebar yet) */}
+              {isAdmin && (
+                <div className="hidden md:flex lg:hidden items-center gap-2" role="group" aria-label="Viewing as persona">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Mode</span>
+                  <ToggleGroup
+                    type="single"
+                    value={persona}
+                    onValueChange={(v) => v && switchPersona(v as "resident" | "admin")}
+                    aria-label="Switch persona"
+                  >
+                    <ToggleGroupItem value="resident" size="sm" aria-label="View as Resident" className="text-xs data-[state=on]:bg-cyan-500/10 data-[state=on]:text-cyan-700 dark:data-[state=on]:text-cyan-400">
+                      🏠 Resident
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="admin" size="sm" aria-label="View as Admin" className="text-xs data-[state=on]:bg-violet-500/10 data-[state=on]:text-violet-700 dark:data-[state=on]:text-violet-400">
+                      🔧 Admin
+                    </ToggleGroupItem>
+                  </ToggleGroup>
+                </div>
+              )}
+              <Select value={period} onValueChange={(v) => setPeriod(v as PeriodValue)}>
+                <SelectTrigger className="w-[130px] sm:w-[180px]"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {(Object.keys(periodConfig) as PeriodValue[]).map((k) => (
+                    <SelectItem key={k} value={k}>{periodConfig[k].label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {showViewToggle && (
+                <ToggleGroup type="single" value={view} onValueChange={(v) => v && setView(v as "chart" | "number")}>
+                  <ToggleGroupItem value="chart" size="sm" aria-label="Chart view">
+                    <BarChart3 className="h-4 w-4" />
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="number" size="sm" aria-label="Number view">
+                    <Table2 className="h-4 w-4" />
+                  </ToggleGroupItem>
+                </ToggleGroup>
+              )}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="icon" className="hidden sm:inline-flex" aria-label="Export CSV" onClick={() => downloadCSV(periodCtx, title)}>
+                    <Download className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">Export monthly totals as CSV</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="icon" className="hidden sm:inline-flex" aria-label="Print" onClick={() => window.print()}>
+                    <Printer className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">Print / save as PDF</TooltipContent>
+              </Tooltip>
+            </div>
+          </div>
+          <div className="px-4 sm:hidden pb-3 space-y-2">
+            {isAdmin && (
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground shrink-0">Mode</span>
+                <ToggleGroup
+                  type="single"
+                  value={persona}
+                  onValueChange={(v) => v && switchPersona(v as "resident" | "admin")}
+                  className="flex-1 grid grid-cols-2"
+                  aria-label="Switch persona"
+                >
+                  <ToggleGroupItem value="resident" size="sm" aria-label="View as Resident" className="text-xs data-[state=on]:bg-cyan-500/10 data-[state=on]:text-cyan-700 dark:data-[state=on]:text-cyan-400 data-[state=on]:border-cyan-500/40">
+                    🏠 Resident
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="admin" size="sm" aria-label="View as Admin" className="text-xs data-[state=on]:bg-violet-500/10 data-[state=on]:text-violet-700 dark:data-[state=on]:text-violet-400 data-[state=on]:border-violet-500/40">
+                    🔧 Admin
+                  </ToggleGroupItem>
+                </ToggleGroup>
+              </div>
+            )}
+            <Select
+              value={personaItems.find((it) => it.to === pathname)?.to ?? ""}
+              onValueChange={(to) => {
+                if (to && to !== pathname) navigate({ to: to as string, search: ((prev: any) => ({ period: prev.period, view: prev.view })) as any });
+              }}
+            >
+              <SelectTrigger className="w-full" aria-label={`Jump to ${persona} section`}>
+                <SelectValue placeholder="Jump to section" />
+              </SelectTrigger>
+              <SelectContent>
+                {personaSections.map((section) => (
+                  <div key={section.label}>
+                    {personaSections.length > 1 && (
+                      <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                        {section.label}
+                      </div>
+                    )}
+                    {section.items.map((it) => (
+                      <SelectItem key={it.to} value={it.to}>
+                        {it.label}
+                        <span className="ml-2 text-[10px] font-mono opacity-60">{it.req}</span>
+                      </SelectItem>
+                    ))}
+                  </div>
+                ))}
+              </SelectContent>
+            </Select>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" className="flex-1" onClick={() => downloadCSV(periodCtx, title)}>
+                <Download className="h-3.5 w-3.5 mr-1" /> CSV
+              </Button>
+              <Button variant="outline" size="sm" className="flex-1" onClick={() => window.print()}>
+                <Printer className="h-3.5 w-3.5 mr-1" /> Print
+              </Button>
+            </div>
+          </div>
+          <nav className="hidden sm:flex px-4 sm:px-8 items-center gap-1 overflow-x-auto scrollbar-none" aria-label={`${persona} sections`}>
+            {personaSections.map((section, si) => (
+              <div key={section.label} className="flex items-center gap-1">
+                {si > 0 && (
+                  <>
+                    <span className="mx-2 h-4 w-px bg-border" aria-hidden />
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap mr-1">
+                      {section.group === "controls" ? "Controls" : "Dashboards"}
+                    </span>
+                  </>
+                )}
+                {section.items.map((it) => {
+                  const active = pathname === it.to;
+                  const activeBg = persona === "resident" ? "bg-cyan-500/5" : "bg-violet-500/5";
+                  return (
+                    <Link
+                      key={it.to}
+                      to={it.to}
+                      search={(((prev: any) => ({ period: prev.period, view: prev.view })) as any)}
+                      aria-current={active ? "page" : undefined}
+                      className={`whitespace-nowrap px-3 py-2 -mb-px border-b-2 text-sm transition-colors ${
+                        active
+                          ? `${accent} ${activeBg} font-medium`
+                          : "border-transparent text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {it.label}
+                    </Link>
+                  );
+                })}
+              </div>
+            ))}
+          </nav>
+        </header>
+        <div className="print-header hidden">
+          <h1 className="text-2xl font-semibold">{title}</h1>
+          <p className="text-sm text-muted-foreground font-mono">{reqIds} · {periodCtx.label}</p>
+        </div>
+        <div className="p-4 sm:p-8 space-y-6 max-w-[1400px]">{children}</div>
+      </main>
+    </div>
+    </TooltipProvider>
+    </Ctx.Provider>
+  );
+}
+
+export function EmptyLink({ to, children }: { to: string; children: ReactNode }) {
+  return (
+    <Button asChild variant="link" className="px-0">
+      <Link to={to}>{children}</Link>
+    </Button>
+  );
+}
+
+// Re-export helpers callers may want.
+export { monthlyTotals, months12, inr };

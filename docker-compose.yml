@@ -1,0 +1,109 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: apartment_finance
+      POSTGRES_USER: apf
+      POSTGRES_PASSWORD: apf
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports: ["5442:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U apf -d apartment_finance"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    restart: unless-stopped
+    ports: ["1035:1025", "8035:8025"]
+
+  migrate:
+    build: ./backend
+    command: ["sh", "./docker-entrypoint.sh", "migrate"]
+    environment:
+      DATABASE_URL: postgres://apf:apf@db:5432/apartment_finance
+      SEED_ON_MIGRATE: "true"
+      SUPERADMIN_EMAIL: admin@example.com
+    depends_on:
+      db: { condition: service_healthy }
+
+  seed:
+    # Idempotent: seed.ts exits early if a community row already exists,
+    # so this is safe to re-run on every `docker compose up`.
+    build: ./backend
+    command: ["sh", "./docker-entrypoint.sh", "seed"]
+    environment:
+      DATABASE_URL: postgres://apf:apf@db:5432/apartment_finance
+      SUPERADMIN_EMAIL: admin@example.com
+      SUPERADMIN_PASSWORD: ChangeMe!2026
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      db: { condition: service_healthy }
+    restart: "no"
+
+
+  api:
+    build: ./backend
+    command: ["sh", "./docker-entrypoint.sh", "server"]
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://apf:apf@db:5432/apartment_finance
+      JWT_SECRET: dev-jwt-secret-change-me
+      SMTP_HOST: mailhog
+      SMTP_PORT: 1025
+      APP_URL: http://localhost:8090
+      SUPERADMIN_EMAIL: admin@example.com
+      AUTH_ENABLED: "true"
+      NODE_ENV: production
+    ports: ["4010:4000"]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      db: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:4000/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  ssr:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+      target: ssr
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      HOST: "0.0.0.0"
+    depends_on:
+      api: { condition: service_started }
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  web:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+      target: web
+    restart: unless-stopped
+    ports: ["8090:80"]
+    depends_on:
+      ssr: { condition: service_started }
+      api: { condition: service_started }
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost/health >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 10s
+
+volumes:
+  pgdata:
