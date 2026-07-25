@@ -1,13 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
-import { PortalShell } from "@/components/portal-shell";
+import { PortalShell, usePeriod } from "@/components/portal-shell";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, Bar, CartesianGrid, ComposedChart, Line, ResponsiveContainer, XAxis, YAxis, Legend } from "recharts";
 import { SmartTooltipContent, getTooltipTrigger } from "@/components/smart-tooltip";
-import { inr, pct, months12, categoryMonthly, type Category } from "@/lib/finance-mock";
+import { inr, pct, categoryMonthly, total, type Category } from "@/lib/finance-mock";
 import { TrendingUp, TrendingDown, AlertTriangle } from "lucide-react";
 import { NoDbData } from "@/components/mock-gate";
 import { useExpenseTree } from "@/lib/hooks";
@@ -17,22 +17,26 @@ export const Route = createFileRoute("/admin/alerts")({
   head: () => ({ meta: [{ title: "Admin · Cost Alerts & Trends" }] }),
 });
 
-function deriveAnalytics(tree: Category[]) {
+function deriveAnalytics(
+  tree: Category[],
+  sliceMonthly: <T>(arr: T[]) => T[],
+  priorSliceMonthly: <T>(arr: T[]) => T[],
+) {
   const momChanges = tree.map((c) => {
     const m = categoryMonthly(c);
-    const cur = m[m.length - 1] ?? 0;
-    const prev = m[m.length - 2] || 1;
-    const change = ((cur - prev) / prev) * 100;
-    const prevPeriod = (m.slice(0, -1).reduce((s, n) => s + n, 0)) / Math.max(1, m.length - 1);
-    const periodChange = prevPeriod ? ((cur - prevPeriod) / prevPeriod) * 100 : 0;
+    const cur = total(sliceMonthly(m));
+    const prev = total(priorSliceMonthly(m));
+    const change = prev ? ((cur - prev) / Math.abs(prev)) * 100 : 0;
+    const periodChange = change;
     return { category: c.name, current: cur, previous: prev, change, periodChange };
   });
   const anomalies = tree
     .map((c) => {
       const m = categoryMonthly(c);
-      const cur = m[m.length - 1] ?? 0;
-      const prev3 = m.slice(-4, -1);
-      const avg = prev3.reduce((s, n) => s + n, 0) / 3;
+      const currentSlice = sliceMonthly(m);
+      const cur = currentSlice[currentSlice.length - 1] ?? 0;
+      const prev3 = [...priorSliceMonthly(m), ...currentSlice.slice(0, -1)].slice(-3);
+      const avg = prev3.length ? prev3.reduce((s, n) => s + n, 0) / prev3.length : 0;
       const ratio = cur / (avg || 1);
       return { category: c.name, cur, avg, ratio };
     })
@@ -42,31 +46,41 @@ function deriveAnalytics(tree: Category[]) {
 }
 
 function Page() {
+  return (
+    <PortalShell title="Cost trend & anomaly alerts" reqIds="AD-01 · AD-02 · AD-03 · AD-04 · AD-05" persona="admin">
+      <Inner />
+    </PortalShell>
+  );
+}
+
+function Inner() {
   const { data: expenseTree = [], isLoading } = useExpenseTree();
+  const { sliceMonthly, priorSliceMonthly, labels } = usePeriod();
   const [selected, setSelected] = useState<string | null>(null);
-  const { momChanges, anomalies } = useMemo(() => deriveAnalytics(expenseTree), [expenseTree]);
+  const { momChanges, anomalies } = useMemo(
+    () => deriveAnalytics(expenseTree, sliceMonthly, priorSliceMonthly),
+    [expenseTree, sliceMonthly, priorSliceMonthly],
+  );
 
   const activeName = selected ?? expenseTree[0]?.name ?? null;
   const cat = expenseTree.find((c) => c.name === activeName);
 
   if (!isLoading && expenseTree.length === 0) {
     return (
-      <PortalShell title="Cost trend & anomaly alerts" reqIds="AD-01 · AD-02 · AD-03 · AD-04 · AD-05" persona="admin">
-        <NoDbData note="Cost alerts and MoM changes require at least two months of expense data." />
-      </PortalShell>
+      <NoDbData note="Cost alerts and MoM changes require at least two months of expense data." />
     );
   }
 
-  const monthly = cat ? categoryMonthly(cat) : new Array(months12.length).fill(0);
+  const monthly = cat ? sliceMonthly(categoryMonthly(cat)) : new Array(labels.length).fill(0);
   const sma = monthly.map((_, i) => {
     const slice = monthly.slice(Math.max(0, i - 2), i + 1);
     return slice.reduce((s, n) => s + n, 0) / slice.length;
   });
-  const chartData = months12.map((m, i) => ({ month: m, value: monthly[i], sma: Math.round(sma[i]) }));
+  const chartData = labels.map((m, i) => ({ month: m, value: monthly[i], sma: Math.round(sma[i]) }));
   const rising = momChanges.filter((c) => c.periodChange > 15).sort((a, b) => b.periodChange - a.periodChange);
 
   return (
-    <PortalShell title="Cost trend & anomaly alerts" reqIds="AD-01 · AD-02 · AD-03 · AD-04 · AD-05" persona="admin">
+    <>
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
@@ -130,7 +144,7 @@ function Page() {
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
               <CardTitle className="text-base">Category trend · AD-03</CardTitle>
-              <CardDescription>12-month spend with 3-month moving average</CardDescription>
+              <CardDescription>Selected-period spend with 3-month moving average</CardDescription>
             </div>
             <Select value={activeName ?? undefined} onValueChange={setSelected}>
               <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
@@ -165,8 +179,8 @@ function Page() {
             <TableHeader>
               <TableRow>
                 <TableHead>Category</TableHead>
-                <TableHead className="text-right">Previous month</TableHead>
-                <TableHead className="text-right">Current month</TableHead>
+                <TableHead className="text-right">Previous period</TableHead>
+                <TableHead className="text-right">Current period</TableHead>
                 <TableHead className="text-right">MoM change</TableHead>
               </TableRow>
             </TableHeader>
@@ -194,6 +208,6 @@ function Page() {
           </Table>
         </CardContent>
       </Card>
-    </PortalShell>
+    </>
   );
 }

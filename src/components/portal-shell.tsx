@@ -14,18 +14,100 @@ import {
 import { Home, BarChart3, Table2, Menu, ChevronLeft, Printer, Download, LogOut } from "lucide-react";
 
 // ─── Period context ──────────────────────────────────────────────────────
-export type PeriodValue = "month-jul" | "range-3m" | "range-6m" | "range-12m" | "fy";
-const periodConfig: Record<PeriodValue, { label: string; count: number }> = {
-  "month-jul": { label: "Jul 2026 only", count: 1 },
+export type PeriodValue = "month-prev" | "range-3m" | "range-6m" | "range-12m" | "fy";
+
+// Format like "Jul '26" — matches finance-mock months12 and hooks.isoMonthToLabel
+const MONTH_ABBRS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+function fmtMonthLabel(d: Date): string {
+  const mon = MONTH_ABBRS[d.getMonth()] ?? "Jan";
+  return `${mon} '${String(d.getFullYear()).slice(-2)}`;
+}
+function parseMonthLabel(label: string): Date | null {
+  // "Jul '26" → 2026-07
+  const m = /^([A-Za-z]{3})\s'(\d{2})$/.exec(label ?? "");
+  if (!m) return null;
+  const monthIdx = MONTH_ABBRS.indexOf(m[1]);
+  if (monthIdx < 0) return null;
+  return new Date(2000 + Number(m[2]), monthIdx, 1);
+}
+
+// Dynamic reference date — "current month - 1" is the default reporting anchor.
+const NOW = new Date();
+const PREV_MONTH = new Date(NOW.getFullYear(), NOW.getMonth() - 1, 1);
+const PREV_LABEL = fmtMonthLabel(PREV_MONTH);
+// Indian FY runs Apr → Mar
+function fiscalStartYearFor(d: Date): number {
+  return d.getMonth() >= 3 ? d.getFullYear() : d.getFullYear() - 1;
+}
+const FY_START_YEAR = fiscalStartYearFor(PREV_MONTH);
+const FY_START = new Date(FY_START_YEAR, 3, 1);
+const FY_END = new Date(FY_START_YEAR + 1, 2, 31);
+const FY_LABEL = `FY ${FY_START_YEAR}-${String(FY_START_YEAR + 1).slice(-2)}`;
+
+type PeriodMeta = { label: string; count: number };
+const periodConfig: Record<PeriodValue, PeriodMeta> = {
+  "month-prev": { label: `${PREV_LABEL} only`, count: 1 },
   "range-3m": { label: "Last 3 months", count: 3 },
   "range-6m": { label: "Last 6 months", count: 6 },
   "range-12m": { label: "Last 12 months", count: 12 },
-  "fy": { label: "FY 2025-26", count: 12 },
+  "fy": { label: FY_LABEL, count: 12 },
 };
+
+function labelForItem(x: unknown, i: number, fallback: string[]): string {
+  if (x && typeof x === "object" && "month" in (x as any) && typeof (x as any).month === "string") {
+    return (x as any).month as string;
+  }
+  return fallback[i] ?? "";
+}
+
+function anchorIndex(labels: string[]): number {
+  if (labels.length === 0) return -1;
+  const exact = labels.indexOf(PREV_LABEL);
+  if (exact >= 0) return exact;
+
+  const prevTime = PREV_MONTH.getTime();
+  let best = -1;
+  let bestTime = Number.NEGATIVE_INFINITY;
+  labels.forEach((label, i) => {
+    const d = parseMonthLabel(label);
+    if (!d) return;
+    const t = d.getTime();
+    if (t <= prevTime && t > bestTime) {
+      best = i;
+      bestTime = t;
+    }
+  });
+  return best >= 0 ? best : labels.length - 1;
+}
+
+function selectIndices(period: PeriodValue, labels: string[]): number[] {
+  const anchor = anchorIndex(labels);
+  if (anchor < 0) return [];
+
+  if (period === "fy") {
+    const anchorDate = parseMonthLabel(labels[anchor]) ?? PREV_MONTH;
+    const fyStartYear = fiscalStartYearFor(anchorDate);
+    const fyStart = new Date(fyStartYear, 3, 1);
+    const fyEnd = new Date(fyStartYear + 1, 2, 31);
+    return labels
+      .map((l, i) => ({ i, d: parseMonthLabel(l) }))
+      .filter(({ d }) => d && d >= fyStart && d <= fyEnd && d <= anchorDate)
+      .map(({ i }) => i);
+  }
+  if (period === "month-prev") {
+    return [anchor];
+  }
+  const count = periodConfig[period].count;
+  const start = Math.max(0, anchor - count + 1);
+  return labels.slice(start, anchor + 1).map((_, i) => start + i);
+}
+
 type PeriodCtx = {
   value: PeriodValue;
   count: number;
   label: string;
+  labels: string[];               // month labels within selected period (fallback: months12)
+  activeLabels: string[];
   sliceMonthly: <T>(arr: T[]) => T[];
   priorSliceMonthly: <T>(arr: T[]) => T[];
   view: "chart" | "number";
@@ -35,6 +117,8 @@ const Ctx = createContext<PeriodCtx | null>(null);
 export function usePeriod(): PeriodCtx {
   return useContext(Ctx) ?? {
     value: "range-12m", count: 12, label: "Last 12 months",
+    labels: months12,
+    activeLabels: months12,
     sliceMonthly: (a) => a,
     priorSliceMonthly: () => [],
     view: "chart", setView: () => {},
@@ -282,16 +366,25 @@ export function PortalShell({
 
   const periodCtx = useMemo<PeriodCtx>(() => {
     const { count, label } = periodConfig[period];
+    const labelsInPeriod = selectIndices(period, months12).map((i) => months12[i]);
     return {
       value: period,
       count,
       label,
-      sliceMonthly: <T,>(arr: T[]) => (count >= arr.length ? arr : arr.slice(-count)),
-      priorSliceMonthly: <T,>(arr: T[]) => {
-        if (count >= arr.length) return [];
-        const end = arr.length - count;
-        const start = Math.max(0, end - count);
-        return arr.slice(start, end);
+      labels: labelsInPeriod,
+      activeLabels: labelsInPeriod,
+      sliceMonthly: <T,>(arr: T[]): T[] => {
+        const derivedLabels = arr.map((x, i) => labelForItem(x, i, months12));
+        const idxs = selectIndices(period, derivedLabels);
+        return idxs.map((i) => arr[i]);
+      },
+      priorSliceMonthly: <T,>(arr: T[]): T[] => {
+        const derivedLabels = arr.map((x, i) => labelForItem(x, i, months12));
+        const idxs = selectIndices(period, derivedLabels);
+        if (idxs.length === 0) return [];
+        const first = idxs[0];
+        const start = Math.max(0, first - idxs.length);
+        return arr.slice(start, first);
       },
       view,
       setView,

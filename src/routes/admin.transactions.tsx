@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { PortalShell } from "@/components/portal-shell";
+import { PortalShell, usePeriod } from "@/components/portal-shell";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -32,20 +32,35 @@ const emptyDraft: Omit<TxnRow, "id" | "source"> = {
 };
 
 function Page() {
+  return (
+    <PortalShell title="Transactions" reqIds="AC-01 · AC-02 · AC-03 · AC-04 · AC-05" persona="admin">
+      <Inner />
+    </PortalShell>
+  );
+}
+
+function Inner() {
+  const { activeLabels, label } = usePeriod();
   const { data: fetched = [] } = useAdminTransactions();
   const [localOverride, setLocalOverride] = useState<TxnRow[] | null>(null);
   const rows = localOverride ?? fetched;
   const setRows = (updater: (prev: TxnRow[]) => TxnRow[]) => setLocalOverride(updater(rows));
   const [q, setQ] = useState("");
-  const [month, setMonth] = useState<string>("all");
+  const [month, setMonth] = useState<string>("period");
   const [head, setHead] = useState<string>("all");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<TxnRow | null>(null);
   const [draft, setDraft] = useState<Omit<TxnRow, "id" | "source">>(emptyDraft);
 
+  const monthOptions = useMemo(
+    () => Array.from(new Set([...activeLabels, ...rows.map((r) => r.month)])).filter(Boolean),
+    [activeLabels, rows],
+  );
+
   const filtered = useMemo(() => {
     return rows.filter((r) => {
-      if (month !== "all" && r.month !== month) return false;
+      if (month === "period" && !activeLabels.includes(r.month)) return false;
+      if (month !== "all" && month !== "period" && r.month !== month) return false;
       if (head !== "all" && r.head !== head) return false;
       if (q) {
         const s = q.toLowerCase();
@@ -53,7 +68,7 @@ function Page() {
       }
       return true;
     }).sort((a, b) => (a.date < b.date ? 1 : -1));
-  }, [rows, q, month, head]);
+  }, [rows, q, month, head, activeLabels]);
 
   const totals = useMemo(() => {
     const inc = filtered.filter((r) => r.head === "income").reduce((s, r) => s + r.amount, 0);
@@ -88,7 +103,7 @@ function Page() {
   const catObj = treeForHead.find((c) => c.name === draft.category) ?? treeForHead[0];
 
   return (
-    <PortalShell title="Transactions" reqIds="AC-01 · AC-02 · AC-03 · AC-04 · AC-05" persona="admin">
+    <>
       <Card>
         <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -106,8 +121,9 @@ function Page() {
             <Select value={month} onValueChange={setMonth}>
               <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
               <SelectContent>
+                <SelectItem value="period">Current period · {label}</SelectItem>
                 <SelectItem value="all">All months</SelectItem>
-                {months12.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                {monthOptions.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
               </SelectContent>
             </Select>
             <Select value={head} onValueChange={setHead}>
@@ -203,7 +219,7 @@ function Page() {
             <Field label="Month">
               <Select value={draft.month} onValueChange={(v) => setDraft({ ...draft, month: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{months12.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
+                <SelectContent>{monthOptions.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
               </Select>
             </Field>
             <Field label="Notes" className="sm:col-span-2"><Input value={draft.notes ?? ""} onChange={(e) => setDraft({ ...draft, notes: e.target.value })} /></Field>
@@ -214,7 +230,7 @@ function Page() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </PortalShell>
+    </>
   );
 }
 

@@ -1,13 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { PortalShell } from "@/components/portal-shell";
+import { PortalShell, usePeriod } from "@/components/portal-shell";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid } from "recharts";
 import { SmartTooltipContent, getTooltipTrigger } from "@/components/smart-tooltip";
-import { inr, categoryMonthly, months12, total } from "@/lib/finance-mock";
-import { useIncomeTree } from "@/lib/hooks";
+import { inr, categoryMonthly, total } from "@/lib/finance-mock";
+import { useIncomeTree, useMonthlyTotals } from "@/lib/hooks";
 import { Lightbulb } from "lucide-react";
 
 export const Route = createFileRoute("/admin/income")({
@@ -16,19 +16,31 @@ export const Route = createFileRoute("/admin/income")({
 });
 
 function Page() {
+  return (
+    <PortalShell title="Income optimisation insights" reqIds="AD-30 · AD-31 · AD-32 · AD-33" persona="admin">
+      <Inner />
+    </PortalShell>
+  );
+}
+
+function Inner() {
   const { data: incomeTree = [] } = useIncomeTree();
+  const { data: monthlyTotals = [] } = useMonthlyTotals();
+  const { sliceMonthly, labels } = usePeriod();
   const rows = incomeTree.flatMap((c) =>
     c.vendors.flatMap((v) =>
       v.items.map((it) => {
-        const t = total(it.monthly);
-        const active = it.monthly.filter((n) => n > 0).length;
+        const monthly = sliceMonthly(it.monthly);
+        const t = total(monthly);
+        const active = monthly.filter((n) => n > 0).length;
+        const recent = monthly.slice(-Math.min(3, monthly.length));
         return {
           category: c.name,
           source: it.name,
           total: t,
           active,
-          irregular: active < months12.length && active > 0,
-          dropped: it.monthly.slice(-3).every((n) => n === 0) && active > 0,
+          irregular: active < labels.length && active > 0,
+          dropped: recent.length > 0 && recent.every((n) => n === 0) && active > 0,
         };
       }),
     ),
@@ -36,16 +48,21 @@ function Page() {
   const totalIncome = rows.reduce((s, r) => s + r.total, 0);
 
   // AD-31 coverage trend (illustrative): income / expense per month
-  const coverage = months12.map((m, i) => {
-    const inc = incomeTree.reduce((s, c) => s + categoryMonthly(c)[i], 0);
-    const exp = 260000 + i * 1500;
-    return { month: m, ratio: Math.round((inc / exp) * 100) };
+  const monthlyIncome = sliceMonthly(incomeTree.reduce<number[]>((acc, c) => {
+    const monthly = categoryMonthly(c);
+    return monthly.map((n, i) => (acc[i] ?? 0) + n);
+  }, []));
+  const monthlyExpense = sliceMonthly(monthlyTotals.map((m) => m.expense));
+  const coverage = labels.map((m, i) => {
+    const inc = monthlyIncome[i] ?? 0;
+    const exp = monthlyExpense[i] ?? 0;
+    return { month: m, ratio: exp ? Math.round((inc / exp) * 100) : 0 };
   });
 
   const irregular = rows.filter((r) => r.irregular || r.dropped);
 
   return (
-    <PortalShell title="Income optimisation insights" reqIds="AD-30 · AD-31 · AD-32 · AD-33" persona="admin">
+    <>
       {/* AD-30 */}
       <Card>
         <CardHeader>
@@ -117,7 +134,7 @@ function Page() {
             {irregular.map((r) => (
               <div key={r.source} className="text-sm p-2 rounded border border-border">
                 <div className="font-medium">{r.source}</div>
-                <div className="text-xs text-muted-foreground">Active {r.active} of {months12.length} months</div>
+                <div className="text-xs text-muted-foreground">Active {r.active} of {labels.length} months</div>
               </div>
             ))}
           </CardContent>
@@ -139,6 +156,6 @@ function Page() {
           />
         </CardContent>
       </Card>
-    </PortalShell>
+    </>
   );
 }

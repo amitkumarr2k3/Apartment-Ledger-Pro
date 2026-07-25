@@ -45,7 +45,7 @@ function isoMonthToLabel(iso: string): string {
   // "2025-08-01" -> "Aug '25"
   const d = new Date(iso);
   if (isNaN(d.getTime())) return iso;
-  const mon = d.toLocaleString("en", { month: "short" });
+  const mon = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][d.getMonth()] ?? "Jan";
   const yr = String(d.getFullYear()).slice(-2);
   return `${mon} '${yr}`;
 }

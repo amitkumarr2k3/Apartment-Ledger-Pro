@@ -1,15 +1,15 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
-import { PortalShell } from "@/components/portal-shell";
+import { PortalShell, usePeriod } from "@/components/portal-shell";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, Bar, BarChart, CartesianGrid, ResponsiveContainer, XAxis, YAxis } from "recharts";
 import { SmartTooltipContent, getTooltipTrigger } from "@/components/smart-tooltip";
-import { inr, pct, months12 } from "@/lib/finance-mock";
+import { inr, pct, total, vendorMonthly } from "@/lib/finance-mock";
 import { TrendingUp, ChevronRight, ExternalLink } from "lucide-react";
 import { NoDbData } from "@/components/mock-gate";
-import { useVendorRanking, useExpenseTree } from "@/lib/hooks";
+import { useExpenseTree } from "@/lib/hooks";
 
 export const Route = createFileRoute("/admin/vendors")({
   component: Page,
@@ -17,9 +17,36 @@ export const Route = createFileRoute("/admin/vendors")({
 });
 
 function Page() {
-  const { data: vendorRanking = [], isLoading } = useVendorRanking();
-  const { data: expenseTree = [] } = useExpenseTree();
+  return (
+    <PortalShell title="Vendor & service provider analysis" reqIds="AD-10 → AD-14" persona="admin">
+      <Inner />
+    </PortalShell>
+  );
+}
+
+function Inner() {
+  const { data: expenseTree = [], isLoading } = useExpenseTree();
+  const { sliceMonthly, priorSliceMonthly, labels } = usePeriod();
   const [openVendor, setOpenVendor] = useState<string | null>(null);
+
+  const vendorRanking = useMemo(() => expenseTree
+    .flatMap((c) => c.vendors.map((v) => {
+      const full = vendorMonthly(v);
+      const selected = sliceMonthly(full);
+      const previous = priorSliceMonthly(full);
+      const selectedTotal = total(selected);
+      const previousTotal = total(previous);
+      return {
+        vendor: v.name,
+        category: c.name,
+        kind: v.kind,
+        total: selectedTotal,
+        monthsActive: selected.filter((x) => x > 0).length,
+        changePct: previousTotal ? ((selectedTotal - previousTotal) / Math.abs(previousTotal)) * 100 : 0,
+      };
+    }))
+    .filter((v) => v.total > 0)
+    .sort((a, b) => b.total - a.total), [expenseTree, sliceMonthly, priorSliceMonthly]);
 
   const activeVendor = openVendor ?? vendorRanking[0]?.vendor ?? null;
   const vendorObj = useMemo(
@@ -27,21 +54,20 @@ function Page() {
     [expenseTree, activeVendor],
   );
   const vendorTrend = useMemo(() => {
-    if (!vendorObj) return new Array(months12.length).fill(0);
-    return months12.map((_, i) => vendorObj.items.reduce((s, it) => s + (it.monthly[i] ?? 0), 0));
-  }, [vendorObj]);
-  const trendData = months12.map((m, i) => ({ month: m, value: vendorTrend[i] ?? 0 }));
+    if (!vendorObj) return new Array(labels.length).fill(0);
+    return vendorMonthly(vendorObj);
+  }, [vendorObj, labels.length]);
+  const slicedTrend = sliceMonthly(vendorTrend);
+  const trendData = labels.map((m, i) => ({ month: m, value: slicedTrend[i] ?? 0 }));
 
   if (!isLoading && vendorRanking.length === 0) {
     return (
-      <PortalShell title="Vendor & service provider analysis" reqIds="AD-10 → AD-14" persona="admin">
-        <NoDbData note="Vendor analytics will appear once expense transactions with vendors are imported." />
-      </PortalShell>
+      <NoDbData note="Vendor analytics will appear once expense transactions with vendors are imported." />
     );
   }
 
   return (
-    <PortalShell title="Vendor & service provider analysis" reqIds="AD-10 → AD-14" persona="admin">
+    <>
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Vendor ranking · AD-10, AD-13, AD-14</CardTitle>
@@ -77,7 +103,7 @@ function Page() {
                         {pct(v.changePct)}
                       </span>
                     </TableCell>
-                    <TableCell className="text-right text-xs text-muted-foreground">{v.monthsActive} / 12 months</TableCell>
+                    <TableCell className="text-right text-xs text-muted-foreground">{v.monthsActive} / {labels.length} months</TableCell>
                     <TableCell>
                       <div className="flex items-center justify-end gap-3">
                         <button onClick={() => setOpenVendor(v.vendor)} className="text-xs text-primary hover:underline inline-flex items-center gap-1">
@@ -129,7 +155,7 @@ function Page() {
             <CardContent>
               <ul className="space-y-2 text-sm">
                 {vendorObj.items.map((it) => {
-                  const t = it.monthly.reduce((s, n) => s + n, 0);
+                  const t = total(sliceMonthly(it.monthly));
                   return (
                     <li key={it.name} className="flex justify-between border-b border-border pb-2 last:border-none">
                       <span>{it.name}</span>
@@ -142,6 +168,6 @@ function Page() {
           </Card>
         </div>
       )}
-    </PortalShell>
+    </>
   );
 }

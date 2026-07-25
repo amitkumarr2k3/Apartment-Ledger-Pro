@@ -1,12 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo } from "react";
-import { PortalShell } from "@/components/portal-shell";
+import { PortalShell, usePeriod } from "@/components/portal-shell";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, Bar, CartesianGrid, ComposedChart, Line, ResponsiveContainer, XAxis, YAxis, Legend } from "recharts";
 import { SmartTooltipContent, getTooltipTrigger } from "@/components/smart-tooltip";
-import { inr, pct, categoryMonthly, months12, type Category } from "@/lib/finance-mock";
+import { inr, pct, categoryMonthly, total, type Category } from "@/lib/finance-mock";
 import { AlertTriangle, ArrowRight, Snowflake } from "lucide-react";
 import { NoDbData } from "@/components/mock-gate";
 import { useExpenseTree } from "@/lib/hooks";
@@ -20,20 +20,25 @@ const budgets: Record<string, number> = {
   Utilities: 480000, Maintenance: 800000, Security: 700000, Housekeeping: 400000, "Petty Cash": 60000,
 };
 
-function derive(tree: Category[]) {
+function derive(
+  tree: Category[],
+  sliceMonthly: <T>(arr: T[]) => T[],
+  priorSliceMonthly: <T>(arr: T[]) => T[],
+) {
   const momChanges = tree.map((c) => {
     const m = categoryMonthly(c);
-    const cur = m[m.length - 1] ?? 0;
-    const prevPeriod = (m.slice(0, -1).reduce((s, n) => s + n, 0)) / Math.max(1, m.length - 1);
-    const periodChange = prevPeriod ? ((cur - prevPeriod) / prevPeriod) * 100 : 0;
+    const cur = total(sliceMonthly(m));
+    const prevPeriod = total(priorSliceMonthly(m));
+    const periodChange = prevPeriod ? ((cur - prevPeriod) / Math.abs(prevPeriod)) * 100 : 0;
     return { category: c.name, current: cur, periodChange };
   });
   const anomalies = tree
     .map((c) => {
       const m = categoryMonthly(c);
-      const cur = m[m.length - 1] ?? 0;
-      const prev3 = m.slice(-4, -1);
-      const avg = prev3.reduce((s, n) => s + n, 0) / 3;
+      const currentSlice = sliceMonthly(m);
+      const cur = currentSlice[currentSlice.length - 1] ?? 0;
+      const prev3 = [...priorSliceMonthly(m), ...currentSlice.slice(0, -1)].slice(-3);
+      const avg = prev3.length ? prev3.reduce((s, n) => s + n, 0) / prev3.length : 0;
       const ratio = cur / (avg || 1);
       return { category: c.name, cur, avg, ratio };
     })
@@ -42,14 +47,24 @@ function derive(tree: Category[]) {
 }
 
 function Page() {
+  return (
+    <PortalShell title="Action needed" reqIds="AD-40 · AD-41 · AD-42 · AD-43" persona="admin">
+      <Inner />
+    </PortalShell>
+  );
+}
+
+function Inner() {
   const { data: expenseTree = [], isLoading } = useExpenseTree();
-  const { momChanges, anomalies } = useMemo(() => derive(expenseTree), [expenseTree]);
+  const { sliceMonthly, priorSliceMonthly, labels } = usePeriod();
+  const { momChanges, anomalies } = useMemo(
+    () => derive(expenseTree, sliceMonthly, priorSliceMonthly),
+    [expenseTree, sliceMonthly, priorSliceMonthly],
+  );
 
   if (!isLoading && expenseTree.length === 0) {
     return (
-      <PortalShell title="Action needed" reqIds="AD-40 · AD-41 · AD-42 · AD-43" persona="admin">
-        <NoDbData note="Alerts, projections and budget variance appear once transactions exist for the selected period." />
-      </PortalShell>
+      <NoDbData note="Alerts, projections and budget variance appear once transactions exist for the selected period." />
     );
   }
 
@@ -62,26 +77,28 @@ function Page() {
   const actions = [...anomalyItems, ...risingItems].slice(0, 5);
 
   const risingCat = expenseTree.find((c) => c.name === risingItems[0]?.label) ?? expenseTree[0];
-  const monthly = risingCat ? categoryMonthly(risingCat) : new Array(months12.length).fill(0);
+  const monthlyFull = risingCat ? categoryMonthly(risingCat) : new Array(labels.length).fill(0);
+  const monthly = sliceMonthly(monthlyFull);
   const last6 = monthly.slice(-6);
   const slope = last6.length >= 2 ? (last6[last6.length - 1] - last6[0]) / (last6.length - 1) : 0;
-  const projA = Math.max(0, Math.round(monthly[monthly.length - 1] + slope));
+  const lastVal = monthly[monthly.length - 1] ?? 0;
+  const projA = Math.max(0, Math.round(lastVal + slope));
   const projB = Math.max(0, Math.round(projA + slope));
   const trendData = [
-    ...months12.map((m, i) => ({ month: m, actual: monthly[i], projected: null as number | null })),
+    ...labels.map((m, i) => ({ month: m, actual: monthly[i], projected: null as number | null })),
     { month: "+1 mo", actual: null, projected: projA },
     { month: "+2 mo", actual: null, projected: projB },
   ];
 
   const budgetRows = expenseTree.map((c) => {
-    const spent = categoryMonthly(c).reduce((s, n) => s + n, 0);
-    const budget = budgets[c.name] ?? (spent || 1);
+    const spent = total(sliceMonthly(categoryMonthly(c)));
+    const budget = Math.round(((budgets[c.name] ?? (spent || 1)) / 12) * Math.max(1, labels.length));
     const variance = ((spent - budget) / budget) * 100;
     return { category: c.name, budget, spent, variance };
   });
 
   return (
-    <PortalShell title="Action needed" reqIds="AD-40 · AD-41 · AD-42 · AD-43" persona="admin">
+    <>
       <Card className="border-rose-500/30">
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
@@ -189,6 +206,6 @@ function Page() {
           </CardContent>
         </Card>
       </div>
-    </PortalShell>
+    </>
   );
 }

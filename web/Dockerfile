@@ -29,7 +29,13 @@ CMD ["node", ".output/server/index.mjs"]
 # Serves /health and proxies:
 #   /api/*  -> api  container (fastify, port 4000)
 #   /*      -> ssr  container (node ssr,  port 3000)
+# Upstreams are templated via env vars (API_UPSTREAM / SSR_UPSTREAM) using
+# the official nginx image's built-in envsubst-on-templates entrypoint step,
+# so the same image works both in docker-compose (service-name DNS) and in
+# Azure Container Apps (internal FQDN DNS) without a rebuild.
 FROM nginx:1.27-alpine AS web
 RUN rm -rf /usr/share/nginx/html/* /etc/nginx/conf.d/*
-COPY web/nginx.conf /etc/nginx/conf.d/default.conf
+COPY web/templates/default.conf.template /etc/nginx/templates/default.conf.template
+ENV API_UPSTREAM="http://api:4000"
+ENV SSR_UPSTREAM="http://ssr:3000"
 EXPOSE 80

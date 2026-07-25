@@ -1,10 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { PortalShell } from "@/components/portal-shell";
+import { PortalShell, usePeriod } from "@/components/portal-shell";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tooltip, Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, XAxis, YAxis, Legend } from "recharts";
 import { SmartTooltipContent, getTooltipTrigger } from "@/components/smart-tooltip";
-import { inr, categoryMonthly, total, months12, sumMonthly } from "@/lib/finance-mock";
-import { useIncomeTree } from "@/lib/hooks";
+import { inr, categoryMonthly, total, sumMonthly } from "@/lib/finance-mock";
+import { useIncomeTree, useMonthlyTotals } from "@/lib/hooks";
 
 export const Route = createFileRoute("/resident/income")({
   component: Page,
@@ -14,16 +14,27 @@ export const Route = createFileRoute("/resident/income")({
 const COLORS = ["var(--color-chart-1)", "var(--color-chart-2)", "var(--color-chart-3)", "var(--color-chart-4)", "var(--color-chart-5)"];
 
 function Page() {
-  const { data: incomeTree = [] } = useIncomeTree();
-  const rows = incomeTree.map((c) => ({ name: c.name, value: total(categoryMonthly(c)) }));
-  const totalIncome = rows.reduce((s, r) => s + r.value, 0);
-  const totalExpense = 3_200_000; // illustrative
-  const coverage = totalExpense ? (totalIncome / totalExpense) * 100 : 0;
-
-  const monthlyIncome = sumMonthly(incomeTree.flatMap((c) => c.vendors.flatMap((v) => v.items.map((i) => i.monthly))));
-
   return (
     <PortalShell title="Income visibility" reqIds="RD-30 · RD-31 · RD-32" persona="resident">
+      <Inner />
+    </PortalShell>
+  );
+}
+
+function Inner() {
+  const { data: incomeTree = [] } = useIncomeTree();
+  const { data: monthlyTotals = [] } = useMonthlyTotals();
+  const { sliceMonthly, labels } = usePeriod();
+  const rows = incomeTree.map((c) => ({ name: c.name, value: total(sliceMonthly(categoryMonthly(c))) }));
+  const totalIncome = rows.reduce((s, r) => s + r.value, 0);
+  const totalExpense = total(sliceMonthly(monthlyTotals.map((m) => m.expense)));
+  const coverage = totalExpense ? (totalIncome / totalExpense) * 100 : 0;
+
+  const monthlyIncomeFull = sumMonthly(incomeTree.flatMap((c) => c.vendors.flatMap((v) => v.items.map((i) => i.monthly))));
+  const monthlyIncome = sliceMonthly(monthlyIncomeFull);
+
+  return (
+    <>
       <div className="grid gap-4 lg:grid-cols-3">
         {/* RD-30 */}
         <Card className="lg:col-span-2">
@@ -51,7 +62,7 @@ function Page() {
                       </span>
                       <span className="font-mono">{inr(r.value)}</span>
                     </div>
-                    <div className="text-xs text-muted-foreground text-right">{((r.value / totalIncome) * 100).toFixed(1)}%</div>
+                    <div className="text-xs text-muted-foreground text-right">{(totalIncome ? (r.value / totalIncome) * 100 : 0).toFixed(1)}%</div>
                   </li>
                 ))}
               </ul>
@@ -87,7 +98,7 @@ function Page() {
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={260}>
-            <BarChart data={months12.map((m, i) => ({ month: m, value: monthlyIncome[i] }))}>
+            <BarChart data={labels.map((m, i) => ({ month: m, value: monthlyIncome[i] }))}>
               <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
               <XAxis dataKey="month" fontSize={11} />
               <YAxis tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} fontSize={11} />
@@ -98,6 +109,6 @@ function Page() {
           </ResponsiveContainer>
         </CardContent>
       </Card>
-    </PortalShell>
+    </>
   );
 }

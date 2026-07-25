@@ -1,12 +1,12 @@
 import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router";
-import { PortalShell } from "@/components/portal-shell";
+import { PortalShell, usePeriod } from "@/components/portal-shell";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { Tooltip, Bar, BarChart, CartesianGrid, ResponsiveContainer, XAxis, YAxis, Legend } from "recharts";
 import { SmartTooltipContent, getTooltipTrigger } from "@/components/smart-tooltip";
 import {
-  inr, months12, categoryMonthly, vendorMonthly, total,
+  inr, categoryMonthly, vendorMonthly, total,
 } from "@/lib/finance-mock";
 import { useExpenseTree, useIncomeTree } from "@/lib/hooks";
 import { ChevronRight } from "lucide-react";
@@ -19,7 +19,16 @@ export const Route = createFileRoute("/resident/drilldown")({
 type Head = "expense" | "income";
 
 function Page() {
+  return (
+    <PortalShell title="Head-wise drill-down" reqIds="RD-10 → RD-15" persona="resident">
+      <Inner />
+    </PortalShell>
+  );
+}
+
+function Inner() {
   const navigate = useNavigate();
+  const { sliceMonthly, labels } = usePeriod();
   const search = useSearch({ strict: false }) as {
     head?: string; category?: string; vendor?: string; line?: string;
   };
@@ -44,11 +53,11 @@ function Page() {
     });
   };
 
-  const expenseTotal = expenseTree.reduce((s, c) => s + total(categoryMonthly(c)), 0);
-  const incomeTotal = incomeTree.reduce((s, c) => s + total(categoryMonthly(c)), 0);
+  const expenseTotal = expenseTree.reduce((s, c) => s + total(sliceMonthly(categoryMonthly(c))), 0);
+  const incomeTotal = incomeTree.reduce((s, c) => s + total(sliceMonthly(categoryMonthly(c))), 0);
 
   return (
-    <PortalShell title="Head-wise drill-down" reqIds="RD-10 → RD-15" persona="resident">
+    <>
       <Breadcrumb>
         <BreadcrumbList>
           <BreadcrumbItem>
@@ -92,7 +101,7 @@ function Page() {
           </CardHeader>
           <CardContent className="divide-y divide-border">
             {tree.map((c) => {
-              const t = total(categoryMonthly(c));
+              const t = total(sliceMonthly(categoryMonthly(c)));
               return (
                 <button key={c.name} onClick={() => update({ category: c.name })} className="w-full flex items-center justify-between py-3 text-left hover:bg-accent/40 -mx-4 px-4 rounded">
                   <div>
@@ -118,7 +127,7 @@ function Page() {
           </CardHeader>
           <CardContent className="divide-y divide-border">
             {category.vendors.map((v) => {
-              const t = total(vendorMonthly(v));
+              const t = total(sliceMonthly(vendorMonthly(v)));
               return (
                 <button key={v.name} onClick={() => update({ vendor: v.name })} className="w-full flex items-center justify-between py-3 text-left hover:bg-accent/40 -mx-4 px-4 rounded">
                   <div>
@@ -148,7 +157,7 @@ function Page() {
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={220}>
-                <BarChart data={months12.map((m, i) => ({ month: m, value: vendorMonthly(vendor)[i] }))}>
+                <BarChart data={labels.map((m, i) => ({ month: m, value: sliceMonthly(vendorMonthly(vendor))[i] }))}>
                   <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                   <XAxis dataKey="month" fontSize={11} />
                   <YAxis tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} fontSize={11} />
@@ -165,13 +174,14 @@ function Page() {
             </CardHeader>
             <CardContent className="divide-y divide-border">
               {vendor.items.map((it) => {
-                const t = total(it.monthly);
-                const activeMonths = it.monthly.filter((n) => n > 0).length;
+                const sliced = sliceMonthly(it.monthly);
+                const t = total(sliced);
+                const activeMonths = sliced.filter((n) => n > 0).length;
                 return (
                   <button key={it.name} onClick={() => update({ line: it.name })} className="w-full flex items-center justify-between py-3 text-left hover:bg-accent/40 -mx-4 px-4 rounded">
                     <div>
                       <div className="font-medium">{it.name}</div>
-                      <div className="text-xs text-muted-foreground">Active in {activeMonths} of {months12.length} months</div>
+                      <div className="text-xs text-muted-foreground">Active in {activeMonths} of {labels.length} months</div>
                     </div>
                     <div className="flex items-center gap-3">
                       <span className="font-mono text-sm">{inr(t)}</span>
@@ -189,11 +199,11 @@ function Page() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base">{line.name} · Monthly trend</CardTitle>
-            <CardDescription>RD-13 · 12-month bar chart · Absent months = ₹0</CardDescription>
+            <CardDescription>RD-13 · Selected-period bar chart · Absent months = ₹0</CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={months12.map((m, i) => ({ month: m, value: line.monthly[i] }))}>
+              <BarChart data={labels.map((m, i) => ({ month: m, value: sliceMonthly(line.monthly)[i] }))}>
                 <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                 <XAxis dataKey="month" fontSize={11} />
                 <YAxis tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} fontSize={11} />
@@ -203,14 +213,14 @@ function Page() {
               </BarChart>
             </ResponsiveContainer>
             <div className="mt-4 grid grid-cols-3 gap-4 text-sm">
-              <Stat label="Total in period" value={inr(total(line.monthly))} />
-              <Stat label="Peak month" value={inr(Math.max(...line.monthly))} />
-              <Stat label="Active months" value={`${line.monthly.filter(n=>n>0).length} / 12`} />
+              <Stat label="Total in period" value={inr(total(sliceMonthly(line.monthly)))} />
+              <Stat label="Peak month" value={inr(Math.max(0, ...sliceMonthly(line.monthly)))} />
+              <Stat label="Active months" value={`${sliceMonthly(line.monthly).filter(n=>n>0).length} / ${labels.length}`} />
             </div>
           </CardContent>
         </Card>
       )}
-    </PortalShell>
+    </>
   );
 }
 

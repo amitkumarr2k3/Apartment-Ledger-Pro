@@ -100,6 +100,24 @@ function validateRows(rows: string[][], mapping: Record<string, string>, spec: F
   });
 }
 
+// Quotes a CSV field only when needed (contains comma, quote, or newline).
+function csvEscape(v: string): string {
+  if (/[",\n\r]/.test(v)) return `"${v.replace(/"/g, '""')}"`;
+  return v;
+}
+
+// Rebuilds a canonical CSV (headers = spec keys) from the mapped+validated rows,
+// so the backend — which expects exact canonical column names — receives data
+// that matches the mapping the user configured in the UI, not the raw file headers.
+function buildCanonicalCsv(rows: MappedRow[], spec: FieldSpec[]): string {
+  const header = spec.map((f) => f.key);
+  const lines = [header.join(",")];
+  for (const r of rows) {
+    lines.push(header.map((k) => csvEscape(r.values[k] ?? "")).join(","));
+  }
+  return lines.join("\r\n");
+}
+
 function authHeader(): HeadersInit {
   if (typeof window === "undefined") return {};
   const t = window.localStorage.getItem("apf.token");
@@ -132,6 +150,9 @@ function Page() {
   const [step, setStep] = useState<"upload" | "map" | "preview">("upload");
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [committing, setCommitting] = useState(false);
+  const [showErrorsOnly, setShowErrorsOnly] = useState(false);
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 100;
 
   const history = useQuery({
     queryKey: ["import-history", showMock],
@@ -151,6 +172,9 @@ function Page() {
   const ok = validated.filter((r) => r.errors.length === 0);
   const bad = validated.filter((r) => r.errors.length > 0);
   const missingRequired = spec.filter((f) => f.required && !mapping[f.key]);
+  const displayRows = showErrorsOnly ? bad : validated;
+  const pageCount = Math.max(1, Math.ceil(displayRows.length / PAGE_SIZE));
+  const pagedRows = displayRows.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
 
   async function onPick(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
@@ -185,8 +209,12 @@ function Page() {
     }
     setCommitting(true);
     try {
+      // Send the mapped/canonical rows (not the raw file) so the backend's
+      // column names line up with what the user actually mapped in step 2.
+      const canonicalCsv = buildCanonicalCsv(ok, spec);
+      const blob = new Blob([canonicalCsv], { type: "text/csv" });
       const fd = new FormData();
-      fd.append("file", pickedFile, pickedFile.name);
+      fd.append("file", blob, pickedFile.name);
       const r = await fetch(`/api/admin/imports/${kind}`, {
         method: "POST",
         headers: authHeader(),
@@ -294,7 +322,7 @@ function Page() {
                   </div>
                 ))}
                 <div className="sm:col-span-3 flex justify-end">
-                  <Button size="sm" onClick={() => setStep("preview")} disabled={missingRequired.length > 0}>
+                  <Button size="sm" onClick={() => { setStep("preview"); setPage(0); setShowErrorsOnly(false); }} disabled={missingRequired.length > 0}>
                     <Wand2 className="h-4 w-4 mr-1" /> Apply mapping & preview
                   </Button>
                 </div>
@@ -309,10 +337,22 @@ function Page() {
                   <CheckCircle2 className="h-4 w-4 text-emerald-500" />
                   Preview — {ok.length} valid, {bad.length} with errors
                 </CardTitle>
-                <CardDescription>
-                  {bad.length > 0
-                    ? `Rows with errors will be skipped on commit. Fix them in the source CSV and re-upload if needed.`
-                    : `All rows validated. Nothing is written until you commit.`}
+                <CardDescription className="flex flex-wrap items-center gap-2">
+                  <span>
+                    {bad.length > 0
+                      ? `Rows with errors will be skipped on commit. Fix them in the source CSV and re-upload if needed.`
+                      : `All rows validated. Nothing is written until you commit.`}
+                  </span>
+                  {bad.length > 0 && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-6 px-2 text-xs"
+                      onClick={() => { setShowErrorsOnly((v) => !v); setPage(0); }}
+                    >
+                      {showErrorsOnly ? `Show all ${validated.length} rows` : `Show only ${bad.length} error row${bad.length === 1 ? "" : "s"}`}
+                    </Button>
+                  )}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -327,7 +367,7 @@ function Page() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {validated.slice(0, 100).map((r) => (
+                      {pagedRows.map((r) => (
                         <TableRow key={r.rowNo} className={r.errors.length ? "bg-rose-500/5" : ""}>
                           <TableCell className="font-mono text-xs">{r.rowNo}</TableCell>
                           <TableCell>
@@ -352,7 +392,19 @@ function Page() {
                     </TableBody>
                   </Table>
                 </div>
-                {validated.length > 100 && <p className="text-xs text-muted-foreground">Showing first 100 of {validated.length} rows.</p>}
+                {displayRows.length > PAGE_SIZE && (
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span>
+                      Showing rows {page * PAGE_SIZE + 1}–{Math.min(displayRows.length, (page + 1) * PAGE_SIZE)} of {displayRows.length}
+                      {showErrorsOnly ? " error rows" : " rows"}.
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm" className="h-6 px-2" disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))}>Prev</Button>
+                      <span>Page {page + 1} of {pageCount}</span>
+                      <Button variant="outline" size="sm" className="h-6 px-2" disabled={page >= pageCount - 1} onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}>Next</Button>
+                    </div>
+                  </div>
+                )}
                 <div className="flex justify-end gap-2">
                   <Button variant="outline" size="sm" onClick={() => { setStep("upload"); setFile(""); setPickedFile(null); setRawRows([]); }}>Cancel</Button>
                   <Button size="sm" onClick={commit} disabled={ok.length === 0 || committing}>

@@ -1,0 +1,144 @@
+defaults:
+  expense_head: expense
+  income_head: income
+
+# ---------------------------------
+# EXPENSE CATEGORIES
+# ---------------------------------
+
+expense_categories:
+
+  Utilities:
+    - BESCOM A Block
+    - BESCOM B Block
+    - BESCOM C Block
+    - BESCOM D Block
+    - BESCOM E Block
+    - BESCOM F Block
+    - BESCOM G Block
+    - Water Supply
+    - Airtel Postpaid Connection
+    - Diesel
+
+  Maintenance:
+    - AMC (Lift)
+    - AMC (AC)
+    - AMC (DG)
+    - DG Service
+    - Repair Work
+    - Rental Charges Machinery
+
+  Security:
+    - Security Guards Salary
+    - Security Supervisor Salary
+    - Security Lady Guards Salary
+
+  Housekeeping:
+    - House Keeping Janitor Salary
+    - Housekeeping Supervisor Salary
+    - HK Materials
+    - Garbage removal
+
+  Gardening:
+    - Gardeners Salary
+    - Gardening Supervisor Salary
+    - Garden Tools
+
+  Petty Cash:
+    - Petty Cash - Consumables
+    - Petty Cash - Electricals
+    - Petty Cash - Hardware
+    - Petty Cash - Office Supplies
+
+
+# ---------------------------------
+# INCOME CATEGORIES
+# ---------------------------------
+
+income_categories:
+
+  Maintenance Collection:
+    - Maintenance Charge
+
+  Facility Rental:
+    - Multipurpose Party Hall/Club House
+    - AV room
+    - Business Center
+
+  Advertisement:
+    - Lift Advertisement
+
+  Penalties:
+    - Late Payment Fine
+    - Common Area Violation
+    - Parking Violation
+
+  Move Charges:
+    - Move in/out Charges
+    - Move In/Out (Manual)
+
+  Events:
+    - Flee Market
+    - Community Curriculum Activities
+
+  Tax:
+    - CGST Output
+    - SGST Output
+
+# ---------------------------------
+# VENDORS
+# ---------------------------------
+
+vendors:
+
+  BESCOM A Block:
+    vendor: BESCOM
+    vendor_kind: company
+
+  BESCOM B Block:
+    vendor: BESCOM
+    vendor_kind: company
+
+  BESCOM C Block:
+    vendor: BESCOM
+    vendor_kind: company
+
+  BESCOM D Block:
+    vendor: BESCOM
+    vendor_kind: company
+
+  BESCOM E Block:
+    vendor: BESCOM
+    vendor_kind: company
+
+  BESCOM F Block:
+    vendor: BESCOM
+    vendor_kind: company
+
+  BESCOM G Block:
+    vendor: BESCOM
+    vendor_kind: company
+
+  Water Supply:
+    vendor: Water Supplier
+    vendor_kind: company
+
+  Airtel Postpaid Connection:
+    vendor: Airtel
+    vendor_kind: company
+
+  Maintenance Charge:
+    vendor: Flat Owners
+    vendor_kind: individual
+
+  AV room:
+    vendor: Residents
+    vendor_kind: individual
+
+  Multipurpose Party Hall/Club House:
+    vendor: Residents
+    vendor_kind: individual
+
+  Lift Advertisement:
+    vendor: Advertiser
+    vendor_kind: company

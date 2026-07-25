@@ -28,7 +28,7 @@ function Inner() {
 
   const totalCol = period.reduce((s, m) => s + m.collection, 0);
   const totalExp = period.reduce((s, m) => s + m.expense, 0);
-  const ratio = (totalCol / totalExp) * 100;
+  const ratio = totalExp === 0 ? 0 : (totalCol / totalExp) * 100;
   const surplus = period.filter((m) => m.net >= 0).length;
   const deficit = period.length - surplus;
 
