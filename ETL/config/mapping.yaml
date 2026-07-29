@@ -2,10 +2,6 @@ defaults:
   expense_head: expense
   income_head: income
 
-# ---------------------------------
-# EXPENSE CATEGORIES
-# ---------------------------------
-
 expense_categories:
 
   Utilities:
@@ -25,24 +21,54 @@ expense_categories:
     - AMC (AC)
     - AMC (DG)
     - DG Service
-    - Repair Work
-    - Rental Charges Machinery
 
-  Security:
-    - Security Guards Salary
-    - Security Supervisor Salary
-    - Security Lady Guards Salary
-
-  Housekeeping:
+  Facility Management:
+    - Facility Manager
+    - Help Desk Salary
+    - Management Fee
+    - Electricians Salary
+    - Plumbers Salary
+    - Gardeners Salary
+    - Gardening Supervisor Salary
     - House Keeping Janitor Salary
     - Housekeeping Supervisor Salary
+    - Security Supervisor Salary
+    - Security Guards Salary
+    - Security Lady Guards Salary
+    - STP/WTP Operators Salary
+    - Walkie Talkies
+    - Pest Control Services
+    - Swimming Pool Services
+    - Rental Charges Machinery
+    - Water Test Report
+    - Annual Compliance Expense
     - HK Materials
+    - Repair Work
+    - Tank Cleaning Charges
+
+  Housekeeping:
     - Garbage removal
 
   Gardening:
-    - Gardeners Salary
-    - Gardening Supervisor Salary
     - Garden Tools
+
+  Cleaning:
+    - Debris Disposal
+
+  Water Treatment:
+    - STP water collection (Sludge Removal)
+
+  Office Supplies:
+    - Amazon Purchase
+    - Tools & Stationary
+    - One Time Operational Procurement
+
+  Professional Services:
+    - Chartered Accountant
+    - Legal Consultant
+
+  Accounting Adjustments:
+    - Roundoff
 
   Petty Cash:
     - Petty Cash - Consumables
@@ -50,10 +76,9 @@ expense_categories:
     - Petty Cash - Hardware
     - Petty Cash - Office Supplies
 
+  Events:
+    - Petty Cash - Cultural Event
 
-# ---------------------------------
-# INCOME CATEGORIES
-# ---------------------------------
 
 income_categories:
 
@@ -61,9 +86,9 @@ income_categories:
     - Maintenance Charge
 
   Facility Rental:
-    - Multipurpose Party Hall/Club House
     - AV room
     - Business Center
+    - Multipurpose Party Hall/Club House
 
   Advertisement:
     - Lift Advertisement
@@ -85,11 +110,56 @@ income_categories:
     - CGST Output
     - SGST Output
 
-# ---------------------------------
-# VENDORS
-# ---------------------------------
+  Community Contributions:
+    - Association Fund
+
+  Recreation & Wellness:
+    - Fitness Trainers
+
+  Parking Revenue:
+    - Guest Parking Rent
+
+
+vendor_groups:
+
+  EXOZEN:
+    - Facility Manager
+    - Help Desk Salary
+    - Management Fee
+    - Electricians Salary
+    - Plumbers Salary
+    - Gardeners Salary
+    - Gardening Supervisor Salary
+    - House Keeping Janitor Salary
+    - Housekeeping Supervisor Salary
+    - Security Supervisor Salary
+    - Security Guards Salary
+    - Security Lady Guards Salary
+    - STP/WTP Operators Salary
+    - Walkie Talkies
+    - Pest Control Services
+    - Swimming Pool Services
+    - Rental Charges Machinery
+    - Water Test Report
+    - Annual Compliance Expense
+    - HK Materials
+    - Repair Work
+    - Tank Cleaning Charges
+
 
 vendors:
+
+  # -------------------
+  # Expense Vendors
+  # -------------------
+
+  Airtel Postpaid Connection:
+    vendor: Airtel Postpaid
+    vendor_kind: company
+
+  Amazon Purchase:
+    vendor: Amazon CG Boulevard RWA
+    vendor_kind: internal
 
   BESCOM A Block:
     vendor: BESCOM
@@ -120,25 +190,157 @@ vendors:
     vendor_kind: company
 
   Water Supply:
-    vendor: Water Supplier
+    vendor: BSN Water Supply
     vendor_kind: company
 
-  Airtel Postpaid Connection:
-    vendor: Airtel
+  Diesel:
+    vendor: Sai Krupa Petroleum
     vendor_kind: company
+
+  AMC (Lift):
+    vendor: JOHNSON LIFTS Pvt Ltd
+    vendor_kind: company
+
+  AMC (AC):
+    vendor: KNND ASSOCIATES PVT LTD
+    vendor_kind: company
+
+  AMC (DG):
+    vendor: KIRLOSKAR OIL ENGINES LTD
+    vendor_kind: company
+
+  DG Service:
+    vendor: KIRLOSKAR OIL ENGINES LTD
+    vendor_kind: company
+
+  Garbage removal:
+    vendor: Sewa Waste Management
+    vendor_kind: company
+
+  Garden Tools:
+    vendor: Kavitha Enterprises
+    vendor_kind: company
+
+  STP water collection (Sludge Removal):
+    vendor: Sapthagiri Cleaner
+    vendor_kind: company
+
+  Tools & Stationary:
+    vendor: Petty Cash
+    vendor_kind: internal
+
+  One Time Operational Procurement:
+    vendor: Petty Cash
+    vendor_kind: internal
+
+  Petty Cash - Consumables:
+    vendor: Petty Cash
+    vendor_kind: internal
+
+  Petty Cash - Electricals:
+    vendor: Petty Cash
+    vendor_kind: internal
+
+  Petty Cash - Hardware:
+    vendor: Petty Cash
+    vendor_kind: internal
+
+  Petty Cash - Office Supplies:
+    vendor: Petty Cash
+    vendor_kind: internal
+
+  Petty Cash - Cultural Event:
+    vendor: Petty Cash
+    vendor_kind: internal
+
+  Chartered Accountant:
+    vendor: Professional Consultant
+    vendor_kind: individual
+
+  Legal Consultant:
+    vendor: Professional Consultant
+    vendor_kind: individual
+
+  Roundoff:
+    vendor: System Adjustment
+    vendor_kind: system
+
+
+  # -------------------
+  # Income Vendors
+  # -------------------
 
   Maintenance Charge:
-    vendor: Flat Owners
-    vendor_kind: individual
+    vendor: Apartment Owners
+    vendor_kind: resident
 
   AV room:
-    vendor: Residents
-    vendor_kind: individual
+    vendor: Amenities
+    vendor_kind: internal
+
+  Business Center:
+    vendor: Amenities
+    vendor_kind: internal
 
   Multipurpose Party Hall/Club House:
-    vendor: Residents
-    vendor_kind: individual
+    vendor: Amenities
+    vendor_kind: internal
 
   Lift Advertisement:
-    vendor: Advertiser
-    vendor_kind: company
+    vendor: Advertising Revenue
+    vendor_kind: income_stream
+
+  Late Payment Fine:
+    vendor: Resident Penalties
+    vendor_kind: income_stream
+
+  Common Area Violation:
+    vendor: Resident Penalties
+    vendor_kind: income_stream
+
+  Parking Violation:
+    vendor: Resident Penalties
+    vendor_kind: income_stream
+
+  Move In/Out (Manual):
+    vendor: Resident Services
+    vendor_kind: income_stream
+
+  Move in/out Charges:
+    vendor: Resident Services
+    vendor_kind: income_stream
+
+  Flee Market:
+    vendor: Community Events
+    vendor_kind: income_stream
+
+  Community Curriculum Activities:
+    vendor: Community Events
+    vendor_kind: income_stream
+
+  CGST Output:
+    vendor: Tax Collection
+    vendor_kind: statutory
+
+  SGST Output:
+    vendor: Tax Collection
+    vendor_kind: statutory
+
+  Association Fund:
+    vendor: Residents
+    vendor_kind: resident
+
+  Fitness Trainers:
+    vendor: Wellness Programs
+    vendor_kind: income_stream
+
+  Guest Parking Rent:
+    vendor: Parking Services
+    vendor_kind: income_stream
+
+
+vendor_candidates:
+
+  Debris Disposal:
+    - Kavitha Enterprises
+    - Sashi Kumar K

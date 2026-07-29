@@ -15,10 +15,17 @@ dist-ssr
 .tanstack/**
 .nitro
 *.local
-
+ETL/transform_v.2.py
+ETL/transform_v0.1.py
+ETL/output/*
+ETL/input/*
+ETL/config/mapping_bk.yaml
+ETL/config/mapping11.yaml
+.gitignore
 # Wrangler / Cloudflare
 .wrangler/
 .dev.vars
+ETL/output/transactions.xlsx
 
 # Editor directories and files
 .vscode/*
