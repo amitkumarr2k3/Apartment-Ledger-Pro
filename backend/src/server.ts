@@ -15,6 +15,7 @@ import { routes as adminResRoutes } from "./routes/admin.residents";
 import { routes as adminSettingsRoutes } from "./routes/admin.settings";
 import { routes as adminAuditRoutes } from "./routes/admin.audit";
 import { routes as adminImportsRoutes } from "./routes/admin.imports";
+import { routes as adminETLRoutes } from "./routes/admin.etl";
 import { pool } from "./db";
 
 export async function buildApp() {
@@ -73,6 +74,7 @@ export async function buildApp() {
   await app.register(adminSettingsRoutes, { prefix: "/api/admin/settings" });
   await app.register(adminAuditRoutes, { prefix: "/api/admin/audit" });
   await app.register(adminImportsRoutes, { prefix: "/api/admin/imports" });
+  await app.register(adminETLRoutes, { prefix: "/api/admin/etl" });
 
   return app;
 }

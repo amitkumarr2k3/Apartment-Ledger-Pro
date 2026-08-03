@@ -262,6 +262,7 @@ export const navSections = [
       { to: "/admin/settings", label: "Dashboard Controls", req: "AC-30 → AC-32" },
       { to: "/admin/audit", label: "Audit Trail", req: "AC-40 → AC-41" },
       { to: "/admin/imports", label: "CSV Imports", req: "AC-50 → AC-52" },
+      { to: "/admin/etl", label: "ETL Integration", req: "AC-53 → AC-55" },
     ],
   },
 ];
