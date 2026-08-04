@@ -1,0 +1,18 @@
+# .dockerignore for the backend build context (context: ./backend)
+
+# Dependencies — npm install runs inside Docker, no need to copy
+node_modules/
+
+# TypeScript build output — rebuilt inside Docker
+dist/
+
+# Test files — not needed in production image
+coverage/
+*.test.ts
+*.spec.ts
+
+# Editor & misc
+.vscode/
+.idea/
+*.log
+.DS_Store

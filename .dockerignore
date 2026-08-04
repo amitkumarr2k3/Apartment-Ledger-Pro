@@ -1,0 +1,75 @@
+# -----------------------------------------------------------------------
+# .dockerignore — root build context (used by the "ssr" Docker build)
+#
+# The SSR image only needs: src/, public/, package.json, bun.lock,
+# bunfig.toml, tsconfig.json, vite.config.ts, components.json
+# Everything else adds transfer time for zero benefit.
+# -----------------------------------------------------------------------
+
+# --- Dependencies (biggest offender — 200 MB+) ---
+node_modules/
+**/node_modules/
+.pnpm-store/
+.yarn/
+
+# --- Build outputs ---
+dist/
+dist-ssr/
+.output/
+.vinxi/
+.nitro/
+.tanstack/
+
+# --- Backend service (has its own build context: ./backend) ---
+backend/
+
+# --- ETL module (Python data pipeline, not needed at runtime) ---
+ETL/
+
+# --- Docs & scripts not needed at runtime ---
+docs/
+scripts/
+
+# --- Git & VCS ---
+.git/
+.gitignore
+.gitattributes
+.github/
+
+# --- Local env & secrets ---
+.env
+.env.*
+!.env.example
+
+# --- Editor & IDE ---
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# --- Logs ---
+*.log
+npm-debug.log*
+yarn-debug.log*
+
+# --- Test & coverage ---
+coverage/
+*.test.ts
+*.spec.ts
+__tests__/
+test/
+
+# --- Misc tooling ---
+.lovable/
+.prettierignore
+.prettierrc
+eslint.config.js
+AGENTS.md
+Makefile
+README.txt
+web/README*
+
+# --- Nginx / web container config (only needed in the nginx stage, already COPY'd directly) ---
+# (we still need web/Dockerfile and web/templates during build, so do NOT exclude web/)

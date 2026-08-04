@@ -28,6 +28,11 @@ import {
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 
+function authHeader(): HeadersInit {
+  const t = typeof window !== "undefined" ? window.localStorage.getItem("apf.token") : null;
+  return t ? { Authorization: `Bearer ${t}` } : {};
+}
+
 export const Route = createFileRoute("/admin/etl")({
   component: Page,
   head: () => ({ meta: [{ title: "Admin · ETL Integration" }] }),
@@ -37,18 +42,20 @@ function Page() {
   const queryClient = useQueryClient();
   const [uploadedFiles, setUploadedFiles] = useState<{ file: File; kind: string }[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const hasToken = typeof window !== "undefined" && !!window.localStorage.getItem("apf.token");
 
-  // Fetch ETL sessions
+  // Fetch ETL sessions — disabled during SSR (no localStorage on server)
   const { data: sessionsData, isLoading: isLoadingSessions } = useQuery({
     queryKey: ["etl-sessions"],
+    enabled: hasToken,
     queryFn: async () => {
       const res = await fetch("/api/admin/etl/sessions", {
-        credentials: "include",
+        headers: authHeader(),
       });
       if (!res.ok) throw new Error("Failed to fetch sessions");
       return res.json();
     },
-    refetchInterval: 5000, // Auto-refresh every 5s
+    refetchInterval: 5000,
   });
 
   // ETL upload mutation
@@ -65,8 +72,8 @@ function Page() {
 
       const res = await fetch("/api/admin/etl/upload", {
         method: "POST",
+        headers: authHeader(),
         body: formData,
-        credentials: "include",
       });
 
       if (!res.ok) {
@@ -105,7 +112,7 @@ function Page() {
   const sessions = sessionsData?.sessions ?? [];
 
   return (
-    <PortalShell>
+    <PortalShell title="ETL Integration" reqIds="AC-53 · AC-54 · AC-55" persona="admin">
       <div className="space-y-6">
         {/* Header */}
         <div>
@@ -122,6 +129,16 @@ function Page() {
             automatically transform them according to your configuration and import the results.
           </AlertDescription>
         </Alert>
+
+        {!hasToken && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Authentication required</AlertTitle>
+            <AlertDescription>
+              Your session does not have an API token. Please sign out and sign in again from the login page.
+            </AlertDescription>
+          </Alert>
+        )}
 
         <Tabs defaultValue="upload" className="space-y-4">
           <TabsList>
@@ -155,6 +172,7 @@ function Page() {
                 <Button
                   onClick={handleFileUpload}
                   disabled={
+                    !hasToken ||
                     uploadedFiles.length === 0 ||
                     isUploading ||
                     uploadMutation.isPending

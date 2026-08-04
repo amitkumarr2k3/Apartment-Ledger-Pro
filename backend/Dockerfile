@@ -10,6 +10,13 @@ RUN npx tsc -p tsconfig.json
 
 FROM node:20-alpine
 WORKDIR /app
+RUN apk add --no-cache \
+	python3 \
+	py3-pip \
+	py3-pandas \
+	py3-openpyxl \
+	py3-yaml
+RUN python3 -m pip install --no-cache-dir --break-system-packages xlrd
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/db ./db

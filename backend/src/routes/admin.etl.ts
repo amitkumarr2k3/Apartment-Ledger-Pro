@@ -1,5 +1,5 @@
 import { FastifyInstance } from "fastify";
-import { pool, withTx } from "../db";
+import { pool, refreshRollups, withTx } from "../db";
 import { z } from "zod";
 import {
   saveUploadedFiles,
@@ -69,7 +69,7 @@ export async function routes(app: FastifyInstance) {
             communityId: p.cid,
             actorUserId: p.sub,
             actorEmail: p.email,
-            entity: "etl_session",
+            entity: "import_batch",
             entityId: sessionId,
             action: "import",
             after: {
@@ -91,16 +91,6 @@ export async function routes(app: FastifyInstance) {
           logs: result.logs,
         });
       }
-
-      // Create ETL batch record for tracking
-      const batchResult = await pool.query(
-        `INSERT INTO etl_sessions (community_id, session_id, uploaded_by, input_files, status)
-         VALUES ($1, $2, $3, $4, $5)
-         RETURNING id`,
-        [p.cid, sessionId, p.sub, JSON.stringify(inputFiles), "completed"]
-      );
-
-      const batchId = batchResult.rows[0]?.id;
 
       // Read the transformed transactions CSV
       const csvBuffer = await readTransformedTransactions();
@@ -168,8 +158,8 @@ export async function routes(app: FastifyInstance) {
             communityId: p.cid,
             actorUserId: p.sub,
             actorEmail: p.email,
-            entity: "etl_session",
-            entityId: sessionId,
+            entity: "import_batch",
+            entityId: importBatchId,
             action: "import",
             after: {
               sessionId,
@@ -186,10 +176,12 @@ export async function routes(app: FastifyInstance) {
         );
       });
 
+      await refreshRollups();
+
       return reply.send({
         success: true,
         sessionId,
-        batchId,
+        batchId: importBatchId,
         importBatchId,
         message: "ETL process completed and transactions imported",
         stats: {
@@ -220,9 +212,18 @@ export async function routes(app: FastifyInstance) {
     const p = req.user;
 
     const { rows } = await pool.query(
-      `SELECT id, session_id, uploaded_by, input_files, status, created_at
-       FROM etl_sessions
+      `SELECT
+         id,
+         id::text AS session_id,
+         uploaded_by,
+         jsonb_build_array(filename) AS input_files,
+         status,
+         error AS error_message,
+         created_at
+       FROM import_batches
        WHERE community_id = $1
+         AND kind = 'transactions'
+         AND filename = 'etl-transformed-transactions.csv'
        ORDER BY created_at DESC
        LIMIT 50`,
       [p.cid]
@@ -240,8 +241,19 @@ export async function routes(app: FastifyInstance) {
     const { sessionId } = z.object({ sessionId: z.string() }).parse(req.params);
 
     const { rows } = await pool.query(
-      `SELECT * FROM etl_sessions
-       WHERE community_id = $1 AND session_id = $2`,
+      `SELECT
+         id,
+         id::text AS session_id,
+         uploaded_by,
+         jsonb_build_array(filename) AS input_files,
+         status,
+         error AS error_message,
+         created_at
+       FROM import_batches
+       WHERE community_id = $1
+         AND id = $2::uuid
+         AND kind = 'transactions'
+         AND filename = 'etl-transformed-transactions.csv'`,
       [p.cid, sessionId]
     );
 
@@ -294,12 +306,15 @@ async function commitTransactionRow(c: any, communityId: string, r: any) {
   );
 
   let vendorId: string | null = null;
-  if (r.vendor) {
+  const vendorName = (r.vendor ?? "").trim();
+  const vendorKind = (r.vendor_kind ?? "individual").toString().toLowerCase().trim();
+  if (vendorName) {
     vendorId = await upsert(
       c,
-      `INSERT INTO vendors (community_id, name, kind) VALUES ($1,$2,COALESCE($3::vendor_kind,'company'::vendor_kind))
+      `INSERT INTO vendors (community_id, name, kind)
+       VALUES ($1,$2,COALESCE($3::vendor_kind,'company'::vendor_kind))
        ON CONFLICT (community_id, name) DO UPDATE SET kind=EXCLUDED.kind RETURNING id`,
-      [communityId, r.vendor, r.vendor_kind]
+      [communityId, vendorName, vendorKind === "company" ? "company" : "individual"]
     );
   }
 
@@ -326,19 +341,30 @@ async function commitTransactionRow(c: any, communityId: string, r: any) {
     if (f.rows.length > 0) flatId = f.rows[0].id;
   }
 
+  const amountPaise = Math.round(Number(r.amount) * 100);
+  const direction = String(r.direction ?? "D").toUpperCase().trim();
+  // Use the source_ref from transform.py if present; it is already unique per row.
+  const sourceRef = (r.source_ref ?? "").trim() ||
+    `${r.date}|${r.category}|${vendorName}|${r.line_item ?? ""}|${r.amount}`;
+
   await c.query(
-    `INSERT INTO transactions (period, head_id, category_id, vendor_id, line_item_id, flat_id, amount, direction, source_ref)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+    `INSERT INTO transactions
+     (community_id, txn_date, period_month, head_id, category_id, vendor_id, line_item_id,
+      flat_id, amount_paise, direction, source, source_ref)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'csv',$11)
+     ON CONFLICT (source, source_ref) DO NOTHING`,
     [
+      communityId,
+      r.date,
       period,
       head,
       cat,
       vendorId,
       lineItemId,
       flatId,
-      Number(r.amount),
-      r.direction?.toUpperCase() ?? "D",
-      r.source_ref ?? null,
+      amountPaise,
+      direction,
+      sourceRef,
     ]
   );
 }

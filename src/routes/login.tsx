@@ -9,7 +9,8 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
-import { requestOtp, verifyOtp, signInWithPassword } from "@/lib/session";
+import { requestOtp as requestOtpApi, verifyOtp as verifyOtpApi } from "@/lib/api";
+import { signInWithPassword } from "@/lib/session";
 import { KeyRound, Mail, ShieldCheck, RefreshCw, Lock } from "lucide-react";
 
 
@@ -72,35 +73,53 @@ function LoginPage() {
 
 
 
-  function sendOtp(isResend = false) {
+  async function sendOtp(isResend = false) {
     if (!email.includes("@")) { toast.error("Enter a valid email address"); return; }
-    const res = requestOtp(email);
-    // Always show the same success message — do not leak whitelist status.
-    toast.success(isResend ? "OTP resent — check your email" : "OTP sent — check your email");
-    setStage("otp");
-    startCooldown();
-    // Prototype-only hint (real app never surfaces the code).
-    if (res.ok && res.code) setDevHint(res.code);
-    else setDevHint(null);
+    setBusy(true);
+    try {
+      await requestOtpApi(email);
+      // Always show the same success message — do not leak whitelist status.
+      toast.success(isResend ? "OTP resent — check your email" : "OTP sent — check your email");
+      setStage("otp");
+      startCooldown();
+      // Real API mode: never expose OTP in UI.
+      setDevHint(null);
+    } catch {
+      toast.error("Could not send OTP. Try again.");
+    } finally {
+      setBusy(false);
+    }
   }
 
-  function verify() {
-    const res = verifyOtp(email, otp);
-    if (!res.ok) {
-      const msg =
-        res.reason === "invalid_code" ? "That code is incorrect."
-        : res.reason === "expired" ? "That code has expired. Resend a new one."
-        : res.reason === "not_whitelisted" ? "This email is not on the whitelist."
-        : res.reason === "no_otp_requested" ? "Request an OTP first."
-        : "Could not verify. Try again.";
-      toast.error(msg);
-      return;
+  async function verify() {
+    setBusy(true);
+    try {
+      const j = await verifyOtpApi(email, otp);
+      const roles: string[] = Array.isArray(j.user?.roles) ? j.user.roles : [];
+      const role: "admin" | "resident" = (roles.includes("admin") || roles.includes("superadmin"))
+        ? "admin"
+        : "resident";
+      const session = {
+        email: j.user?.email ?? email.toLowerCase(),
+        name: j.user?.name || j.user?.email || email,
+        role,
+        issuedAt: Date.now(),
+      };
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem("apf.session", JSON.stringify(session));
+        window.dispatchEvent(new Event("apf-session-change"));
+      }
+
+      toast.success(`Signed in as ${session.name} (${session.role})`);
+      const dest = session.role === "admin"
+        ? "/admin/actions"
+        : ((redirect as string) || "/resident/overview");
+      navigate({ to: dest });
+    } catch {
+      toast.error("That code is invalid or expired.");
+    } finally {
+      setBusy(false);
     }
-    toast.success(`Signed in as ${res.session!.name} (${res.session!.role})`);
-    const dest = res.session!.role === "admin"
-      ? "/admin/actions"
-      : ((redirect as string) || "/resident/overview");
-    navigate({ to: dest });
   }
 
   return (

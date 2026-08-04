@@ -32,6 +32,10 @@ export function useVendorRanking() {
 // ---- normalisers ----
 const paiseToRupees = (n: unknown) => Math.round(Number(n ?? 0) / 100);
 
+function hasPaiseTotal(rows: any[]): boolean {
+  return Array.isArray(rows) && rows.length > 0 && rows.some((r) => r && typeof r === "object" && "total" in r);
+}
+
 // Normalise any date-ish value (JS Date, ISO string with time, "YYYY-MM-DD")
 // into a plain YYYY-MM-DD string for display.
 function toYmd(v: unknown): string {
@@ -111,10 +115,24 @@ export function useIncomeCategoryTotals() {
     queryKey: ["income-cat-totals", authCacheKey()],
     queryFn: async () => {
       const r: any[] = await api.getIncomeCategoryTotals();
-      if (r[0] && "total" in r[0] && Number(r[0].total) > 100_000_000) {
+      if (hasPaiseTotal(r)) {
         return r.map((x) => ({ name: x.name, total: paiseToRupees(x.total) }));
       }
       return r as typeof mock.incomeCategoryTotals;
+    },
+    staleTime: 60_000,
+  });
+}
+
+export function useExpenseCategoryTotals() {
+  return useQuery({
+    queryKey: ["expense-cat-totals", authCacheKey()],
+    queryFn: async () => {
+      const r: any[] = await api.getExpenseCategoryTotals();
+      if (hasPaiseTotal(r)) {
+        return r.map((x) => ({ name: x.name, total: paiseToRupees(x.total) }));
+      }
+      return r as typeof mock.expenseCategoryTotals;
     },
     staleTime: 60_000,
   });
@@ -198,6 +216,7 @@ function authHeaders(): RequestInit {
 }
 
 function buildTree(rows: any[]): mock.Category[] {
+  const orderedMonths = Array.from(new Set(rows.map((r) => isoMonthToLabel(r.month))));
   const byCat = new Map<string, mock.Category>();
   for (const r of rows) {
     const catName = r.category ?? "Uncategorised";
@@ -208,9 +227,9 @@ function buildTree(rows: any[]): mock.Category[] {
     if (!vend) { vend = { name: vName, kind: (r.vendor_kind ?? "company") as any, items: [] }; cat.vendors.push(vend); }
     const liName = r.line_item ?? "—";
     let li = vend.items.find((i) => i.name === liName);
-    if (!li) { li = { name: liName, monthly: new Array(mock.months12.length).fill(0) }; vend.items.push(li); }
+    if (!li) { li = { name: liName, monthly: new Array(orderedMonths.length).fill(0) }; vend.items.push(li); }
     const label = isoMonthToLabel(r.month);
-    const idx = mock.months12.indexOf(label);
+    const idx = orderedMonths.indexOf(label);
     if (idx >= 0) li.monthly[idx] = paiseToRupees(r.amount);
   }
   return Array.from(byCat.values());

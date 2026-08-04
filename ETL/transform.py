@@ -169,6 +169,19 @@ months = {
 
 rows = []
 
+EXPECTED_COLUMNS = [
+    "date",
+    "head",
+    "category",
+    "vendor",
+    "vendor_kind",
+    "line_item",
+    "amount",
+    "direction",
+    "flat_code",
+    "source_ref",
+]
+
 # -------------------------------------------------------
 # Process Expense / Receipt Files
 # -------------------------------------------------------
@@ -178,175 +191,209 @@ for file in Path(INPUT_DIR).glob("*.xls*"):
     if "vendor" in file.name.lower():
         continue
 
-    name = file.name.lower()
+    try:
 
-    head = (
-        "expense"
-        if "expense" in name
-        else "income"
-    )
+        name = file.name.lower()
 
-    direction = (
-        "D"
-        if head == "expense"
-        else "C"
-    )
-
-    raw = pd.read_excel(
-        file,
-        header=None
-    )
-
-    fy = ""
-
-    for _, r in raw.iterrows():
-
-        txt = " ".join(
-            [
-                str(x)
-                for x in r
-                if pd.notna(x)
-            ]
+        head = (
+            "expense"
+            if "expense" in name
+            else "income"
         )
 
-        if "Financial Year" in txt:
-            fy = txt
-            break
+        direction = (
+            "D"
+            if head == "expense"
+            else "C"
+        )
 
-    m = re.search(
-        r"(\d{4})-(\d{4})",
-        fy
-    )
+        raw = pd.read_excel(
+            file,
+            header=None
+        )
 
-    if not m:
-        continue
+        fy = ""
 
-    start_year = int(m.group(1))
-    end_year = int(m.group(2))
+        for _, r in raw.iterrows():
 
-    hdr = next(
-        i
-        for i, r in raw.iterrows()
-        if "April"
-        in [str(x) for x in r.values]
-    )
+            txt = " ".join(
+                [
+                    str(x)
+                    for x in r
+                    if pd.notna(x)
+                ]
+            )
 
-    df = pd.read_excel(
-        file,
-        header=hdr
-    )
+            if "Financial Year" in txt:
+                fy = txt
+                break
 
-    ledger_col = df.columns[0]
+        m = re.search(
+            r"(\d{4})-(\d{4})",
+            fy
+        )
 
-    for _, r in df.iterrows():
-
-        ledger = str(
-            r[ledger_col]
-        ).strip()
-
-        if ledger.lower() == "total":
+        if not m:
+            print(
+                f"Skipping {file.name}: could not find 'Financial Year' header"
+            )
             continue
 
-        ledger_norm = norm(ledger)
+        start_year = int(m.group(1))
+        end_year = int(m.group(2))
 
-        for mon, num in months.items():
+        hdr = next(
+            (
+                i
+                for i, r in raw.iterrows()
+                if "April"
+                in [str(x) for x in r.values]
+            ),
+            None
+        )
 
-            if mon not in df.columns:
+        if hdr is None:
+            print(
+                f"Skipping {file.name}: could not find header row containing 'April'"
+            )
+            continue
+
+        df = pd.read_excel(
+            file,
+            header=hdr
+        )
+
+        ledger_col = df.columns[0]
+
+        for _, r in df.iterrows():
+
+            ledger = str(
+                r[ledger_col]
+            ).strip()
+
+            if ledger.lower() == "total":
                 continue
 
-            amt = r.get(mon)
+            ledger_norm = norm(ledger)
 
-            if (
-                pd.isna(amt)
-                or float(amt) == 0
-            ):
-                continue
+            for mon, num in months.items():
 
-            yr = (
-                start_year
-                if num >= 4
-                else end_year
+                if mon not in df.columns:
+                    continue
+
+                amt = r.get(mon)
+
+                if (
+                    pd.isna(amt)
+                    or float(amt) == 0
+                ):
+                    continue
+
+                yr = (
+                    start_year
+                    if num >= 4
+                    else end_year
+                )
+
+                category = (
+                    expense_map
+                    if head == "expense"
+                    else income_map
+                ).get(
+                    ledger_norm,
+                    "Uncategorized"
+                )
+
+                vendor_info = {}
+
+                for k, vv in vendors.items():
+
+                    if norm(k) == ledger_norm:
+                        vendor_info = vv
+                        break
+
+                vendor = vendor_info.get(
+                    "vendor",
+                    "Individual"
+                )
+
+                vendor_kind = vendor_info.get(
+                    "vendor_kind",
+                    "individual"
+                )
+
+                rows.append(
+                    {
+                        "date":
+                            f"{yr}-{num:02d}-01",
+
+                        "head":
+                            head,
+
+                        "category":
+                            category,
+
+                        "vendor":
+                            vendor,
+
+                        "vendor_kind":
+                            vendor_kind,
+
+                        "line_item":
+                            ledger,
+
+                        "amount":
+                            amt,
+
+                        "direction":
+                            direction,
+
+                        "flat_code":
+                            "",
+
+                        "source_ref":
+                            f"{direction}|"
+                            f"{category}|"
+                            f"{vendor}|"
+                            f"{ledger}|"
+                            f"{yr}-{num:02d}"
+                    }
+                )
+
+    except Exception as ex:
+        print(
+            f"Error processing {file.name}: {ex}"
+        )
+
+    finally:
+        # Always move the input file so it isn't reprocessed, even if it
+        # failed or produced no rows.
+        ts = datetime.now().strftime(
+            "%Y%m%d_%H%M%S"
+        )
+
+        try:
+            shutil.move(
+                str(file),
+                f"{PROCESSED_DIR}/{file.stem}_{ts}{file.suffix}"
             )
-
-            category = (
-                expense_map
-                if head == "expense"
-                else income_map
-            ).get(
-                ledger_norm,
-                "Uncategorized"
+        except Exception as move_ex:
+            print(
+                f"Could not move {file.name} to processed: {move_ex}"
             )
-
-            vendor_info = {}
-
-            for k, vv in vendors.items():
-
-                if norm(k) == ledger_norm:
-                    vendor_info = vv
-                    break
-
-            vendor = vendor_info.get(
-                "vendor",
-                "Individual"
-            )
-
-            vendor_kind = vendor_info.get(
-                "vendor_kind",
-                "individual"
-            )
-
-            rows.append(
-                {
-                    "date":
-                        f"{yr}-{num:02d}-01",
-
-                    "head":
-                        head,
-
-                    "category":
-                        category,
-
-                    "vendor":
-                        vendor,
-
-                    "vendor_kind":
-                        vendor_kind,
-
-                    "line_item":
-                        ledger,
-
-                    "amount":
-                        amt,
-
-                    "direction":
-                        direction,
-
-                    "flat_code":
-                        "",
-
-                    "source_ref":
-                        f"{direction}|"
-                        f"{category}|"
-                        f"{vendor}|"
-                        f"{ledger}|"
-                        f"{yr}-{num:02d}"
-                }
-            )
-
-    ts = datetime.now().strftime(
-        "%Y%m%d_%H%M%S"
-    )
-
-    shutil.move(
-        str(file),
-        f"{PROCESSED_DIR}/{file.stem}_{ts}{file.suffix}"
-    )
 
 # -------------------------------------------------------
 # Outputs
 # -------------------------------------------------------
 
-output_df = pd.DataFrame(rows)
+output_df = pd.DataFrame(rows, columns=EXPECTED_COLUMNS)
+
+if output_df.empty:
+    print(
+        "Warning: no transaction rows were extracted from the uploaded "
+        "files (check that they contain a 'Financial Year' header, a "
+        "month header row starting with 'April', and non-zero amounts)."
+    )
 
 # Force ISO date format YYYY-MM-DD
 output_df["date"] = pd.to_datetime(

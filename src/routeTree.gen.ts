@@ -22,6 +22,7 @@ import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
 import { Route as AdminResidentsRouteImport } from './routes/admin.residents'
 import { Route as AdminIncomeRouteImport } from './routes/admin.income'
 import { Route as AdminImportsRouteImport } from './routes/admin.imports'
+import { Route as AdminEtlRouteImport } from './routes/admin.etl'
 import { Route as AdminCollectionsRouteImport } from './routes/admin.collections'
 import { Route as AdminAuditRouteImport } from './routes/admin.audit'
 import { Route as AdminAlertsRouteImport } from './routes/admin.alerts'
@@ -92,6 +93,11 @@ const AdminImportsRoute = AdminImportsRouteImport.update({
   path: '/admin/imports',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminEtlRoute = AdminEtlRouteImport.update({
+  id: '/admin/etl',
+  path: '/admin/etl',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminCollectionsRoute = AdminCollectionsRouteImport.update({
   id: '/admin/collections',
   path: '/admin/collections',
@@ -120,6 +126,7 @@ export interface FileRoutesByFullPath {
   '/admin/alerts': typeof AdminAlertsRoute
   '/admin/audit': typeof AdminAuditRoute
   '/admin/collections': typeof AdminCollectionsRoute
+  '/admin/etl': typeof AdminEtlRoute
   '/admin/imports': typeof AdminImportsRoute
   '/admin/income': typeof AdminIncomeRoute
   '/admin/residents': typeof AdminResidentsRoute
@@ -139,6 +146,7 @@ export interface FileRoutesByTo {
   '/admin/alerts': typeof AdminAlertsRoute
   '/admin/audit': typeof AdminAuditRoute
   '/admin/collections': typeof AdminCollectionsRoute
+  '/admin/etl': typeof AdminEtlRoute
   '/admin/imports': typeof AdminImportsRoute
   '/admin/income': typeof AdminIncomeRoute
   '/admin/residents': typeof AdminResidentsRoute
@@ -159,6 +167,7 @@ export interface FileRoutesById {
   '/admin/alerts': typeof AdminAlertsRoute
   '/admin/audit': typeof AdminAuditRoute
   '/admin/collections': typeof AdminCollectionsRoute
+  '/admin/etl': typeof AdminEtlRoute
   '/admin/imports': typeof AdminImportsRoute
   '/admin/income': typeof AdminIncomeRoute
   '/admin/residents': typeof AdminResidentsRoute
@@ -180,6 +189,7 @@ export interface FileRouteTypes {
     | '/admin/alerts'
     | '/admin/audit'
     | '/admin/collections'
+    | '/admin/etl'
     | '/admin/imports'
     | '/admin/income'
     | '/admin/residents'
@@ -199,6 +209,7 @@ export interface FileRouteTypes {
     | '/admin/alerts'
     | '/admin/audit'
     | '/admin/collections'
+    | '/admin/etl'
     | '/admin/imports'
     | '/admin/income'
     | '/admin/residents'
@@ -218,6 +229,7 @@ export interface FileRouteTypes {
     | '/admin/alerts'
     | '/admin/audit'
     | '/admin/collections'
+    | '/admin/etl'
     | '/admin/imports'
     | '/admin/income'
     | '/admin/residents'
@@ -238,6 +250,7 @@ export interface RootRouteChildren {
   AdminAlertsRoute: typeof AdminAlertsRoute
   AdminAuditRoute: typeof AdminAuditRoute
   AdminCollectionsRoute: typeof AdminCollectionsRoute
+  AdminEtlRoute: typeof AdminEtlRoute
   AdminImportsRoute: typeof AdminImportsRoute
   AdminIncomeRoute: typeof AdminIncomeRoute
   AdminResidentsRoute: typeof AdminResidentsRoute
@@ -337,6 +350,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminIncomeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/etl': {
+      id: '/admin/etl'
+      path: '/admin/etl'
+      fullPath: '/admin/etl'
+      preLoaderRoute: typeof AdminEtlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/imports': {
       id: '/admin/imports'
       path: '/admin/imports'
@@ -382,6 +402,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminAlertsRoute: AdminAlertsRoute,
   AdminAuditRoute: AdminAuditRoute,
   AdminCollectionsRoute: AdminCollectionsRoute,
+  AdminEtlRoute: AdminEtlRoute,
   AdminImportsRoute: AdminImportsRoute,
   AdminIncomeRoute: AdminIncomeRoute,
   AdminResidentsRoute: AdminResidentsRoute,

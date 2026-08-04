@@ -84,7 +84,7 @@ export async function runETLTransformation(
       // Check if Python script exists
       const scriptPath = path.join(ETL_DIR, "transform.py");
 
-      const python = spawn("python", [scriptPath], {
+      const python = spawn("python3", [scriptPath], {
         cwd: ETL_DIR,
         env: {
           ...process.env,
@@ -181,6 +181,17 @@ async function moveProcessedFiles(inputFiles: string[]): Promise<string[]> {
       const destPath = path.join(PROCESSED_DIR, file);
 
       try {
+        // transform.py already moves files to processed/ with timestamped names.
+        // If the source no longer exists, treat this as a successful no-op.
+        const exists = await fs
+          .access(sourcePath)
+          .then(() => true)
+          .catch(() => false);
+        if (!exists) {
+          movedFiles.push(file);
+          continue;
+        }
+
         await fs.rename(sourcePath, destPath);
         movedFiles.push(file);
       } catch (error) {
