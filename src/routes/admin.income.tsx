@@ -47,7 +47,7 @@ function Inner() {
   );
   const totalIncome = rows.reduce((s, r) => s + r.total, 0);
 
-  // AD-31 coverage trend (illustrative): income / expense per month
+  // AD-31: % of expense covered by income (flipped to: % of income spent on expenses)
   const monthlyIncome = sliceMonthly(incomeTree.reduce<number[]>((acc, c) => {
     const monthly = categoryMonthly(c);
     return monthly.map((n, i) => (acc[i] ?? 0) + n);
@@ -56,7 +56,7 @@ function Inner() {
   const coverage = labels.map((m, i) => {
     const inc = monthlyIncome[i] ?? 0;
     const exp = monthlyExpense[i] ?? 0;
-    return { month: m, ratio: exp ? Math.round((inc / exp) * 100) : 0 };
+    return { month: m, ratio: inc ? Math.round((exp / inc) * 100) : 0 };
   });
 
   const irregular = rows.filter((r) => r.irregular || r.dropped);
@@ -107,8 +107,8 @@ function Inner() {
         {/* AD-31 */}
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle className="text-base">Income coverage trend · AD-31</CardTitle>
-            <CardDescription>% of expense covered by non-maintenance income, per month</CardDescription>
+            <CardTitle className="text-base">Expense-to-income ratio trend · AD-31</CardTitle>
+            <CardDescription>% of income spent on expenses per month (lower is healthier)</CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={240}>

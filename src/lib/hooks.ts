@@ -216,7 +216,9 @@ function authHeaders(): RequestInit {
 }
 
 function buildTree(rows: any[]): mock.Category[] {
-  const orderedMonths = Array.from(new Set(rows.map((r) => isoMonthToLabel(r.month))));
+  // Use mock.months12 as the canonical month index so that sliceMonthly (which
+  // assumes numeric monthly[] arrays are aligned to months12) works correctly.
+  const orderedMonths = mock.months12;
   const byCat = new Map<string, mock.Category>();
   for (const r of rows) {
     const catName = r.category ?? "Uncategorised";

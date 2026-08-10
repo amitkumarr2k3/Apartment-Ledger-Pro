@@ -28,7 +28,8 @@ function Inner() {
 
   const totalCol = period.reduce((s, m) => s + m.collection, 0);
   const totalExp = period.reduce((s, m) => s + m.expense, 0);
-  const ratio = totalExp === 0 ? 0 : (totalCol / totalExp) * 100;
+  // % of collected income that has been spent
+  const ratio = totalCol === 0 ? 0 : (totalExp / totalCol) * 100;
   const surplus = period.filter((m) => m.net >= 0).length;
   const deficit = period.length - surplus;
 
@@ -44,13 +45,13 @@ function Inner() {
         {/* RD-20 */}
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription className="text-xs uppercase tracking-wider">Collection / Expense · RD-20</CardDescription>
+            <CardDescription className="text-xs uppercase tracking-wider">Expense / Income · RD-20</CardDescription>
             <CardTitle className="text-4xl font-mono">{ratio.toFixed(0)}%</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded ${ratio >= 100 ? "bg-emerald-500/10 text-emerald-600" : "bg-amber-500/10 text-amber-600"}`}>
-              {ratio >= 100 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-              {ratio >= 100 ? "Healthy" : "Under-recovery"}
+            <div className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded ${ratio <= 100 ? "bg-emerald-500/10 text-emerald-600" : "bg-amber-500/10 text-amber-600"}`}>
+              {ratio <= 100 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+              {ratio <= 100 ? "Within budget" : "Over-spent"}
             </div>
           </CardContent>
         </Card>

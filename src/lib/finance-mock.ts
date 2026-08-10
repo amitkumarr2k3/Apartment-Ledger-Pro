@@ -14,10 +14,26 @@ export const inr = (n: number) => {
 
 export const pct = (n: number, digits = 1) => `${n >= 0 ? "+" : ""}${n.toFixed(digits)}%`;
 
-export const months12 = [
-  "Aug '25", "Sep '25", "Oct '25", "Nov '25", "Dec '25", "Jan '26",
-  "Feb '26", "Mar '26", "Apr '26", "May '26", "Jun '26", "Jul '26",
-];
+// Dynamically compute a month window that covers the previous FY + current FY
+// so that "Last FY" and all rolling filters always have the data they need.
+const _NOW = new Date();
+const _PREV = new Date(_NOW.getFullYear(), _NOW.getMonth() - 1, 1);
+const _ABBRS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const _fmt = (d: Date) => `${_ABBRS[d.getMonth()]} '${String(d.getFullYear()).slice(-2)}`;
+// Indian FY starts Apr. Go back to start of the previous FY.
+const _curFYStartYear = _PREV.getMonth() >= 3 ? _PREV.getFullYear() : _PREV.getFullYear() - 1;
+const _prevFYStartYear = _curFYStartYear - 1;
+const _windowStart = new Date(_prevFYStartYear, 3, 1); // Apr of prevFY year
+
+export const months12: string[] = (() => {
+  const result: string[] = [];
+  let d = new Date(_windowStart);
+  while (d <= _PREV) {
+    result.push(_fmt(d));
+    d = new Date(d.getFullYear(), d.getMonth() + 1, 1);
+  }
+  return result;
+})();
 
 // Monthly totals (community-level)
 export const monthlyTotals = months12.map((m, i) => {

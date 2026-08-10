@@ -14,7 +14,7 @@ import {
 import { Home, BarChart3, Table2, Menu, ChevronLeft, Printer, Download, LogOut } from "lucide-react";
 
 // ─── Period context ──────────────────────────────────────────────────────
-export type PeriodValue = "month-prev" | "range-3m" | "range-6m" | "range-12m" | "fy";
+export type PeriodValue = "month-prev" | "range-3m" | "range-6m" | "range-12m" | "fy" | "fy-prev";
 
 // Format like "Jul '26" — matches finance-mock months12 and hooks.isoMonthToLabel
 const MONTH_ABBRS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -43,6 +43,8 @@ const FY_START_YEAR = fiscalStartYearFor(PREV_MONTH);
 const FY_START = new Date(FY_START_YEAR, 3, 1);
 const FY_END = new Date(FY_START_YEAR + 1, 2, 31);
 const FY_LABEL = `FY ${FY_START_YEAR}-${String(FY_START_YEAR + 1).slice(-2)}`;
+const PREV_FY_START_YEAR = FY_START_YEAR - 1;
+const PREV_FY_LABEL = `FY ${PREV_FY_START_YEAR}-${String(PREV_FY_START_YEAR + 1).slice(-2)}`;
 
 type PeriodMeta = { label: string; count: number };
 const periodConfig: Record<PeriodValue, PeriodMeta> = {
@@ -51,6 +53,7 @@ const periodConfig: Record<PeriodValue, PeriodMeta> = {
   "range-6m": { label: "Last 6 months", count: 6 },
   "range-12m": { label: "Last 12 months", count: 12 },
   "fy": { label: FY_LABEL, count: 12 },
+  "fy-prev": { label: PREV_FY_LABEL, count: 12 },
 };
 
 function labelForItem(x: unknown, i: number, fallback: string[]): string {
@@ -92,6 +95,16 @@ function selectIndices(period: PeriodValue, labels: string[]): number[] {
     return labels
       .map((l, i) => ({ i, d: parseMonthLabel(l) }))
       .filter(({ d }) => d && d >= fyStart && d <= fyEnd && d <= anchorDate)
+      .map(({ i }) => i);
+  }
+  if (period === "fy-prev") {
+    const anchorDate = parseMonthLabel(labels[anchor]) ?? PREV_MONTH;
+    const fyStartYear = fiscalStartYearFor(anchorDate) - 1;
+    const fyStart = new Date(fyStartYear, 3, 1);
+    const fyEnd = new Date(fyStartYear + 1, 2, 31);
+    return labels
+      .map((l, i) => ({ i, d: parseMonthLabel(l) }))
+      .filter(({ d }) => d && d >= fyStart && d <= fyEnd)
       .map(({ i }) => i);
   }
   if (period === "month-prev") {
