@@ -4,13 +4,13 @@ import { PortalShell, usePeriod } from "@/components/portal-shell";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import {
-  Bar, BarChart, CartesianGrid, LabelList, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend, Cell,
+  Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend, Cell,
 } from "recharts";
 import { SmartTooltipContent, getTooltipTrigger } from "@/components/smart-tooltip";
 import {
   inr, pct, expenseTree, categoryMonthly, total,
 } from "@/lib/finance-mock";
-import { useMonthlyTotals, useExpenseTree, useIncomeTree } from "@/lib/hooks";
+import { useMonthlyTotals, useIncomeCategoryTotals, useExpenseTree } from "@/lib/hooks";
 import { Wallet, ArrowRight, TrendingUp, TrendingDown } from "lucide-react";
 
 export const Route = createFileRoute("/resident/overview")({
@@ -29,7 +29,7 @@ function Page() {
 function Inner() {
   const { sliceMonthly, priorSliceMonthly, view } = usePeriod();
   const { data: monthlyTotals = [] } = useMonthlyTotals();
-  const { data: incomeTree = [] } = useIncomeTree();
+  const { data: incomeCategoryTotals = [] } = useIncomeCategoryTotals();
   const { data: expenseTree = [] } = useExpenseTree();
   const period = sliceMonthly(monthlyTotals);
   const prior = priorSliceMonthly(monthlyTotals);
@@ -53,24 +53,7 @@ function Inner() {
     .sort((a, b) => b.total - a.total)
     .slice(0, 5);
   const top5Total = top5.reduce((s, c) => s + c.total, 0);
-
-  // Income breakdown: separate maintenance from other sources, sorted by contribution %
-  const incomeByCategory = incomeTree
-    .map((c) => ({ name: c.name, amount: total(sliceMonthly(categoryMonthly(c))) }))
-    .sort((a, b) => b.amount - a.amount);
-  const maintenanceCat = incomeByCategory.find((c) =>
-    c.name.toLowerCase().includes("maintenance"),
-  );
-  const maintenanceTotal = maintenanceCat?.amount ?? 0;
-  const allIncomeTotal = incomeByCategory.reduce((s, c) => s + c.amount, 0);
-  const maintenancePct = allIncomeTotal ? (maintenanceTotal / allIncomeTotal) * 100 : 0;
-  const otherIncomeItems = incomeByCategory
-    .filter((c) => !c.name.toLowerCase().includes("maintenance"))
-    .map((c) => ({
-      ...c,
-      pct: allIncomeTotal ? +((c.amount / allIncomeTotal) * 100).toFixed(1) : 0,
-    }));
-  const otherIncomeTotal = otherIncomeItems.reduce((s, c) => s + c.amount, 0);
+  const communityIncome = incomeCategoryTotals.find((c) => c.name === "Other Income")?.total ?? 0;
 
   const priorLabel = prior.length === 0 ? "no prior window" : `vs prior ${prior.length}m`;
 
@@ -164,40 +147,26 @@ function Inner() {
             <CardTitle className="text-base flex items-center gap-2">
               <Wallet className="h-4 w-4" /> Community income
             </CardTitle>
-            <CardDescription>RD-05 · Sorted by contribution %</CardDescription>
+            <CardDescription>RD-05 · Non-maintenance income</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Maintenance headline — separated out */}
-            <Link
-              to="/resident/drilldown"
-              search={(((prev: any) => ({ ...prev, head: "income", category: "Maintenance Collections", vendor: undefined, line: undefined })) as any)}
-              className="flex items-center justify-between p-3 rounded-md bg-cyan-500/5 border border-cyan-500/20 hover:bg-cyan-500/10 transition-colors"
-            >
-              <div>
-                <div className="text-sm font-medium">Maintenance Collections</div>
-                <div className="text-xs text-muted-foreground">Flat dues · {maintenancePct.toFixed(1)}% of income</div>
-              </div>
-              <span className="font-mono text-sm">{inr(maintenanceTotal)}</span>
-            </Link>
-
-            {/* Other income sources — sorted by %, with inline % labels */}
-            {otherIncomeItems.length > 0 && (
-              <>
-                <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span className="font-medium uppercase tracking-wider">Other income</span>
-                  <span className="font-mono">{inr(otherIncomeTotal)}</span>
-                </div>
-                <ResponsiveContainer width="100%" height={otherIncomeItems.length * 32 + 8}>
-                  <BarChart data={otherIncomeItems} layout="vertical" margin={{ left: 0, right: 44, top: 0, bottom: 0 }}>
-                    <XAxis type="number" hide />
-                    <YAxis type="category" dataKey="name" width={88} fontSize={11} tick={{ fill: "currentColor" }} />
-                    <Bar dataKey="amount" fill="var(--color-chart-2)" radius={[0, 4, 4, 0]}>
-                      <LabelList dataKey="pct" position="right" formatter={(v: number) => `${v}%`} style={{ fontSize: 11 }} />
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </>
-            )}
+            <div>
+              <div className="text-3xl font-semibold">{inr(communityIncome)}</div>
+              <div className="text-xs text-muted-foreground">from hall rental, signage, events</div>
+            </div>
+            <div className="space-y-2 text-sm">
+              {incomeCategoryTotals.map((i) => (
+                <Link
+                  key={i.name}
+                  to="/resident/drilldown"
+                  search={(((prev: any) => ({ ...prev, head: "income", category: i.name, vendor: undefined, line: undefined })) as any)}
+                  className="flex justify-between hover:bg-accent/40 rounded px-2 -mx-2 py-1 transition-colors"
+                >
+                  <span className="text-muted-foreground">{i.name}</span>
+                  <span className="font-mono">{inr(i.total)}</span>
+                </Link>
+              ))}
+            </div>
           </CardContent>
         </Card>
       </div>

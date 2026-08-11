@@ -62,8 +62,15 @@ function Inner() {
     [expenseTree, sliceMonthly, priorSliceMonthly],
   );
 
-  const activeName = selected ?? expenseTree[0]?.name ?? null;
-  const cat = expenseTree.find((c) => c.name === activeName);
+  // Only include categories that have actual spend in the selected period —
+  // categories like "Accounting Adjustment" with zero/minimal data are excluded.
+  const categoriesWithSpend = expenseTree.filter(
+    (c) => total(sliceMonthly(categoryMonthly(c))) > 0,
+  );
+  const activeName = selected
+    ? (categoriesWithSpend.find((c) => c.name === selected)?.name ?? categoriesWithSpend[0]?.name ?? null)
+    : (categoriesWithSpend[0]?.name ?? null);
+  const cat = categoriesWithSpend.find((c) => c.name === activeName);
 
   if (!isLoading && expenseTree.length === 0) {
     return (
@@ -149,7 +156,7 @@ function Inner() {
             <Select value={activeName ?? undefined} onValueChange={setSelected}>
               <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
               <SelectContent>
-                {expenseTree.map((c) => <SelectItem key={c.name} value={c.name}>{c.name}</SelectItem>)}
+                {categoriesWithSpend.map((c) => <SelectItem key={c.name} value={c.name}>{c.name}</SelectItem>)}
               </SelectContent>
             </Select>
           </CardHeader>

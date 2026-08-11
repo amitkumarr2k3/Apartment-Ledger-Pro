@@ -1,8 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { PortalShell, usePeriod } from "@/components/portal-shell";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, Bar, CartesianGrid, ComposedChart, Line, ResponsiveContainer, XAxis, YAxis, Legend } from "recharts";
 import { SmartTooltipContent, getTooltipTrigger } from "@/components/smart-tooltip";
@@ -61,6 +62,7 @@ function Inner() {
     () => derive(expenseTree, sliceMonthly, priorSliceMonthly),
     [expenseTree, sliceMonthly, priorSliceMonthly],
   );
+  const [selectedProjection, setSelectedProjection] = useState<string | null>(null);
 
   if (!isLoading && expenseTree.length === 0) {
     return (
@@ -76,7 +78,27 @@ function Inner() {
   }));
   const actions = [...anomalyItems, ...risingItems].slice(0, 5);
 
-  const risingCat = expenseTree.find((c) => c.name === risingItems[0]?.label) ?? expenseTree[0];
+  const projectionCandidates = [
+    ...anomalies
+      .sort((a, b) => b.ratio - a.ratio)
+      .map((a) => ({
+        category: a.category,
+        reason: `Anomaly: ${a.ratio.toFixed(1)}x above prior 3-month average`,
+        score: a.ratio,
+      })),
+    ...momChanges
+      .filter((c) => c.periodChange > 15)
+      .sort((a, b) => b.periodChange - a.periodChange)
+      .map((c) => ({
+        category: c.category,
+        reason: `Rising cost: ${pct(c.periodChange, 1)} vs prior period`,
+        score: c.periodChange,
+      })),
+  ].filter((candidate, index, arr) => arr.findIndex((x) => x.category === candidate.category) === index);
+
+  const activeProjectionName = selectedProjection ?? projectionCandidates[0]?.category ?? null;
+  const activeProjectionMeta = projectionCandidates.find((c) => c.category === activeProjectionName) ?? null;
+  const risingCat = expenseTree.find((c) => c.name === activeProjectionName) ?? null;
   const monthlyFull = risingCat ? categoryMonthly(risingCat) : new Array(labels.length).fill(0);
   const monthly = sliceMonthly(monthlyFull);
   const last6 = monthly.slice(-6);
@@ -126,11 +148,23 @@ function Inner() {
         </CardContent>
       </Card>
 
-      {risingCat && (
+      {risingCat && activeProjectionMeta && (
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Projection · {risingCat.name} · AD-40</CardTitle>
-            <CardDescription>Linear extrapolation for the next 2 months (dashed)</CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between gap-4">
+            <div>
+              <CardTitle className="text-base">Projection · {risingCat.name} · AD-40</CardTitle>
+              <CardDescription>{activeProjectionMeta.reason}</CardDescription>
+            </div>
+            {projectionCandidates.length > 1 && (
+              <Select value={activeProjectionName ?? undefined} onValueChange={setSelectedProjection}>
+                <SelectTrigger className="w-[250px]"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {projectionCandidates.map((candidate) => (
+                    <SelectItem key={candidate.category} value={candidate.category}>{candidate.category}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={260}>
@@ -144,6 +178,23 @@ function Inner() {
                 <Line type="monotone" dataKey="projected" name="Projected" stroke="var(--color-chart-4)" strokeWidth={2} strokeDasharray="6 4" />
               </ComposedChart>
             </ResponsiveContainer>
+            <p className="mt-3 text-xs text-muted-foreground">
+              Projection is shown only for flagged categories and is based on the recent linear trend of the selected period.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {!risingCat && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Projection · AD-40</CardTitle>
+            <CardDescription>No flagged category available for projection in the selected period</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              This chart now appears only when a category is flagged as an anomaly or rising cost, so it will not fall back to an unrelated category like the first item in the list.
+            </p>
           </CardContent>
         </Card>
       )}
