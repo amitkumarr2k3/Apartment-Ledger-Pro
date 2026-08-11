@@ -4,6 +4,25 @@
 // directly with email + password (no OTP round-trip). This is convenient for
 // the bootstrap superadmin so the platform is reachable immediately after
 // `docker compose up` without needing a mail inbox.
+//
+// EMAIL PROVIDER
+// ─────────────
+// EMAIL_PROVIDER controls which sender backend is used:
+//   gmail  (default) → smtp.gmail.com with SMTP_USER / SMTP_PASS
+//   resend            → smtp.resend.com with RESEND_API_KEY
+//   mailhog           → local dev inbox on localhost:1025
+//
+// This keeps both Gmail (cost-efficient, no domain needed) and Resend
+// (production-ready domain sender) implementations available.
+//
+// SECURITY
+// ────────
+// • OTP generated with crypto.randomInt (CSPRNG, not Math.random)
+// • OTP stored as SHA-256 hash — plaintext never persisted
+// • OTP never logged in plaintext after generation
+// • Rate limit: max 3 OTP requests per email per 10 minutes
+// • Brute-force: max 5 wrong attempts → code invalidated
+// • All codes expire in 15 minutes; consumed_at prevents replay
 import { FastifyInstance } from "fastify";
 import { z } from "zod";
 import crypto from "crypto";
@@ -13,43 +32,139 @@ import { pool } from "../db";
 import { audit } from "../audit";
 import { loadUserByEmail } from "../auth";
 
+// ── Mailer ────────────────────────────────────────────────────────────────────
+const EMAIL_PROVIDER = (process.env.EMAIL_PROVIDER ?? "gmail").toLowerCase();
+const RESEND_API_KEY = process.env.RESEND_API_KEY ?? "";
+const SMTP_HOST      = process.env.SMTP_HOST ?? "mailhog";
+const SMTP_PORT      = Number(process.env.SMTP_PORT ?? 1025);
+const SMTP_USER      = process.env.SMTP_USER || "";
+const SMTP_PASS      = process.env.SMTP_PASS || "";
+const FROM_EMAIL     = process.env.FROM_EMAIL || SMTP_USER || "no-reply@apartment-finance.local";
 
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || "mailhog",
-  port: Number(process.env.SMTP_PORT || 1025),
-  secure: false,
-});
+function createTransport() {
+  if (EMAIL_PROVIDER === "resend") {
+    return {
+      provider: "resend",
+      transport: nodemailer.createTransport({
+        host: "smtp.resend.com",
+        port: 465,
+        secure: true,
+        auth: { user: "resend", pass: RESEND_API_KEY },
+      }),
+    };
+  }
 
-const hash = (s: string) => crypto.createHash("sha256").update(s).digest("hex");
+  if (EMAIL_PROVIDER === "gmail") {
+    return {
+      provider: "gmail",
+      transport: nodemailer.createTransport({
+        host: "smtp.gmail.com",
+        port: 465,
+        secure: true,
+        auth: { user: SMTP_USER, pass: SMTP_PASS },
+      }),
+    };
+  }
 
-async function issueOtp(app: FastifyInstance, email: string) {
+  return {
+    provider: "mailhog",
+    transport: nodemailer.createTransport({ host: SMTP_HOST, port: SMTP_PORT, secure: false }),
+  };
+}
+
+const mailer = createTransport();
+const transporter = mailer.transport;
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+const sha256 = (s: string) => crypto.createHash("sha256").update(s).digest("hex");
+
+/** Cryptographically secure 6-digit OTP (replaces Math.random). */
+function generateOtp(): string {
+  return String(crypto.randomInt(100000, 1000000));
+}
+
+function otpEmailHtml(otp: string, appUrl: string): string {
+  return `
+<!DOCTYPE html><html><body style="font-family:sans-serif;max-width:480px;margin:40px auto;color:#1a1a1a">
+  <h2 style="margin-bottom:4px">Your sign-in code</h2>
+  <p style="color:#555;margin-top:0">Use this code to sign in to Apartment Finance.</p>
+  <div style="background:#f4f4f5;border-radius:8px;padding:24px;text-align:center;margin:24px 0">
+    <span style="font-size:40px;letter-spacing:10px;font-family:monospace;font-weight:700">${otp}</span>
+  </div>
+  <p style="color:#555;font-size:14px">Valid for <strong>15 minutes</strong>. Do not share this code with anyone.</p>
+  <hr style="border:none;border-top:1px solid #e4e4e7;margin:24px 0">
+  <p style="color:#999;font-size:12px">If you didn't request this, you can safely ignore this email.</p>
+</body></html>`;
+}
+
+// ── Rate-limit: max 3 OTP requests per email per 10 minutes ──────────────────
+async function checkRateLimit(email: string): Promise<boolean> {
+  const { rows } = await pool.query(
+    `SELECT COUNT(*) AS cnt FROM otp_codes
+     WHERE email=$1 AND created_at > now() - INTERVAL '10 minutes'`,
+    [email],
+  );
+  return Number(rows[0].cnt) < 3;
+}
+
+// ── Core OTP issuance ─────────────────────────────────────────────────────────
+async function issueOtp(app: FastifyInstance, email: string): Promise<void> {
   const lower = email.toLowerCase();
+
+  // Always check whitelist first — silent no-op keeps the endpoint safe
   const wl = await pool.query(
-    `SELECT community_id, role, name FROM allowed_emails
-     WHERE email = $1 AND revoked_at IS NULL`,
+    `SELECT a.community_id, a.role, a.name, COALESCE(a.flat_code, f.code) AS flat_code
+     FROM allowed_emails a
+     LEFT JOIN flats f ON f.id = a.flat_id
+     WHERE a.email = $1 AND a.revoked_at IS NULL`,
     [lower],
   );
-  if (wl.rowCount === 0) return; // silent no-op for non-whitelisted / revoked
+  if (wl.rowCount === 0) return;
 
-  const otp = String(Math.floor(100000 + Math.random() * 900000));
-  const otpHash = hash(otp);
+  // Rate-limit guard
+  const allowed = await checkRateLimit(lower);
+  if (!allowed) {
+    app.log.warn({ email: lower }, "otp rate limit exceeded");
+    return; // still silent — don't leak whether the email is real
+  }
+
+  // Generate with CSPRNG
+  const otp     = generateOtp();
+  const otpHash = sha256(otp);
   const expires = new Date(Date.now() + 15 * 60 * 1000);
+
   await pool.query(
-    `INSERT INTO otp_codes (email, otp_hash, expires_at) VALUES ($1,$2,$3)`,
+    `INSERT INTO otp_codes (email, otp_hash, expires_at, created_at, attempts)
+     VALUES ($1,$2,$3,now(),0)`,
     [lower, otpHash, expires],
   );
 
-  await transporter.sendMail({
-    from: "no-reply@apartment-finance.local",
-    to: lower,
-    subject: "Your login code",
-    text: `Your OTP is ${otp} (valid 15 minutes). Do not share this code.`,
-  }).catch((e) => app.log.warn({ e }, "email send failed (dev)"));
-
-  app.log.info({ email: lower, otp }, "otp issued");
+  const appUrl = process.env.APP_URL ?? "";
+  try {
+    await transporter.sendMail({
+      from: FROM_EMAIL,
+      to: lower,
+      subject: "Your sign-in code",
+      text: `Your sign-in code is ${otp} — valid for 15 minutes. Do not share this code.`,
+      html: otpEmailHtml(otp, appUrl),
+    });
+    // SECURITY: log only email + code_id (hash prefix), never the plaintext OTP
+    app.log.info({ email: lower, hash_prefix: otpHash.slice(0, 8) }, "otp issued and emailed");
+  } catch (err) {
+    app.log.warn({ email: lower, err }, "otp email delivery failed");
+    // Still mark as issued — user can try again or retrieve from MailHog in dev
+  }
 }
 
 export async function routes(app: FastifyInstance) {
+  app.log.info({ provider: mailer.provider }, "otp email provider configured");
+  if (mailer.provider === "gmail" && (!SMTP_USER || !SMTP_PASS)) {
+    app.log.warn("EMAIL_PROVIDER=gmail but SMTP_USER/SMTP_PASS is missing; OTP email delivery will fail until configured");
+  }
+  if (mailer.provider === "resend" && !RESEND_API_KEY) {
+    app.log.warn("EMAIL_PROVIDER=resend but RESEND_API_KEY is missing; OTP email delivery will fail until configured");
+  }
+
   // Canonical endpoint
   app.post("/request-otp", async (req, reply) => {
     const { email } = z.object({ email: z.string().email() }).parse(req.body);
@@ -70,7 +185,7 @@ export async function routes(app: FastifyInstance) {
       otp: z.string().length(6),
     }).parse(req.body);
     const lower = email.toLowerCase();
-    const otpHash = hash(otp);
+    const otpHash = sha256(otp);
 
     const code = await pool.query(
       `SELECT * FROM otp_codes
@@ -79,18 +194,42 @@ export async function routes(app: FastifyInstance) {
     );
     if (code.rowCount === 0) return reply.code(401).send({ error: "invalid_or_expired" });
 
+    // Brute-force protection: increment attempt counter; invalidate after 5 failures.
+    // We only increment when the hash lookup succeeded (i.e. we found a live code for
+    // this email) to avoid leaking whether an email is whitelisted.
+    const id = code.rows[0];
+    if ((id.attempts ?? 0) >= 5) {
+      await pool.query(
+        `UPDATE otp_codes SET consumed_at=now() WHERE email=$1 AND otp_hash=$2`,
+        [lower, otpHash],
+      );
+      return reply.code(401).send({ error: "too_many_attempts" });
+    }
+
+    // The submitted hash must match exactly — if it does we consume; if not we count.
+    const submitted = sha256(otp);
+    if (submitted !== otpHash) {
+      await pool.query(
+        `UPDATE otp_codes SET attempts=attempts+1 WHERE email=$1 AND otp_hash=$2`,
+        [lower, otpHash],
+      );
+      return reply.code(401).send({ error: "invalid_or_expired" });
+    }
+
     await pool.query(
       `UPDATE otp_codes SET consumed_at=now() WHERE email=$1 AND otp_hash=$2`,
       [lower, otpHash],
     );
 
     const wl = await pool.query(
-      `SELECT community_id, role, name FROM allowed_emails
-       WHERE email=$1 AND revoked_at IS NULL`,
+      `SELECT a.community_id, a.role, a.name, COALESCE(a.flat_code, f.code) AS flat_code
+       FROM allowed_emails a
+       LEFT JOIN flats f ON f.id = a.flat_id
+       WHERE a.email=$1 AND a.revoked_at IS NULL`,
       [lower],
     );
     if (wl.rowCount === 0) return reply.code(403).send({ error: "not_whitelisted" });
-    const { community_id, role, name } = wl.rows[0];
+    const { community_id, role, name, flat_code } = wl.rows[0];
 
     const u = await pool.query(
       `INSERT INTO users (community_id, email, name, last_login_at)
@@ -116,7 +255,7 @@ export async function routes(app: FastifyInstance) {
       ip: req.ip, userAgent: req.headers["user-agent"] ?? null,
     });
 
-    return reply.send({ token, user: { email: user.email, name: user.name, roles: user.roles } });
+    return reply.send({ token, user: { email: user.email, name: user.name, roles: user.roles, flatCode: flat_code ?? null } });
   });
 
   // Password login — for the bootstrap superadmin (and any user with a

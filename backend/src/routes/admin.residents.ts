@@ -7,7 +7,17 @@ const Body = z.object({
   email: z.string().email(),
   role: z.enum(["resident","admin","superadmin"]).default("resident"),
   flat_id: z.string().uuid().optional().nullable(),
+  flat_code: z.string().optional().nullable(),
   name: z.string().optional(),
+});
+
+const PatchBody = z.object({
+  role: z.enum(["resident","admin","superadmin"]).optional(),
+  flat_id: z.string().uuid().optional().nullable(),
+  flat_code: z.string().optional().nullable(),
+  name: z.string().optional(),
+  // Pass revoke: true to revoke, revoke: false to reactivate
+  revoke: z.boolean().optional(),
 });
 
 export async function routes(app: FastifyInstance) {
@@ -17,13 +27,14 @@ export async function routes(app: FastifyInstance) {
   app.get("/", async (req) => {
     const p = req.user;
     const { rows } = await pool.query(
-      `SELECT a.email, a.role, a.name, a.invited_at, a.revoked_at, a.flat_id, f.code AS flat_code
+      `SELECT a.email, a.role, a.name, a.flat_code, a.invited_at, a.revoked_at, a.flat_id, f.code AS flat_code_join
        FROM allowed_emails a LEFT JOIN flats f ON f.id=a.flat_id
        WHERE a.community_id=$1
        ORDER BY a.invited_at DESC`,
       [p.cid],
     );
-    return rows;
+    // Prefer explicit flat_code text column; fall back to flats join code
+    return rows.map((r) => ({ ...r, flat_code: r.flat_code ?? r.flat_code_join ?? null }));
   });
 
   app.post("/", async (req, reply) => {
@@ -31,12 +42,12 @@ export async function routes(app: FastifyInstance) {
     const body = Body.parse(req.body);
     const created = await withTx(async (c) => {
       const r = await c.query(
-        `INSERT INTO allowed_emails (email, community_id, role, flat_id, name, invited_by)
-         VALUES ($1,$2,$3,$4,$5,$6)
+        `INSERT INTO allowed_emails (email, community_id, role, flat_id, flat_code, name, invited_by)
+         VALUES ($1,$2,$3,$4,$5,$6,$7)
          ON CONFLICT (email) DO UPDATE SET role=EXCLUDED.role, flat_id=EXCLUDED.flat_id,
-           name=EXCLUDED.name, revoked_at=NULL
+           flat_code=EXCLUDED.flat_code, name=EXCLUDED.name, revoked_at=NULL
          RETURNING *`,
-        [body.email.toLowerCase(), p.cid, body.role, body.flat_id ?? null, body.name ?? null, p.email],
+        [body.email.toLowerCase(), p.cid, body.role, body.flat_id ?? null, body.flat_code ?? null, body.name ?? null, p.email],
       );
       await audit({ communityId: p.cid, actorUserId: p.sub, actorEmail: p.email,
         entity: "allowed_email", entityId: body.email, action: "create", after: r.rows[0] }, c);
@@ -48,7 +59,7 @@ export async function routes(app: FastifyInstance) {
   app.patch("/:email", async (req, reply) => {
     const p = req.user;
     const { email } = z.object({ email: z.string().email() }).parse(req.params);
-    const body = Body.partial().parse(req.body);
+    const body = PatchBody.parse(req.body);
     const updated = await withTx(async (c) => {
       const before = (await c.query(`SELECT * FROM allowed_emails WHERE email=$1 AND community_id=$2`,
         [email.toLowerCase(), p.cid])).rows[0];
@@ -57,7 +68,11 @@ export async function routes(app: FastifyInstance) {
       const push = (col: string, val: any) => { params.push(val); fields.push(`${col}=$${params.length}`); };
       if (body.role) push("role", body.role);
       if (body.flat_id !== undefined) push("flat_id", body.flat_id);
+      if (body.flat_code !== undefined) push("flat_code", body.flat_code);
       if (body.name !== undefined) push("name", body.name);
+      if (body.revoke === true) push("revoked_at", new Date().toISOString());
+      if (body.revoke === false) push("revoked_at", null);
+      if (fields.length === 0) return before;
       params.push(email.toLowerCase(), p.cid);
       const r = await c.query(
         `UPDATE allowed_emails SET ${fields.join(", ")} WHERE email=$${params.length-1} AND community_id=$${params.length} RETURNING *`,

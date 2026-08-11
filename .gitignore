@@ -26,6 +26,7 @@ ETL/config/mapping11.yaml
 .wrangler/
 .dev.vars
 ETL/output/transactions.xlsx
+.env
 
 # Editor directories and files
 .vscode/*

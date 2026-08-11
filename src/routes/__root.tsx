@@ -36,6 +36,11 @@ function RouteGuard() {
     }
     const check = () => {
       const session = getSession();
+      if (session && pathname === "/") {
+        const target = session.role === "admin" ? "/admin/actions" : "/resident/overview";
+        navigate({ to: target, replace: true });
+        return;
+      }
       if (PUBLIC_PATHS.has(pathname)) return;
       if (!session) {
         if (pathname === "/") return; // landing stays public
@@ -133,14 +138,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Apartment Ledger Pro — Prototype Index" },
-      { name: "description", content: "Index of prototype screens covering every requirement in the Apartment Ledger Pro Phase 2 document." },
-      { property: "og:title", content: "Apartment Ledger Pro — Prototype Index" },
-      { property: "og:description", content: "Index of prototype screens covering every requirement in the Apartment Ledger Pro Phase 2 document." },
+      { title: "CG Boulevard Apartment Ledger Portal" },
+      { name: "description", content: "Unified finance dashboards for residents and admins with secure OTP access, audit tracking, and insights across collections, expenses, and cashflow." },
+      { property: "og:title", content: "CG Boulevard Apartment Ledger Portal" },
+      { property: "og:description", content: "Unified finance dashboards for residents and admins with secure OTP access, audit tracking, and insights across collections, expenses, and cashflow." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:title", content: "Apartment Ledger Pro — Prototype Index" },
-      { name: "twitter:description", content: "Index of prototype screens covering every requirement in the Apartment Ledger Pro Phase 2 document." },
+      { name: "twitter:title", content: "CG Boulevard Apartment Ledger Portal" },
+      { name: "twitter:description", content: "Unified finance dashboards for residents and admins with secure OTP access, audit tracking, and insights across collections, expenses, and cashflow." },
       { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/9bd5624d-5aaf-45a3-b3ed-271beacb5f0c/id-preview-bfc9bbc8--5f4910d9-cc7e-478e-a2c6-2827c8a63769.lovable.app-1783860026025.png" },
       { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/9bd5624d-5aaf-45a3-b3ed-271beacb5f0c/id-preview-bfc9bbc8--5f4910d9-cc7e-478e-a2c6-2827c8a63769.lovable.app-1783860026025.png" },
     ],

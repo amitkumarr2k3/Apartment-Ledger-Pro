@@ -9,6 +9,7 @@ import { AUTH_ENABLED, GUEST_SESSION } from "./feature-flags";
 export type Session = {
   email: string;
   name: string;
+  flatCode?: string | null;
   role: "resident" | "admin";
   issuedAt: number;
 };
@@ -108,7 +109,11 @@ export async function signInWithPassword(email: string, password: string):
       j.user?.email?.toLowerCase() === "admin@example.com";
     const role: "admin" | "resident" = isAdmin ? "admin" : "resident";
     const session = normaliseSession({
-      email: j.user.email, name: j.user.name || j.user.email, role, issuedAt: Date.now(),
+      email: j.user.email,
+      name: j.user.name || j.user.email,
+      flatCode: j.user.flatCode ?? j.user.flat_code ?? null,
+      role,
+      issuedAt: Date.now(),
     });
     window.localStorage.setItem(SESSION_KEY, JSON.stringify(session));
     window.dispatchEvent(new Event("apf-session-change"));

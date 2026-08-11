@@ -11,7 +11,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import {
   CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator,
 } from "@/components/ui/command";
-import { Home, BarChart3, Table2, Menu, ChevronLeft, Printer, Download, LogOut } from "lucide-react";
+import { Home, BarChart3, Table2, Menu, ChevronLeft, Printer, Download, LogOut, UserCircle2 } from "lucide-react";
 
 // ─── Period context ──────────────────────────────────────────────────────
 export type PeriodValue = "month-prev" | "range-3m" | "range-6m" | "range-12m" | "fy" | "fy-prev";
@@ -88,18 +88,19 @@ function selectIndices(period: PeriodValue, labels: string[]): number[] {
   if (anchor < 0) return [];
 
   if (period === "fy") {
-    const anchorDate = parseMonthLabel(labels[anchor]) ?? PREV_MONTH;
-    const fyStartYear = fiscalStartYearFor(anchorDate);
+    // Always derive FY boundaries from PREV_MONTH (the canonical reference date),
+    // not from the anchor in the data. When backend data ends before PREV_MONTH,
+    // using the anchor date gives the wrong fiscal year.
+    const fyStartYear = fiscalStartYearFor(PREV_MONTH);
     const fyStart = new Date(fyStartYear, 3, 1);
     const fyEnd = new Date(fyStartYear + 1, 2, 31);
     return labels
       .map((l, i) => ({ i, d: parseMonthLabel(l) }))
-      .filter(({ d }) => d && d >= fyStart && d <= fyEnd && d <= anchorDate)
+      .filter(({ d }) => d && d >= fyStart && d <= fyEnd && d <= PREV_MONTH)
       .map(({ i }) => i);
   }
   if (period === "fy-prev") {
-    const anchorDate = parseMonthLabel(labels[anchor]) ?? PREV_MONTH;
-    const fyStartYear = fiscalStartYearFor(anchorDate) - 1;
+    const fyStartYear = fiscalStartYearFor(PREV_MONTH) - 1;
     const fyStart = new Date(fyStartYear, 3, 1);
     const fyEnd = new Date(fyStartYear + 1, 2, 31);
     return labels
@@ -160,7 +161,7 @@ function SidebarNav({
       <div className="p-5 border-b border-border space-y-3">
         <Link to="/" onClick={onNavigate} className="flex items-center gap-2 text-sm font-semibold">
           <Home className="h-4 w-4" />
-          Apartment Finance
+          CG Boulevard Ledger
         </Link>
         {isAdmin && (
           <div>
@@ -238,22 +239,6 @@ function SidebarNav({
           );
         })}
       </nav>
-      {session && (
-        <div className="mt-auto p-4 border-t border-border sticky bottom-0 bg-card">
-          <div className="text-[11px] text-muted-foreground">Signed in as</div>
-          <div className="text-sm font-medium truncate">{session.name}</div>
-          <div className="text-[11px] font-mono text-muted-foreground truncate">{session.email}</div>
-          <div className="mt-1"><Badge variant="outline" className="text-[10px] capitalize">{session.role}</Badge></div>
-          <Button
-            variant="outline"
-            size="sm"
-            className="mt-3 w-full"
-            onClick={() => { signOut(); onNavigate?.(); }}
-          >
-            <LogOut className="h-3.5 w-3.5 mr-1" /> Sign out
-          </Button>
-        </div>
-      )}
     </>
   );
 }
@@ -441,6 +426,11 @@ export function PortalShell({
     navigate({ to: target as string, search: ((prev: any) => ({ period: prev.period, view: prev.view })) as any });
   };
 
+  const handleSignOut = () => {
+    signOut();
+    window.location.replace("/login");
+  };
+
   return (
     <Ctx.Provider value={periodCtx}>
     <TooltipProvider delayDuration={200}>
@@ -454,7 +444,7 @@ export function PortalShell({
         <header className="sticky top-0 z-10 border-b border-border bg-background/80 backdrop-blur no-print">
           <div className="px-4 sm:px-8 pt-2 sm:pt-3 flex items-center justify-between gap-2 text-xs">
             <Link to="/" className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors">
-              <ChevronLeft className="h-3.5 w-3.5" /> All screens
+              <ChevronLeft className="h-3.5 w-3.5" /> Dashboard home
             </Link>
             <span className="text-muted-foreground truncate hidden sm:inline">
               Viewing: <span className="text-foreground">{periodCtx.label}</span>
@@ -485,6 +475,21 @@ export function PortalShell({
               <h1 className="sr-only">{title}</h1>
             </div>
             <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+              {session && (
+                <div className="hidden sm:flex items-center gap-2 rounded-xl border border-border bg-card px-2 py-1.5 shadow-sm">
+                  <UserCircle2 className="h-6 w-6 text-muted-foreground" />
+                  <div className="min-w-0">
+                    <div className="text-xs font-medium leading-tight truncate max-w-[180px]">{session.name}</div>
+                    <div className="text-[10px] text-muted-foreground leading-tight truncate max-w-[180px]">
+                      {session.flatCode ? `Flat ${session.flatCode} · ` : ""}
+                      {session.role}
+                    </div>
+                  </div>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" aria-label="Sign out" onClick={handleSignOut}>
+                    <LogOut className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              )}
               {/* Persona switcher: admin-only, visible md–lg (no sidebar yet) */}
               {isAdmin && (
                 <div className="hidden md:flex lg:hidden items-center gap-2" role="group" aria-label="Viewing as persona">
@@ -541,6 +546,20 @@ export function PortalShell({
             </div>
           </div>
           <div className="px-4 sm:hidden pb-3 space-y-2">
+            {session && (
+              <div className="flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2">
+                <div className="min-w-0">
+                  <div className="text-xs font-medium truncate">{session.name}</div>
+                  <div className="text-[10px] text-muted-foreground truncate">
+                    {session.flatCode ? `Flat ${session.flatCode} · ` : ""}
+                    {session.role}
+                  </div>
+                </div>
+                <Button variant="ghost" size="sm" className="h-7 px-2" onClick={handleSignOut}>
+                  <LogOut className="h-3.5 w-3.5 mr-1" /> Sign out
+                </Button>
+              </div>
+            )}
             {isAdmin && (
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground shrink-0">Mode</span>
@@ -634,7 +653,7 @@ export function PortalShell({
           <h1 className="text-2xl font-semibold">{title}</h1>
           <p className="text-sm text-muted-foreground font-mono">{reqIds} · {periodCtx.label}</p>
         </div>
-        <div className="p-4 sm:p-8 space-y-6 max-w-[1400px]">{children}</div>
+        <div className="p-4 sm:p-6 xl:p-8 space-y-6 w-full max-w-[1680px] mx-auto">{children}</div>
       </main>
     </div>
     </TooltipProvider>

@@ -30,7 +30,10 @@ function Inner() {
     .map((c) => ({ name: c.name, value: total(sliceMonthly(categoryMonthly(c))) }))
     .sort((a, b) => b.value - a.value);
   const totalIncome = rows.reduce((s, r) => s + r.value, 0);
-  const totalExpense = total(sliceMonthly(monthlyTotals.map((m) => m.expense)));
+  // Use sliceMonthly on the full objects to preserve month-label alignment,
+  // then sum the expense field — avoids the index-mismatch when backend data
+  // does not cover the same months as months12.
+  const totalExpense = sliceMonthly(monthlyTotals).reduce((s, m) => s + m.expense, 0);
   const spentRatio = totalIncome ? (totalExpense / totalIncome) * 100 : 0;
   const maintenanceRow = rows.find((r) => r.name.toLowerCase().includes("maintenance"));
   const maintenanceValue = maintenanceRow?.value ?? 0;

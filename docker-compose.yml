@@ -52,8 +52,29 @@ services:
     environment:
       DATABASE_URL: postgres://apf:apf@db:5432/apartment_finance
       JWT_SECRET: dev-jwt-secret-change-me
-      SMTP_HOST: mailhog
-      SMTP_PORT: 1025
+      # ── Email / OTP ────────────────────────────────────────────────────────
+      # Choose provider: gmail (default), resend, or mailhog
+      EMAIL_PROVIDER: gmail
+
+      # Gmail SMTP (default)
+      SMTP_HOST: smtp.gmail.com
+      SMTP_PORT: 465
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+      FROM_EMAIL: ${FROM_EMAIL}
+
+      # Resend (keep for future switch)
+      # Set EMAIL_PROVIDER: resend and configure below values
+      # Free tier: 3,000 emails/month — https://resend.com
+      RESEND_API_KEY: ${RESEND_API_KEY}
+      #FROM_EMAIL: "onboarding@resend.dev"
+      #FROM_EMAIL: "noreply@yourdomain.com"
+
+      # MailHog local dev fallback
+      # Set EMAIL_PROVIDER: mailhog to use local inbox at http://localhost:8035
+      # SMTP_HOST: mailhog
+      # SMTP_PORT: 1025
+      # ───────────────────────────────────────────────────────────────────────
       APP_URL: http://localhost:8090
       SUPERADMIN_EMAIL: admin@example.com
       AUTH_ENABLED: "true"

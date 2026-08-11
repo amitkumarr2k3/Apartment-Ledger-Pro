@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { PortalShell } from "@/components/portal-shell";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -12,32 +13,175 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogD
 import { seedResidents, type ResidentRow } from "@/lib/finance-mock";
 import { Pencil, Plus, ShieldOff, ShieldCheck, Search, MailCheck } from "lucide-react";
 import { toast } from "sonner";
-import { useShowMockData } from "@/components/mock-gate";
+import { useShowMockData, NoDbData } from "@/components/mock-gate";
 
 export const Route = createFileRoute("/admin/residents")({
   component: Page,
   head: () => ({ meta: [{ title: "Admin · Residents & Whitelist" }] }),
 });
 
-const empty: Omit<ResidentRow, "id" | "invitedAt"> = { email: "", name: "", flat: "", role: "resident", status: "invited" };
+// ── API helpers ──────────────────────────────────────────────────────────────
+function authHeader(): HeadersInit {
+  if (typeof window === "undefined") return {};
+  const t = window.localStorage.getItem("apf.token");
+  return t ? { Authorization: `Bearer ${t}` } : {};
+}
 
+function dbRowToResident(r: any): ResidentRow {
+  return {
+    id: r.email,
+    email: r.email,
+    name: r.name ?? "",
+    flat: r.flat_code ?? "",
+    role: r.role === "superadmin" ? "admin" : r.role,
+    status: r.revoked_at ? "revoked" : "active",
+    invitedAt: r.invited_at ? String(r.invited_at).slice(0, 10) : "",
+  };
+}
+
+async function fetchResidents(): Promise<ResidentRow[]> {
+  const r = await fetch("/api/admin/residents", { headers: authHeader() });
+  if (!r.ok) throw new Error(String(r.status));
+  return (await r.json() as any[]).map(dbRowToResident);
+}
+
+async function createResident(body: { email: string; name: string; flat_code: string; role: string }) {
+  const r = await fetch("/api/admin/residents", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeader() },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j?.error ?? String(r.status)); }
+  return r.json();
+}
+
+async function patchResident(email: string, patch: Record<string, unknown>) {
+  const r = await fetch(`/api/admin/residents/${encodeURIComponent(email)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...authHeader() },
+    body: JSON.stringify(patch),
+  });
+  if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j?.error ?? String(r.status)); }
+  return r.json();
+}
+
+// ── Draft shape ──────────────────────────────────────────────────────────────
+const emptyDraft = { email: "", name: "", flat: "", role: "resident" as "resident" | "admin" };
+type Draft = { email: string; name: string; flat: string; role: "resident" | "admin" };
+
+// ── Page ─────────────────────────────────────────────────────────────────────
 function Page() {
   const showMock = useShowMockData();
+  return (
+    <PortalShell title="Residents & Whitelist" reqIds="AC-10 · AC-11 · AC-12 · AC-13" persona="admin">
+      {showMock ? <MockView /> : <LiveView />}
+    </PortalShell>
+  );
+}
+
+// ── Mock view (unauthenticated) ───────────────────────────────────────────────
+function MockView() {
   const [rows, setRows] = useState<ResidentRow[]>(seedResidents);
-  useEffect(() => { if (!showMock) setRows([]); }, [showMock]);
+
+  function onSave(editing: ResidentRow | null, draft: Draft) {
+    if (editing) {
+      setRows((rs) => rs.map((r) => r.id === editing.id ? { ...r, ...draft } : r));
+      toast.success(`Updated ${editing.email}`);
+    } else {
+      const id = `R${Math.floor(Math.random() * 900) + 100}`;
+      setRows((rs) => [{ id, invitedAt: new Date().toISOString().slice(0, 10), status: "invited" as const, ...draft }, ...rs]);
+      toast.success(`Whitelisted ${draft.email}`);
+    }
+  }
+  function onToggleRevoke(r: ResidentRow) {
+    const next = r.status === "revoked" ? "active" : "revoked";
+    setRows((rs) => rs.map((x) => x.id === r.id ? { ...x, status: next as ResidentRow["status"] } : x));
+    toast.success(`${r.email} ${next === "revoked" ? "revoked" : "reactivated"}`);
+  }
+
+  return (
+    <>
+      <div className="rounded-md border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">
+        Sign in with an admin account to manage residents in the database.
+      </div>
+      <ResidentTable rows={rows} onSave={onSave} onToggleRevoke={onToggleRevoke} onResend={() => {}} />
+    </>
+  );
+}
+
+// ── Live view (authenticated, real DB) ───────────────────────────────────────
+function LiveView() {
+  const qc = useQueryClient();
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ["residents"],
+    queryFn: fetchResidents,
+    staleTime: 30_000,
+  });
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["residents"] });
+
+  const createMut = useMutation({
+    mutationFn: createResident,
+    onSuccess: (_, v) => { toast.success(`Whitelisted ${v.email}`); invalidate(); },
+    onError: (e: Error) => toast.error(`Failed: ${e.message}`),
+  });
+  const patchMut = useMutation({
+    mutationFn: ({ email, patch }: { email: string; patch: Record<string, unknown> }) => patchResident(email, patch),
+    onSuccess: () => invalidate(),
+    onError: (e: Error) => toast.error(`Failed: ${e.message}`),
+  });
+
+  if (isLoading) return <p className="text-sm text-muted-foreground py-8 text-center">Loading residents…</p>;
+  if (isError) return <NoDbData note="Could not load residents. Check your connection or try refreshing." />;
+
+  function onSave(editing: ResidentRow | null, draft: Draft) {
+    if (editing) {
+      patchMut.mutate(
+        { email: editing.email, patch: { name: draft.name, flat_code: draft.flat, role: draft.role } },
+        { onSuccess: () => toast.success(`Updated ${editing.email}`) },
+      );
+    } else {
+      createMut.mutate({ email: draft.email, name: draft.name, flat_code: draft.flat, role: draft.role });
+    }
+  }
+  function onToggleRevoke(r: ResidentRow) {
+    const willRevoke = r.status !== "revoked";
+    patchMut.mutate(
+      { email: r.email, patch: { revoke: willRevoke } },
+      { onSuccess: () => toast.success(`${r.email} ${willRevoke ? "revoked" : "reactivated"}`) },
+    );
+  }
+  function onResend(r: ResidentRow) {
+    toast.info(`Ask ${r.email} to use the OTP sign-in flow — a 6-digit code will be sent on their next attempt.`);
+  }
+
+  return <ResidentTable rows={data ?? []} onSave={onSave} onToggleRevoke={onToggleRevoke} onResend={onResend} />;
+}
+
+// ── Shared table + dialog ─────────────────────────────────────────────────────
+function ResidentTable({
+  rows,
+  onSave,
+  onToggleRevoke,
+  onResend,
+}: {
+  rows: ResidentRow[];
+  onSave: (editing: ResidentRow | null, draft: Draft) => void;
+  onToggleRevoke: (r: ResidentRow) => void;
+  onResend: (r: ResidentRow) => void;
+}) {
   const [q, setQ] = useState("");
-  const [status, setStatus] = useState("all");
-  const [role, setRole] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [roleFilter, setRoleFilter] = useState("all");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<ResidentRow | null>(null);
-  const [draft, setDraft] = useState(empty);
+  const [draft, setDraft] = useState<Draft>(emptyDraft);
 
   const filtered = useMemo(() => rows.filter((r) => {
-    if (status !== "all" && r.status !== status) return false;
-    if (role !== "all" && r.role !== role) return false;
+    if (statusFilter !== "all" && r.status !== statusFilter) return false;
+    if (roleFilter !== "all" && r.role !== roleFilter) return false;
     if (q) { const s = q.toLowerCase(); if (![r.email, r.name, r.flat].some((x) => x.toLowerCase().includes(s))) return false; }
     return true;
-  }), [rows, q, status, role]);
+  }), [rows, q, statusFilter, roleFilter]);
 
   const counts = useMemo(() => ({
     total: rows.length,
@@ -46,33 +190,24 @@ function Page() {
     admin: rows.filter((r) => r.role === "admin").length,
   }), [rows]);
 
-  function startCreate() { setEditing(null); setDraft(empty); setOpen(true); }
-  function startEdit(r: ResidentRow) { setEditing(r); setDraft({ email: r.email, name: r.name, flat: r.flat, role: r.role, status: r.status }); setOpen(true); }
+  function startCreate() { setEditing(null); setDraft(emptyDraft); setOpen(true); }
+  function startEdit(r: ResidentRow) {
+    setEditing(r);
+    setDraft({ email: r.email, name: r.name, flat: r.flat, role: r.role === "admin" ? "admin" : "resident" });
+    setOpen(true);
+  }
   function save() {
     if (!draft.email || !draft.name) { toast.error("Email and name are required"); return; }
-    if (editing) {
-      setRows((rs) => rs.map((r) => r.id === editing.id ? { ...r, ...draft } : r));
-      toast.success(`Updated ${editing.email}`);
-    } else {
-      const id = `R${Math.floor(Math.random() * 900) + 100}`;
-      setRows((rs) => [{ id, invitedAt: new Date().toISOString().slice(0, 10), ...draft }, ...rs]);
-      toast.success(`Whitelisted ${draft.email}`);
-    }
+    onSave(editing, draft);
     setOpen(false);
   }
-  function toggleRevoke(r: ResidentRow) {
-    const next = r.status === "revoked" ? "active" : "revoked";
-    setRows((rs) => rs.map((x) => x.id === r.id ? { ...x, status: next } : x));
-    toast.success(`${r.email} ${next === "revoked" ? "revoked" : "reactivated"}`);
-  }
-  function resend(r: ResidentRow) { toast.success(`Magic link re-sent to ${r.email}`); }
 
   return (
-    <PortalShell title="Residents & Whitelist" reqIds="AC-10 · AC-11 · AC-12 · AC-13" persona="admin">
+    <>
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Whitelist policy</CardTitle>
-          <CardDescription>Only emails in this table can request a magic link. Admins receive elevated permissions.</CardDescription>
+          <CardDescription>Only emails in this table can request an OTP. Every change is logged in the audit trail.</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid gap-3 sm:grid-cols-4 text-sm">
@@ -95,7 +230,7 @@ function Page() {
               <Search className="h-3.5 w-3.5 absolute left-2.5 top-2.5 text-muted-foreground" />
               <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search email / name / flat" className="pl-8 h-9" />
             </div>
-            <Select value={status} onValueChange={setStatus}>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All statuses</SelectItem>
@@ -104,7 +239,7 @@ function Page() {
                 <SelectItem value="revoked">Revoked</SelectItem>
               </SelectContent>
             </Select>
-            <Select value={role} onValueChange={setRole}>
+            <Select value={roleFilter} onValueChange={setRoleFilter}>
               <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All roles</SelectItem>
@@ -132,7 +267,7 @@ function Page() {
                   <TableRow key={r.id}>
                     <TableCell className="font-mono text-xs">{r.email}</TableCell>
                     <TableCell>{r.name}</TableCell>
-                    <TableCell className="text-xs">{r.flat}</TableCell>
+                    <TableCell className="text-xs">{r.flat || "—"}</TableCell>
                     <TableCell>
                       <Badge variant="outline" className={r.role === "admin" ? "border-violet-500/40 text-violet-600" : ""}>{r.role}</Badge>
                     </TableCell>
@@ -145,17 +280,23 @@ function Page() {
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">{r.invitedAt}</TableCell>
                     <TableCell className="text-right">
-                      {r.status === "invited" && <Button size="icon" variant="ghost" title="Resend magic link" onClick={() => resend(r)}><MailCheck className="h-3.5 w-3.5" /></Button>}
+                      {r.status !== "revoked" && (
+                        <Button size="icon" variant="ghost" title="OTP sign-in info" onClick={() => onResend(r)}>
+                          <MailCheck className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
                       <Button size="icon" variant="ghost" onClick={() => startEdit(r)}><Pencil className="h-3.5 w-3.5" /></Button>
-                      <Button size="icon" variant="ghost" onClick={() => toggleRevoke(r)}>
+                      <Button size="icon" variant="ghost" onClick={() => onToggleRevoke(r)}>
                         {r.status === "revoked"
-                          ? <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
-                          : <ShieldOff className="h-3.5 w-3.5 text-rose-500" />}
+                          ? <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" title="Reactivate" />
+                          : <ShieldOff className="h-3.5 w-3.5 text-rose-500" title="Revoke access" />}
                       </Button>
                     </TableCell>
                   </TableRow>
                 ))}
-                {filtered.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-8">No residents match those filters.</TableCell></TableRow>}
+                {filtered.length === 0 && (
+                  <TableRow><TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-8">No residents match those filters.</TableCell></TableRow>
+                )}
               </TableBody>
             </Table>
           </div>
@@ -166,38 +307,41 @@ function Page() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>{editing ? "Edit resident" : "Invite / whitelist"}</DialogTitle>
-            <DialogDescription>{editing ? "Update this whitelist entry." : "Adds the email to the login whitelist and sends a magic link."}</DialogDescription>
+            <DialogDescription>
+              {editing
+                ? "Update this whitelist entry. Changes are saved to the database and logged in the audit trail."
+                : "Adds the email to the OTP login whitelist. The resident signs in by requesting a one-time code."}
+            </DialogDescription>
           </DialogHeader>
           <div className="grid gap-3">
-            <Field label="Email"><Input type="email" value={draft.email} onChange={(e) => setDraft({ ...draft, email: e.target.value })} placeholder="name@example.com" /></Field>
-            <Field label="Name"><Input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} /></Field>
+            <Field label="Email">
+              <Input type="email" value={draft.email} onChange={(e) => setDraft({ ...draft, email: e.target.value })} placeholder="name@example.com" disabled={!!editing} />
+            </Field>
+            <Field label="Name">
+              <Input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
+            </Field>
             <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="Flat"><Input value={draft.flat} onChange={(e) => setDraft({ ...draft, flat: e.target.value })} placeholder="A-101" /></Field>
+              <Field label="Flat / Unit">
+                <Input value={draft.flat} onChange={(e) => setDraft({ ...draft, flat: e.target.value })} placeholder="A-101" />
+              </Field>
               <Field label="Role">
                 <Select value={draft.role} onValueChange={(v: "resident" | "admin") => setDraft({ ...draft, role: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent><SelectItem value="resident">Resident</SelectItem><SelectItem value="admin">Admin</SelectItem></SelectContent>
+                  <SelectContent>
+                    <SelectItem value="resident">Resident</SelectItem>
+                    <SelectItem value="admin">Admin</SelectItem>
+                  </SelectContent>
                 </Select>
               </Field>
             </div>
-            <Field label="Status">
-              <Select value={draft.status} onValueChange={(v: ResidentRow["status"]) => setDraft({ ...draft, status: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="invited">Invited</SelectItem>
-                  <SelectItem value="revoked">Revoked</SelectItem>
-                </SelectContent>
-              </Select>
-            </Field>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button onClick={save}>{editing ? "Save" : "Send invite"}</Button>
+            <Button onClick={save}>{editing ? "Save changes" : "Add to whitelist"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </PortalShell>
+    </>
   );
 }
 

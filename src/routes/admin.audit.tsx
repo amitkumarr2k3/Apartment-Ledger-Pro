@@ -7,7 +7,6 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { seedAuditLog } from "@/lib/finance-mock";
 import { Search, ShieldCheck } from "lucide-react";
 import { useShowMockData } from "@/components/mock-gate";
 
@@ -78,16 +77,15 @@ function Page() {
   const [entity, setEntity] = useState("all");
 
   const audit = useQuery({
-    queryKey: ["audit-log", showMock],
+    queryKey: ["audit-log"],
     queryFn: fetchAudit,
     enabled: !showMock,
     staleTime: 15_000,
     refetchOnWindowFocus: true,
   });
 
-  const source: AuditRow[] = showMock
-    ? (seedAuditLog as unknown as AuditRow[])
-    : (audit.data ?? []);
+  // Always run hooks unconditionally — React requires consistent hook call order.
+  const source: AuditRow[] = audit.data ?? [];
   const entities = useMemo(() => Array.from(new Set(source.map((a) => a.entity))), [source]);
   const filtered = useMemo(() => source.filter((a) => {
     if (action !== "all" && a.action !== action) return false;
@@ -98,6 +96,25 @@ function Page() {
     }
     return true;
   }), [q, action, entity, source]);
+
+  // Audit trail is only meaningful when authenticated — never fall back to mock.
+  if (showMock) {
+    return (
+      <PortalShell title="Audit Trail" reqIds="AC-40 · AC-41" persona="admin">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4 text-emerald-500" /> Audit Trail
+            </CardTitle>
+            <CardDescription>
+              Sign in with your admin account to view the immutable activity log.
+              Audit data is stored permanently in the database and is never deleted on logout.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </PortalShell>
+    );
+  }
 
   return (
     <PortalShell title="Audit Trail" reqIds="AC-40 · AC-41" persona="admin">

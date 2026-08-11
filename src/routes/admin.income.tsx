@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid } from "recharts";
 import { SmartTooltipContent, getTooltipTrigger } from "@/components/smart-tooltip";
-import { inr, categoryMonthly, total } from "@/lib/finance-mock";
+import { inr, total } from "@/lib/finance-mock";
 import { useIncomeTree, useMonthlyTotals } from "@/lib/hooks";
 import { Lightbulb } from "lucide-react";
 
@@ -34,12 +34,15 @@ function Inner() {
         const t = total(monthly);
         const active = monthly.filter((n) => n > 0).length;
         const recent = monthly.slice(-Math.min(3, monthly.length));
+        // Compare against 12 expected months (full FY), not just available labels,
+        // so a source present in 8 of 8 available months isn't wrongly flagged.
+        const expectedMonths = Math.max(labels.length, 12);
         return {
           category: c.name,
           source: it.name,
           total: t,
           active,
-          irregular: active < labels.length && active > 0,
+          irregular: active < expectedMonths && active > 0,
           dropped: recent.length > 0 && recent.every((n) => n === 0) && active > 0,
         };
       }),
@@ -47,17 +50,14 @@ function Inner() {
   );
   const totalIncome = rows.reduce((s, r) => s + r.total, 0);
 
-  // AD-31: % of expense covered by income (flipped to: % of income spent on expenses)
-  const monthlyIncome = sliceMonthly(incomeTree.reduce<number[]>((acc, c) => {
-    const monthly = categoryMonthly(c);
-    return monthly.map((n, i) => (acc[i] ?? 0) + n);
-  }, []));
-  const monthlyExpense = sliceMonthly(monthlyTotals.map((m) => m.expense));
-  const coverage = labels.map((m, i) => {
-    const inc = monthlyIncome[i] ?? 0;
-    const exp = monthlyExpense[i] ?? 0;
-    return { month: m, ratio: inc ? Math.round((exp / inc) * 100) : 0 };
-  });
+  // AD-31: expense-to-income ratio per month.
+  // Use monthlyTotals directly (has real month labels) so FY filters align
+  // correctly regardless of which month the backend data starts from.
+  const slicedTotals = sliceMonthly(monthlyTotals);
+  const coverage = slicedTotals.map((m) => ({
+    month: m.month,
+    ratio: m.collection > 0 ? Math.round((m.expense / m.collection) * 100) : 0,
+  }));
 
   const irregular = rows.filter((r) => r.irregular || r.dropped);
 
@@ -108,7 +108,7 @@ function Inner() {
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle className="text-base">Expense-to-income ratio trend · AD-31</CardTitle>
-            <CardDescription>% of income spent on expenses per month (lower is healthier)</CardDescription>
+            <CardDescription>% of income spent on expenses per month</CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={240}>
@@ -145,13 +145,13 @@ function Inner() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
-            <Lightbulb className="h-4 w-4 text-amber-500" /> Potential income ideas · AD-33
+            <Lightbulb className="h-4 w-4 text-amber-500" /> Income notes · AD-33
           </CardTitle>
-          <CardDescription>Free-text brainstorming panel (persisted in Settings)</CardDescription>
+          <CardDescription>Free-text notes (persisted in Settings)</CardDescription>
         </CardHeader>
         <CardContent>
           <Textarea
-            defaultValue={"• Banner ads on entrance gate LED display\n• Paid parking for visitors (weekend rate)\n• Rooftop solar lease-back with vendor\n• Monthly car-wash tie-up (revenue share)"}
+            defaultValue={""}
             className="min-h-[140px] font-mono text-sm"
           />
         </CardContent>

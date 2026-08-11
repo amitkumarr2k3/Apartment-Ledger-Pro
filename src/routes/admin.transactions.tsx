@@ -192,7 +192,7 @@ function Inner() {
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>{editing ? `Edit ${editing.id}` : "New transaction"}</DialogTitle>
-            <DialogDescription>Prototype only — changes stay in-memory and are echoed in the audit trail.</DialogDescription>
+            <DialogDescription>Create or edit a transaction entry.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Date"><Input type="date" value={draft.date} onChange={(e) => setDraft({ ...draft, date: e.target.value })} /></Field>

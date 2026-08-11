@@ -135,9 +135,6 @@ function Inner() {
                 ))}
               </ul>
             )}
-            <div className="mt-3 text-xs text-muted-foreground">
-              Tip: press <kbd className="rounded border border-border bg-muted px-1 font-mono">⌘K</kbd> to jump to any category or vendor.
-            </div>
           </CardContent>
         </Card>
 
