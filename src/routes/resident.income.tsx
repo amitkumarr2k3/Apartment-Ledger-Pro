@@ -6,6 +6,7 @@ import { Bar, BarChart, CartesianGrid, Cell, ComposedChart, LabelList, Line, Res
 import { SmartTooltipContent, getTooltipTrigger } from "@/components/smart-tooltip";
 import { inr, categoryMonthly, total, sumMonthly } from "@/lib/finance-mock";
 import { useIncomeTree, useMonthlyTotals } from "@/lib/hooks";
+import { filterReportableIncomeCategories, isMaintenanceOutstandingCategory } from "@/lib/income-utils";
 
 export const Route = createFileRoute("/resident/income")({
   component: Page,
@@ -26,9 +27,9 @@ function Inner() {
   const { data: incomeTree = [] } = useIncomeTree();
   const { data: monthlyTotals = [] } = useMonthlyTotals();
   const { sliceMonthly, labels, view } = usePeriod();
-  const isLiabilityCategory = (name: string) => /outstanding|arrears|default/.test(name.toLowerCase());
-  const rows = incomeTree
-    .filter((c) => !isLiabilityCategory(c.name))
+  const reportableIncomeTree = filterReportableIncomeCategories(incomeTree);
+  const outstandingIncomeTree = incomeTree.filter((c) => isMaintenanceOutstandingCategory(c.name));
+  const rows = reportableIncomeTree
     .map((c) => ({ name: c.name, value: total(sliceMonthly(categoryMonthly(c))) }))
     .sort((a, b) => b.value - a.value);
   const totalIncome = rows.reduce((s, r) => s + r.value, 0);
@@ -48,19 +49,19 @@ function Inner() {
     }));
   const otherIncomeTotal = otherIncomeRows.reduce((sum, r) => sum + r.value, 0);
 
-  const monthlyIncomeFull = sumMonthly(incomeTree.flatMap((c) => c.vendors.flatMap((v) => v.items.map((i) => i.monthly))));
-  const monthlyIncome = sliceMonthly(monthlyIncomeFull);
+  const monthlyIncome = sliceMonthly(
+    sumMonthly(reportableIncomeTree.flatMap((c) => c.vendors.flatMap((v) => v.items.map((i) => i.monthly)))),
+  );
   const maintenanceMonthly = sliceMonthly(
     sumMonthly(
-      incomeTree
+      reportableIncomeTree
         .filter((c) => c.name.toLowerCase().includes("maintenance"))
         .flatMap((c) => c.vendors.flatMap((v) => v.items.map((i) => i.monthly))),
     ),
   );
   const outstandingMonthly = sliceMonthly(
     sumMonthly(
-      incomeTree
-        .filter((c) => isLiabilityCategory(c.name))
+      outstandingIncomeTree
         .flatMap((c) => c.vendors.flatMap((v) => v.items.map((i) => i.monthly))),
     ),
   );
@@ -161,7 +162,7 @@ function Inner() {
               <div className="text-xl font-mono">{inr(totalMaintenanceCollected)}</div>
             </div>
             <div className="rounded-md border border-border p-3">
-              <div className="text-xs text-muted-foreground uppercase tracking-wider">Outstanding / default</div>
+              <div className="text-xs text-muted-foreground uppercase tracking-wider">Unpaid maintenance</div>
               <div className="text-xl font-mono">{inr(totalOutstanding)}</div>
             </div>
             <div className="rounded-md border border-border p-3">
@@ -184,7 +185,7 @@ function Inner() {
                 <Tooltip trigger={getTooltipTrigger()} cursor={{ fill: "var(--color-muted)", opacity: 0.35 }} content={<SmartTooltipContent labelPrefix="Month" valueFormatter={(v) => inr(v)} />} />
                 <Legend />
                 <Bar yAxisId="amount" dataKey="collected" name="Maintenance collected" fill="var(--color-chart-2)" radius={[4, 4, 0, 0]} />
-                <Bar yAxisId="amount" dataKey="outstanding" name="Outstanding / defaulted" fill="var(--color-chart-1)" radius={[4, 4, 0, 0]} />
+                <Bar yAxisId="amount" dataKey="outstanding" name="Unpaid maintenance" fill="var(--color-chart-1)" radius={[4, 4, 0, 0]} />
                 <Line yAxisId="pct" type="monotone" dataKey="recoveryPct" name="Recovery %" stroke="var(--color-chart-3)" strokeWidth={2} dot={false} />
               </ComposedChart>
             </ResponsiveContainer>
@@ -216,7 +217,7 @@ function Inner() {
                 <div className="rounded-md border border-border p-3 bg-muted/20">
                   <div className="text-xs uppercase tracking-wider text-muted-foreground">Insight</div>
                   <div className="mt-1 text-sm">
-                    Recovery is calculated from uploaded maintenance collections versus outstanding/default amounts, so periods with low recovery are easy to spot.
+                    Recovery is calculated from uploaded maintenance collections versus unpaid maintenance amounts, so periods with low recovery are easy to spot.
                   </div>
                 </div>
                 <div className="rounded-md border border-border p-3 bg-muted/20">

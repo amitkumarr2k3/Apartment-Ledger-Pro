@@ -1,7 +1,8 @@
 import { FastifyInstance } from "fastify";
 import { pool } from "../db";
 
-const EXCLUDED_INCOME_CATEGORIES = ["Tax", "Tax Collected (Liability)"];
+const EXCLUDED_INCOME_TOTAL_CATEGORIES = ["Tax", "Tax Collected (Liability)", "Maintenance Outstanding"];
+const EXCLUDED_INCOME_TREE_CATEGORIES = ["Tax", "Tax Collected (Liability)"];
 
 export async function routes(app: FastifyInstance) {
   app.get("/tree", { preHandler: app.auth }, async (req) => {
@@ -18,7 +19,7 @@ export async function routes(app: FastifyInstance) {
          AND c.name <> ALL($2::text[])
        GROUP BY c.name, v.name, li.name, t.period_month
        ORDER BY c.name, v.name, li.name, t.period_month`,
-      [p.cid, EXCLUDED_INCOME_CATEGORIES],
+      [p.cid, EXCLUDED_INCOME_TREE_CATEGORIES],
     );
     return rows;
   });
@@ -32,7 +33,7 @@ export async function routes(app: FastifyInstance) {
          AND category_name <> ALL($2::text[])
        GROUP BY category_name
        ORDER BY total DESC`,
-      [p.cid, EXCLUDED_INCOME_CATEGORIES],
+      [p.cid, EXCLUDED_INCOME_TOTAL_CATEGORIES],
     );
     return rows;
   });

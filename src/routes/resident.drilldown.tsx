@@ -9,6 +9,7 @@ import {
   inr, categoryMonthly, vendorMonthly, total,
 } from "@/lib/finance-mock";
 import { useExpenseTree, useIncomeTree } from "@/lib/hooks";
+import { filterReportableIncomeCategories } from "@/lib/income-utils";
 import { ChevronRight } from "lucide-react";
 
 export const Route = createFileRoute("/resident/drilldown")({
@@ -35,7 +36,8 @@ function Inner() {
   const { data: expenseTree = [] } = useExpenseTree();
   const { data: incomeTree = [] } = useIncomeTree();
   const head: Head | null = search.head === "expense" || search.head === "income" ? search.head : null;
-  const tree = head === "income" ? incomeTree : expenseTree;
+  const reportableIncomeTree = filterReportableIncomeCategories(incomeTree);
+  const tree = head === "income" ? reportableIncomeTree : expenseTree;
   const category = search.category ? tree.find((c) => c.name === search.category) ?? null : null;
   const vendor = category && search.vendor ? category.vendors.find((v) => v.name === search.vendor) ?? null : null;
   const line = vendor && search.line ? vendor.items.find((it) => it.name === search.line) ?? null : null;
@@ -54,7 +56,7 @@ function Inner() {
   };
 
   const expenseTotal = expenseTree.reduce((s, c) => s + total(sliceMonthly(categoryMonthly(c))), 0);
-  const incomeTotal = incomeTree.reduce((s, c) => s + total(sliceMonthly(categoryMonthly(c))), 0);
+  const incomeTotal = reportableIncomeTree.reduce((s, c) => s + total(sliceMonthly(categoryMonthly(c))), 0);
 
   return (
     <>
@@ -89,7 +91,7 @@ function Inner() {
       {!head && (
         <div className="grid gap-4 md:grid-cols-2">
           <HeadCard label="Expense" total={expenseTotal} categories={expenseTree.length} onClick={() => update({ head: "expense" })} tone="rose" />
-          <HeadCard label="Income" total={incomeTotal} categories={incomeTree.length} onClick={() => update({ head: "income" })} tone="emerald" />
+          <HeadCard label="Income" total={incomeTotal} categories={reportableIncomeTree.length} onClick={() => update({ head: "income" })} tone="emerald" />
         </div>
       )}
 

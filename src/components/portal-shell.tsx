@@ -344,7 +344,7 @@ export function PortalShell({
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
   const search = useSearch({ strict: false }) as { period?: string; view?: string };
-  const period = (search.period as PeriodValue) in periodConfig ? (search.period as PeriodValue) : "range-6m";
+  const period = (search.period as PeriodValue) in periodConfig ? (search.period as PeriodValue) : "range-12m";
   const view: "chart" | "number" = search.view === "number" ? "number" : "chart";
   const setPeriod = (v: PeriodValue) => navigate({ to: pathname, search: (((prev: any) => ({ ...prev, period: v })) as any), replace: false });
   const setView = (v: "chart" | "number") => navigate({ to: pathname, search: (((prev: any) => ({ ...prev, view: v })) as any), replace: true });

@@ -8,6 +8,7 @@ import { Tooltip, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianG
 import { SmartTooltipContent, getTooltipTrigger } from "@/components/smart-tooltip";
 import { inr, sumMonthly, total } from "@/lib/finance-mock";
 import { useIncomeTree, useMonthlyTotals } from "@/lib/hooks";
+import { filterReportableIncomeCategories } from "@/lib/income-utils";
 import { Lightbulb } from "lucide-react";
 
 export const Route = createFileRoute("/admin/income")({
@@ -27,7 +28,8 @@ function Inner() {
   const { data: incomeTree = [] } = useIncomeTree();
   const { data: monthlyTotals = [] } = useMonthlyTotals();
   const { sliceMonthly, labels, view } = usePeriod();
-  const rows = incomeTree.flatMap((c) =>
+  const reportableIncomeTree = filterReportableIncomeCategories(incomeTree);
+  const rows = reportableIncomeTree.flatMap((c) =>
     c.vendors.flatMap((v) =>
       v.items.map((it) => {
         const monthly = sliceMonthly(it.monthly);
@@ -55,7 +57,7 @@ function Inner() {
   // continues to use monthly totals.
   const monthlyIncome = sliceMonthly(
     sumMonthly(
-      incomeTree.flatMap((c) =>
+      reportableIncomeTree.flatMap((c) =>
         c.vendors.flatMap((v) => v.items.map((it) => it.monthly)),
       ),
     ),
