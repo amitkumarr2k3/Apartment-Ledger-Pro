@@ -8,7 +8,6 @@ import {
   useNavigate,
   HeadContent,
   Scripts,
-  retainSearchParams,
 } from "@tanstack/react-router";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
@@ -43,7 +42,6 @@ function RouteGuard() {
       }
       if (PUBLIC_PATHS.has(pathname)) return;
       if (!session) {
-        if (pathname === "/") return; // landing stays public
         navigate({ to: "/login", search: { redirect: pathname } as never, replace: true });
         return;
       }
@@ -65,12 +63,12 @@ function RouteGuard() {
 }
 
 const rootSearchSchema = z.object({
-  period: fallback(z.string(), "range-6m").default("range-6m"),
-  view: fallback(z.string(), "chart").default("chart"),
-  head: fallback(z.string().optional(), undefined),
-  category: fallback(z.string().optional(), undefined),
-  vendor: fallback(z.string().optional(), undefined),
-  line: fallback(z.string().optional(), undefined),
+  period: z.string().optional(),
+  view: z.string().optional(),
+  head: z.string().optional(),
+  category: z.string().optional(),
+  vendor: z.string().optional(),
+  line: z.string().optional(),
 });
 
 function NotFoundComponent() {
@@ -162,9 +160,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   notFoundComponent: NotFoundComponent,
   errorComponent: ErrorComponent,
   validateSearch: zodValidator(rootSearchSchema),
-  search: {
-    middlewares: [retainSearchParams(["period", "view"])],
-  },
 });
 
 function RootShell({ children }: { children: ReactNode }) {
