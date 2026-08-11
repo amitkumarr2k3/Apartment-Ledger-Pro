@@ -8,9 +8,10 @@ import {
 } from "recharts";
 import { SmartTooltipContent, getTooltipTrigger } from "@/components/smart-tooltip";
 import {
-  inr, pct, expenseTree, categoryMonthly, total, vendorMonthly,
+  inr, pct, expenseTree, categoryMonthly, total, vendorMonthly, sumMonthly,
 } from "@/lib/finance-mock";
 import { useMonthlyTotals, useExpenseTree, useIncomeTree } from "@/lib/hooks";
+import { filterReportableIncomeCategories } from "@/lib/income-utils";
 import { Wallet, ArrowRight, TrendingUp, TrendingDown } from "lucide-react";
 
 export const Route = createFileRoute("/resident/overview")({
@@ -31,16 +32,23 @@ function Inner() {
   const { data: monthlyTotals = [] } = useMonthlyTotals();
   const { data: expenseTree = [] } = useExpenseTree();
   const { data: incomeTree = [] } = useIncomeTree();
+  const reportableIncomeTree = filterReportableIncomeCategories(incomeTree);
   const period = sliceMonthly(monthlyTotals);
   const prior = priorSliceMonthly(monthlyTotals);
+  const periodCollection = sliceMonthly(
+    sumMonthly(reportableIncomeTree.flatMap((c) => c.vendors.flatMap((v) => v.items.map((i) => i.monthly)))),
+  );
+  const priorCollectionSeries = priorSliceMonthly(
+    sumMonthly(reportableIncomeTree.flatMap((c) => c.vendors.flatMap((v) => v.items.map((i) => i.monthly)))),
+  );
 
-  const totalCollection = period.reduce((s, m) => s + m.collection, 0);
+  const totalCollection = periodCollection.reduce((s, v) => s + v, 0);
   const totalExpense = period.reduce((s, m) => s + m.expense, 0);
   const net = totalCollection - totalExpense;
   // Show how much of collected income has been spent (expense ÷ income)
   const ratio = totalCollection === 0 ? 0 : (totalExpense / totalCollection) * 100;
 
-  const priorCollection = prior.reduce((s, m) => s + m.collection, 0);
+  const priorCollection = priorCollectionSeries.reduce((s, v) => s + v, 0);
   const priorExpense = prior.reduce((s, m) => s + m.expense, 0);
   const priorNet = priorCollection - priorExpense;
   const priorRatio = priorCollection === 0 ? 0 : (priorExpense / priorCollection) * 100;
@@ -98,7 +106,7 @@ function Inner() {
     runningOutstanding += outstanding;
     return {
       month,
-      collection: monthlyTotal?.collection ?? 0,
+      collection: periodCollection[i] ?? 0,
       expense: monthlyTotal?.expense ?? 0,
       net: monthlyTotal?.net ?? 0,
       outstanding,
