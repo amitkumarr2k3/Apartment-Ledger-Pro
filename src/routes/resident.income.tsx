@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { PortalShell, usePeriod } from "@/components/portal-shell";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from "@tanstack/react-router";
-import { Bar, BarChart, CartesianGrid, Cell, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend } from "recharts";
+import { Bar, BarChart, CartesianGrid, Cell, ComposedChart, LabelList, Line, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend } from "recharts";
 import { SmartTooltipContent, getTooltipTrigger } from "@/components/smart-tooltip";
 import { inr, categoryMonthly, total, sumMonthly } from "@/lib/finance-mock";
 import { useIncomeTree, useMonthlyTotals } from "@/lib/hooks";
@@ -66,12 +66,22 @@ function Inner() {
   );
   const monthlyMaintenanceData = labels.map((m, i) => {
     const collected = maintenanceMonthly[i] ?? 0;
+    const outstanding = Math.max(0, outstandingMonthly[i] ?? 0);
+    const totalMaintenance = collected + outstanding;
     return {
       month: m,
       collected,
-      outstanding: Math.max(0, outstandingMonthly[i] ?? 0),
+      outstanding,
+      totalMaintenance,
+      recoveryPct: totalMaintenance > 0 ? +((collected / totalMaintenance) * 100).toFixed(1) : 0,
     };
   });
+  const totalMaintenanceCollected = monthlyMaintenanceData.reduce((s, r) => s + r.collected, 0);
+  const totalOutstanding = monthlyMaintenanceData.reduce((s, r) => s + r.outstanding, 0);
+  const maintenanceRecoveryRate = totalMaintenanceCollected + totalOutstanding > 0
+    ? ((totalMaintenanceCollected / (totalMaintenanceCollected + totalOutstanding)) * 100)
+    : 0;
+  const arrearsMonths = monthlyMaintenanceData.filter((r) => r.outstanding > 0).length;
 
   return (
     <>
@@ -142,41 +152,80 @@ function Inner() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Maintenance collection vs outstanding · RD-32</CardTitle>
-          <CardDescription>Monthly maintenance collected with outstanding overlay</CardDescription>
+          <CardDescription>Shows recovery, arrears, and the unpaid maintenance gap for the selected period</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          <div className="grid gap-3 md:grid-cols-4">
+            <div className="rounded-md border border-border p-3">
+              <div className="text-xs text-muted-foreground uppercase tracking-wider">Collected maintenance</div>
+              <div className="text-xl font-mono">{inr(totalMaintenanceCollected)}</div>
+            </div>
+            <div className="rounded-md border border-border p-3">
+              <div className="text-xs text-muted-foreground uppercase tracking-wider">Outstanding / default</div>
+              <div className="text-xl font-mono">{inr(totalOutstanding)}</div>
+            </div>
+            <div className="rounded-md border border-border p-3">
+              <div className="text-xs text-muted-foreground uppercase tracking-wider">Recovery rate</div>
+              <div className="text-xl font-mono">{maintenanceRecoveryRate.toFixed(1)}%</div>
+            </div>
+            <div className="rounded-md border border-border p-3">
+              <div className="text-xs text-muted-foreground uppercase tracking-wider">Months with dues</div>
+              <div className="text-xl font-mono">{arrearsMonths}</div>
+            </div>
+          </div>
+
           {view === "chart" ? (
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={monthlyMaintenanceData}>
+            <ResponsiveContainer width="100%" height={300}>
+              <ComposedChart data={monthlyMaintenanceData}>
                 <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                 <XAxis dataKey="month" fontSize={11} />
-                <YAxis tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} fontSize={11} />
+                <YAxis yAxisId="amount" tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} fontSize={11} />
+                <YAxis yAxisId="pct" orientation="right" tickFormatter={(v) => `${v}%`} fontSize={11} domain={[0, 100]} />
                 <Tooltip trigger={getTooltipTrigger()} cursor={{ fill: "var(--color-muted)", opacity: 0.35 }} content={<SmartTooltipContent labelPrefix="Month" valueFormatter={(v) => inr(v)} />} />
                 <Legend />
-                <Bar dataKey="collected" name="Maintenance collected" fill="var(--color-chart-2)" radius={[4,4,0,0]} />
-                <Bar dataKey="outstanding" name="Outstanding / defaulted" fill="var(--color-chart-1)" radius={[4,4,0,0]} />
-              </BarChart>
+                <Bar yAxisId="amount" dataKey="collected" name="Maintenance collected" fill="var(--color-chart-2)" radius={[4, 4, 0, 0]} />
+                <Bar yAxisId="amount" dataKey="outstanding" name="Outstanding / defaulted" fill="var(--color-chart-1)" radius={[4, 4, 0, 0]} />
+                <Line yAxisId="pct" type="monotone" dataKey="recoveryPct" name="Recovery %" stroke="var(--color-chart-3)" strokeWidth={2} dot={false} />
+              </ComposedChart>
             </ResponsiveContainer>
           ) : (
-            <div className="rounded-md border border-border overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/40">
-                  <tr>
-                    <th className="text-left p-2">Month</th>
-                    <th className="text-right p-2">Collected</th>
-                    <th className="text-right p-2">Outstanding</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {monthlyMaintenanceData.map((m) => (
-                    <tr key={m.month} className="border-t border-border">
-                      <td className="p-2">{m.month}</td>
-                      <td className="p-2 text-right font-mono">{inr(m.collected)}</td>
-                      <td className="p-2 text-right font-mono">{inr(m.outstanding)}</td>
+            <div className="space-y-3">
+              <div className="rounded-md border border-border overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/40">
+                    <tr>
+                      <th className="text-left p-2">Month</th>
+                      <th className="text-right p-2">Collected</th>
+                      <th className="text-right p-2">Outstanding</th>
+                      <th className="text-right p-2">Recovery %</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {monthlyMaintenanceData.map((m) => (
+                      <tr key={m.month} className="border-t border-border">
+                        <td className="p-2">{m.month}</td>
+                        <td className="p-2 text-right font-mono">{inr(m.collected)}</td>
+                        <td className="p-2 text-right font-mono">{inr(m.outstanding)}</td>
+                        <td className="p-2 text-right font-mono">{m.recoveryPct.toFixed(1)}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="rounded-md border border-border p-3 bg-muted/20">
+                  <div className="text-xs uppercase tracking-wider text-muted-foreground">Insight</div>
+                  <div className="mt-1 text-sm">
+                    Recovery is calculated from uploaded maintenance collections versus outstanding/default amounts, so periods with low recovery are easy to spot.
+                  </div>
+                </div>
+                <div className="rounded-md border border-border p-3 bg-muted/20">
+                  <div className="text-xs uppercase tracking-wider text-muted-foreground">Focus</div>
+                  <div className="mt-1 text-sm">
+                    A rising red bar with a falling recovery line indicates collection slippage and helps identify the months needing follow-up.
+                  </div>
+                </div>
+              </div>
             </div>
           )}
         </CardContent>

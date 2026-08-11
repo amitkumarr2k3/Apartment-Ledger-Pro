@@ -123,13 +123,15 @@ function Inner() {
   return (
     <>
       {/* RD-01 summary cards with vs-prior deltas */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         <SummaryCard label="Total collection" value={inr(totalCollection)} tone="cyan"
           delta={delta(totalCollection, priorCollection)} deltaLabel={priorLabel} higherIsBetter />
         <SummaryCard label="Total expense" value={inr(totalExpense)} tone="rose"
           delta={delta(totalExpense, priorExpense)} deltaLabel={priorLabel} higherIsBetter={false} />
         <SummaryCard label={net >= 0 ? "Net surplus" : "Net deficit"} value={inr(net)} tone={net >= 0 ? "emerald" : "amber"}
           delta={delta(net, priorNet)} deltaLabel={priorLabel} higherIsBetter />
+        <SummaryCard label="Total outstanding / default" value={inr(totalOutstanding)} tone="amber"
+          delta={null} deltaLabel="uploaded outstanding and default line items" higherIsBetter={false} />
         <Card>
           <CardHeader className="pb-2">
             <CardDescription className="text-xs uppercase tracking-wider">Expense / Income · RD-04</CardDescription>
@@ -355,53 +357,6 @@ function Inner() {
               </div>
             </div>
           )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Defaulters summary · RD-03</CardTitle>
-          <CardDescription>Strictly from uploaded outstanding/default line items (grouped month-wise)</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="grid gap-3 md:grid-cols-3">
-            <div className="rounded-md border border-border p-3">
-              <div className="text-xs text-muted-foreground uppercase tracking-wider">Outstanding total</div>
-              <div className="text-xl font-mono">{inr(totalOutstanding)}</div>
-            </div>
-            <div className="rounded-md border border-border p-3">
-              <div className="text-xs text-muted-foreground uppercase tracking-wider">Months in arrears</div>
-              <div className="text-xl font-mono">{monthsInArrears}</div>
-            </div>
-            <div className="rounded-md border border-border p-3">
-              <div className="text-xs text-muted-foreground uppercase tracking-wider">Maintenance collected</div>
-              <div className="text-xl font-mono">{inr(maintenanceIncomeByMonth.reduce((s, v) => s + v, 0))}</div>
-            </div>
-          </div>
-          <div className="rounded-md border border-border overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/40">
-                <tr>
-                  <th className="text-left p-2">Month</th>
-                  <th className="text-right p-2">Collected</th>
-                  <th className="text-right p-2">Outstanding</th>
-                </tr>
-              </thead>
-              <tbody>
-                {defaultMonths.length === 0 ? (
-                  <tr>
-                    <td colSpan={3} className="p-3 text-center text-muted-foreground">No outstanding/default data uploaded for this period.</td>
-                  </tr>
-                ) : defaultMonths.map((m) => (
-                  <tr key={m.month} className="border-t border-border">
-                    <td className="p-2">{m.month}</td>
-                    <td className="p-2 text-right font-mono">{inr(m.maintenance_collected)}</td>
-                    <td className="p-2 text-right font-mono">{inr(m.outstanding)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
         </CardContent>
       </Card>
     </>
