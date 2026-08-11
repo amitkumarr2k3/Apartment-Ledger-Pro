@@ -17,9 +17,7 @@ export const Route = createFileRoute("/admin/actions")({
   head: () => ({ meta: [{ title: "Admin · Action Needed" }] }),
 });
 
-const budgets: Record<string, number> = {
-  Utilities: 480000, Maintenance: 800000, Security: 700000, Housekeeping: 400000, "Petty Cash": 60000,
-};
+const getUploadedBudgetForCategory = (_category: string): number | null => null;
 
 function derive(
   tree: Category[],
@@ -57,7 +55,7 @@ function Page() {
 
 function Inner() {
   const { data: expenseTree = [], isLoading } = useExpenseTree();
-  const { sliceMonthly, priorSliceMonthly, labels } = usePeriod();
+  const { sliceMonthly, priorSliceMonthly, labels, view } = usePeriod();
   const { momChanges, anomalies } = useMemo(
     () => derive(expenseTree, sliceMonthly, priorSliceMonthly),
     [expenseTree, sliceMonthly, priorSliceMonthly],
@@ -114,8 +112,8 @@ function Inner() {
 
   const budgetRows = expenseTree.map((c) => {
     const spent = total(sliceMonthly(categoryMonthly(c)));
-    const budget = Math.round(((budgets[c.name] ?? (spent || 1)) / 12) * Math.max(1, labels.length));
-    const variance = ((spent - budget) / budget) * 100;
+    const budget = getUploadedBudgetForCategory(c.name);
+    const variance = budget && budget > 0 ? ((spent - budget) / budget) * 100 : null;
     return { category: c.name, budget, spent, variance };
   });
 
@@ -167,17 +165,40 @@ function Inner() {
             )}
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={260}>
-              <ComposedChart data={trendData}>
-                <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                <XAxis dataKey="month" fontSize={11} />
-                <YAxis tickFormatter={(v) => `₹${(v/1000).toFixed(0)}k`} fontSize={11} />
-                <Tooltip trigger={getTooltipTrigger()} cursor={{ fill: "var(--color-muted)", opacity: 0.35 }} content={<SmartTooltipContent labelPrefix="Month" valueFormatter={(v) => inr(v)} />} />
-                <Legend />
-                <Bar dataKey="actual" name="Actual" fill="var(--color-chart-1)" radius={[4,4,0,0]} />
-                <Line type="monotone" dataKey="projected" name="Projected" stroke="var(--color-chart-4)" strokeWidth={2} strokeDasharray="6 4" />
-              </ComposedChart>
-            </ResponsiveContainer>
+            {view === "chart" ? (
+              <ResponsiveContainer width="100%" height={260}>
+                <ComposedChart data={trendData}>
+                  <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                  <XAxis dataKey="month" fontSize={11} />
+                  <YAxis tickFormatter={(v) => `₹${(v/1000).toFixed(0)}k`} fontSize={11} />
+                  <Tooltip trigger={getTooltipTrigger()} cursor={{ fill: "var(--color-muted)", opacity: 0.35 }} content={<SmartTooltipContent labelPrefix="Month" valueFormatter={(v) => inr(v)} />} />
+                  <Legend />
+                  <Bar dataKey="actual" name="Actual" fill="var(--color-chart-1)" radius={[4,4,0,0]} />
+                  <Line type="monotone" dataKey="projected" name="Projected" stroke="var(--color-chart-4)" strokeWidth={2} strokeDasharray="6 4" />
+                </ComposedChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="rounded-md border border-border overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/40">
+                    <tr>
+                      <th className="text-left p-2">Month</th>
+                      <th className="text-right p-2">Actual</th>
+                      <th className="text-right p-2">Projected</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {trendData.map((r) => (
+                      <tr key={r.month} className="border-t border-border">
+                        <td className="p-2">{r.month}</td>
+                        <td className="p-2 text-right font-mono">{r.actual == null ? "-" : inr(r.actual)}</td>
+                        <td className="p-2 text-right font-mono">{r.projected == null ? "-" : inr(r.projected)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
             <p className="mt-3 text-xs text-muted-foreground">
               Projection is shown only for flagged categories and is based on the recent linear trend of the selected period.
             </p>
@@ -203,7 +224,7 @@ function Inner() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Budget vs actual · AD-43</CardTitle>
-            <CardDescription>Categories over budget flagged red</CardDescription>
+            <CardDescription>Shows variance only when an uploaded budget baseline is available</CardDescription>
           </CardHeader>
           <CardContent>
             <Table>
@@ -219,12 +240,16 @@ function Inner() {
                 {budgetRows.map((r) => (
                   <TableRow key={r.category}>
                     <TableCell className="font-medium">{r.category}</TableCell>
-                    <TableCell className="text-right font-mono">{inr(r.budget)}</TableCell>
+                    <TableCell className="text-right font-mono">{r.budget == null ? "N/A" : inr(r.budget)}</TableCell>
                     <TableCell className="text-right font-mono">{inr(r.spent)}</TableCell>
                     <TableCell className="text-right">
-                      <span className={`font-mono text-xs px-2 py-0.5 rounded ${
-                        r.variance > 0 ? "bg-rose-500/10 text-rose-600" : "bg-emerald-500/10 text-emerald-600"
-                      }`}>{pct(r.variance)}</span>
+                      {r.variance == null ? (
+                        <span className="font-mono text-xs px-2 py-0.5 rounded text-muted-foreground bg-muted/40">N/A</span>
+                      ) : (
+                        <span className={`font-mono text-xs px-2 py-0.5 rounded ${
+                          r.variance > 0 ? "bg-rose-500/10 text-rose-600" : "bg-emerald-500/10 text-emerald-600"
+                        }`}>{pct(r.variance)}</span>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}

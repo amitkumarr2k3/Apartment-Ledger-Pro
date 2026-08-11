@@ -8,9 +8,9 @@ import {
 } from "recharts";
 import { SmartTooltipContent, getTooltipTrigger } from "@/components/smart-tooltip";
 import {
-  inr, pct, expenseTree, categoryMonthly, total,
+  inr, pct, expenseTree, categoryMonthly, total, vendorMonthly,
 } from "@/lib/finance-mock";
-import { useMonthlyTotals, useIncomeCategoryTotals, useExpenseTree } from "@/lib/hooks";
+import { useMonthlyTotals, useExpenseTree, useIncomeTree } from "@/lib/hooks";
 import { Wallet, ArrowRight, TrendingUp, TrendingDown } from "lucide-react";
 
 export const Route = createFileRoute("/resident/overview")({
@@ -27,10 +27,10 @@ function Page() {
 }
 
 function Inner() {
-  const { sliceMonthly, priorSliceMonthly, view } = usePeriod();
+  const { sliceMonthly, priorSliceMonthly, view, labels } = usePeriod();
   const { data: monthlyTotals = [] } = useMonthlyTotals();
-  const { data: incomeCategoryTotals = [] } = useIncomeCategoryTotals();
   const { data: expenseTree = [] } = useExpenseTree();
+  const { data: incomeTree = [] } = useIncomeTree();
   const period = sliceMonthly(monthlyTotals);
   const prior = priorSliceMonthly(monthlyTotals);
 
@@ -53,9 +53,72 @@ function Inner() {
     .sort((a, b) => b.total - a.total)
     .slice(0, 5);
   const top5Total = top5.reduce((s, c) => s + c.total, 0);
-  const communityIncome = incomeCategoryTotals.find((c) => c.name === "Other Income")?.total ?? 0;
+  const top5Vendors = expenseTree
+    .flatMap((c) => c.vendors.map((v) => ({
+      name: v.name,
+      category: c.name,
+      total: total(sliceMonthly(vendorMonthly(v))),
+    })))
+    .filter((v) => v.total > 0)
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 5);
+  const top5VendorTotal = top5Vendors.reduce((s, v) => s + v.total, 0);
+  const maintenanceIncomeByMonth = sliceMonthly(
+    incomeTree
+      .filter((c) => c.name.toLowerCase().includes("maintenance") && !/outstanding|arrears|default/.test(c.name.toLowerCase()))
+      .reduce<number[]>((acc, c) => {
+        const monthly = categoryMonthly(c);
+        return acc.length === 0 ? monthly : acc.map((v, i) => v + (monthly[i] ?? 0));
+      }, []),
+  );
+  const outstandingIncomeByMonth = sliceMonthly(
+    incomeTree
+      .filter((c) => /outstanding|arrears|default/.test(c.name.toLowerCase()))
+      .reduce<number[]>((acc, c) => {
+        const monthly = categoryMonthly(c);
+        return acc.length === 0 ? monthly : acc.map((v, i) => v + (monthly[i] ?? 0));
+      }, []),
+  );
+  const isLiabilityCategory = (name: string) => /outstanding|arrears|default/.test(name.toLowerCase());
+  const nonMaintenanceCategories = incomeTree
+    .filter((c) => !c.name.toLowerCase().includes("maintenance") && !isLiabilityCategory(c.name))
+    .map((c) => ({ name: c.name, total: total(sliceMonthly(categoryMonthly(c))) }))
+    .filter((c) => c.total > 0)
+    .sort((a, b) => b.total - a.total);
+  const communityIncome = nonMaintenanceCategories.reduce((s, c) => s + c.total, 0);
+  const top5Income = nonMaintenanceCategories.slice(0, 5);
+  const top5IncomeTotal = top5Income.reduce((s, c) => s + c.total, 0);
+
+  const periodMonthlyTotals = new Map(period.map((m) => [m.month, m]));
+  let runningOutstanding = 0;
+  const monthlyWithOutstanding = labels.map((month, i) => {
+    const monthlyTotal = periodMonthlyTotals.get(month);
+    const collected = maintenanceIncomeByMonth[i] ?? 0;
+    const outstanding = Math.max(0, outstandingIncomeByMonth[i] ?? 0);
+    runningOutstanding += outstanding;
+    return {
+      month,
+      collection: monthlyTotal?.collection ?? 0,
+      expense: monthlyTotal?.expense ?? 0,
+      net: monthlyTotal?.net ?? 0,
+      outstanding,
+      cumulative_outstanding: runningOutstanding,
+      maintenance_collected: collected,
+    };
+  });
+  const totalOutstanding = monthlyWithOutstanding.reduce((s, m) => s + m.outstanding, 0);
+  const monthsInArrears = monthlyWithOutstanding.filter((m) => m.outstanding > 0).length;
+  const defaultMonths = [...monthlyWithOutstanding]
+    .filter((m) => m.outstanding > 0)
+    .sort((a, b) => a.month.localeCompare(b.month));
+
+  const periodLabel = period.length > 1
+    ? `${period[0].month} to ${period[period.length - 1].month}`
+    : (period[0]?.month ?? "selected period");
 
   const priorLabel = prior.length === 0 ? "no prior window" : `vs prior ${prior.length}m`;
+  const topCardsClass = "h-full min-h-[380px]";
+  const chartHeight = 240;
 
   return (
     <>
@@ -76,7 +139,7 @@ function Inner() {
             <Progress value={Math.min(ratio, 150)} className="h-2" />
             <div className="flex items-center justify-between mt-2 text-xs">
               <span className="text-muted-foreground">
-                {ratio <= 100 ? "Within budget" : "Over-spent"}
+                {ratio <= 100 ? "Expense below collection" : "Expense exceeds collection"}
               </span>
               {prior.length > 0 && (
                 <span className="text-muted-foreground">
@@ -89,15 +152,15 @@ function Inner() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
-        {/* RD-02 top 5 — now drill-through */}
-        <Card className="lg:col-span-2">
+        {/* RD-02 top 5 — drill-through */}
+        <Card className={topCardsClass}>
           <CardHeader>
             <CardTitle className="text-base">Top 5 expense categories</CardTitle>
             <CardDescription>RD-02 · Click any category to drill down</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex-1 overflow-hidden">
             {view === "chart" ? (
-              <ResponsiveContainer width="100%" height={260}>
+              <ResponsiveContainer width="100%" height={chartHeight}>
                 <BarChart data={top5} layout="vertical" margin={{ left: 20 }}>
                   <CartesianGrid horizontal={false} strokeDasharray="3 3" opacity={0.3} />
                   <XAxis type="number" tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} fontSize={11} />
@@ -114,7 +177,7 @@ function Inner() {
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <ul className="divide-y divide-border">
+              <ul className="divide-y divide-border max-h-[240px] overflow-y-auto">
                 {top5.map((c) => (
                   <li key={c.name}>
                     <Link
@@ -139,31 +202,107 @@ function Inner() {
         </Card>
 
         {/* RD-05 community income */}
-        <Card>
+        <Card className={topCardsClass}>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
               <Wallet className="h-4 w-4" /> Community income
             </CardTitle>
-            <CardDescription>RD-05 · Non-maintenance income</CardDescription>
+            <CardDescription>RD-05 · Top 5 income sources with drill down</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <div className="text-3xl font-semibold">{inr(communityIncome)}</div>
-              <div className="text-xs text-muted-foreground">from hall rental, signage, events</div>
-            </div>
-            <div className="space-y-2 text-sm">
-              {incomeCategoryTotals.map((i) => (
-                <Link
-                  key={i.name}
-                  to="/resident/drilldown"
-                  search={(((prev: any) => ({ ...prev, head: "income", category: i.name, vendor: undefined, line: undefined })) as any)}
-                  className="flex justify-between hover:bg-accent/40 rounded px-2 -mx-2 py-1 transition-colors"
-                >
-                  <span className="text-muted-foreground">{i.name}</span>
-                  <span className="font-mono">{inr(i.total)}</span>
-                </Link>
-              ))}
-            </div>
+          <CardContent className="space-y-4 flex-1 overflow-hidden">
+            {top5Income.length === 0 ? (
+              <div className="text-sm text-muted-foreground">
+                {`No community income recorded for ${periodLabel}.`}
+              </div>
+            ) : view === "chart" ? (
+              <ResponsiveContainer width="100%" height={chartHeight}>
+                <BarChart data={top5Income} layout="vertical" margin={{ left: 20 }}>
+                  <CartesianGrid horizontal={false} strokeDasharray="3 3" opacity={0.3} />
+                  <XAxis type="number" tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} fontSize={11} />
+                  <YAxis type="category" dataKey="name" width={110} fontSize={12} />
+                  <Tooltip trigger={getTooltipTrigger()} cursor={{ fill: "var(--color-muted)", opacity: 0.35 }} content={<SmartTooltipContent labelPrefix="Income" valueFormatter={(v) => inr(v)} />} />
+                  <Bar dataKey="total" radius={[0, 4, 4, 0]} className="cursor-pointer">
+                    {top5Income.map((income) => (
+                      <Cell key={income.name} fill="var(--color-chart-2)"
+                        onClick={() => {
+                          window.location.href = `/resident/drilldown?head=income&category=${encodeURIComponent(income.name)}`;
+                        }} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <ul className="divide-y divide-border max-h-[240px] overflow-y-auto">
+                {top5Income.map((income) => (
+                  <li key={income.name}>
+                    <Link
+                      to="/resident/drilldown"
+                      search={(((prev: any) => ({ ...prev, head: "income", category: income.name, vendor: undefined, line: undefined })) as any)}
+                      className="flex items-center justify-between py-3 -mx-4 px-4 hover:bg-accent/40 rounded transition-colors"
+                    >
+                      <div>
+                        <div className="font-medium">{income.name}</div>
+                        <div className="text-xs text-muted-foreground">{((income.total / (top5IncomeTotal || 1)) * 100).toFixed(1)}% of top 5</div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-mono">{inr(income.total)}</span>
+                        <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className={topCardsClass}>
+          <CardHeader>
+            <CardTitle className="text-base">Top 5 vendors by expense</CardTitle>
+            <CardDescription>Actual vendor spend · click any vendor to drill down</CardDescription>
+          </CardHeader>
+          <CardContent className="flex-1 overflow-hidden">
+            {top5Vendors.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No vendor-tagged expense data is available for this period.</p>
+            ) : view === "chart" ? (
+              <ResponsiveContainer width="100%" height={chartHeight}>
+                <BarChart data={top5Vendors} layout="vertical" margin={{ left: 20 }}>
+                  <CartesianGrid horizontal={false} strokeDasharray="3 3" opacity={0.3} />
+                  <XAxis type="number" tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} fontSize={11} />
+                  <YAxis type="category" dataKey="name" width={110} fontSize={12} />
+                  <Tooltip trigger={getTooltipTrigger()} cursor={{ fill: "var(--color-muted)", opacity: 0.35 }} content={<SmartTooltipContent labelPrefix="Vendor" valueFormatter={(v) => inr(v)} />} />
+                  <Bar dataKey="total" radius={[0, 4, 4, 0]} className="cursor-pointer">
+                    {top5Vendors.map((v) => (
+                      <Cell key={`${v.category}-${v.name}`} fill="var(--color-chart-3)"
+                        onClick={() => {
+                          window.location.href = `/resident/drilldown?head=expense&category=${encodeURIComponent(v.category)}&vendor=${encodeURIComponent(v.name)}`;
+                        }} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <ul className="divide-y divide-border max-h-[240px] overflow-y-auto">
+                {top5Vendors.map((v) => (
+                  <li key={`${v.category}-${v.name}`}>
+                    <Link
+                      to="/resident/drilldown"
+                      search={(((prev: any) => ({ ...prev, head: "expense", category: v.category, vendor: v.name, line: undefined })) as any)}
+                      className="flex items-center justify-between py-3 -mx-4 px-4 hover:bg-accent/40 rounded transition-colors"
+                    >
+                      <div>
+                        <div className="font-medium">{v.name}</div>
+                        <div className="text-xs text-muted-foreground">{v.category} · {((v.total / (top5VendorTotal || 1)) * 100).toFixed(1)}% of top 5 vendors</div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-mono">{inr(v.total)}</span>
+                        <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -172,20 +311,97 @@ function Inner() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Monthly trend · collection vs expense</CardTitle>
-          <CardDescription>RD-03 · Selected period</CardDescription>
+          <CardDescription>RD-03 · Includes cumulative outstanding signal</CardDescription>
         </CardHeader>
         <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={period} margin={{ left: 8, right: 8 }}>
-              <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-              <XAxis dataKey="month" fontSize={11} />
-              <YAxis tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} fontSize={11} />
-              <Tooltip trigger={getTooltipTrigger()} cursor={{ fill: "var(--color-muted)", opacity: 0.35 }} content={<SmartTooltipContent labelPrefix="Month" valueFormatter={(v) => inr(v)} />} />
-              <Legend />
-              <Line type="monotone" dataKey="collection" stroke="var(--color-chart-2)" strokeWidth={2} name="Collection" />
-              <Line type="monotone" dataKey="expense" stroke="var(--color-chart-1)" strokeWidth={2} name="Expense" />
-            </LineChart>
-          </ResponsiveContainer>
+          {view === "chart" ? (
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={monthlyWithOutstanding} margin={{ left: 8, right: 8 }}>
+                <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                <XAxis dataKey="month" fontSize={11} />
+                <YAxis tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} fontSize={11} />
+                <Tooltip trigger={getTooltipTrigger()} cursor={{ fill: "var(--color-muted)", opacity: 0.35 }} content={<SmartTooltipContent labelPrefix="Month" valueFormatter={(v) => inr(v)} />} />
+                <Legend />
+                <Line type="monotone" dataKey="collection" stroke="var(--color-chart-2)" strokeWidth={2} name="Collection" />
+                <Line type="monotone" dataKey="expense" stroke="var(--color-chart-1)" strokeWidth={2} name="Expense" />
+                <Line type="monotone" dataKey="cumulative_outstanding" stroke="var(--color-chart-3)" strokeWidth={2} name="Cumulative outstanding" />
+              </LineChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="space-y-3">
+              <div className="rounded-md border border-border overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/40">
+                    <tr>
+                      <th className="text-left p-2">Month</th>
+                      <th className="text-right p-2">Collection</th>
+                      <th className="text-right p-2">Expense</th>
+                      <th className="text-right p-2">Outstanding</th>
+                      <th className="text-right p-2">Cumulative</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {monthlyWithOutstanding.map((m) => (
+                      <tr key={m.month} className="border-t border-border">
+                        <td className="p-2">{m.month}</td>
+                        <td className="p-2 text-right font-mono">{inr(m.collection)}</td>
+                        <td className="p-2 text-right font-mono">{inr(m.expense)}</td>
+                        <td className="p-2 text-right font-mono">{inr(m.outstanding)}</td>
+                        <td className="p-2 text-right font-mono">{inr(m.cumulative_outstanding)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Defaulters summary · RD-03</CardTitle>
+          <CardDescription>Strictly from uploaded outstanding/default line items (grouped month-wise)</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid gap-3 md:grid-cols-3">
+            <div className="rounded-md border border-border p-3">
+              <div className="text-xs text-muted-foreground uppercase tracking-wider">Outstanding total</div>
+              <div className="text-xl font-mono">{inr(totalOutstanding)}</div>
+            </div>
+            <div className="rounded-md border border-border p-3">
+              <div className="text-xs text-muted-foreground uppercase tracking-wider">Months in arrears</div>
+              <div className="text-xl font-mono">{monthsInArrears}</div>
+            </div>
+            <div className="rounded-md border border-border p-3">
+              <div className="text-xs text-muted-foreground uppercase tracking-wider">Maintenance collected</div>
+              <div className="text-xl font-mono">{inr(maintenanceIncomeByMonth.reduce((s, v) => s + v, 0))}</div>
+            </div>
+          </div>
+          <div className="rounded-md border border-border overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/40">
+                <tr>
+                  <th className="text-left p-2">Month</th>
+                  <th className="text-right p-2">Collected</th>
+                  <th className="text-right p-2">Outstanding</th>
+                </tr>
+              </thead>
+              <tbody>
+                {defaultMonths.length === 0 ? (
+                  <tr>
+                    <td colSpan={3} className="p-3 text-center text-muted-foreground">No outstanding/default data uploaded for this period.</td>
+                  </tr>
+                ) : defaultMonths.map((m) => (
+                  <tr key={m.month} className="border-t border-border">
+                    <td className="p-2">{m.month}</td>
+                    <td className="p-2 text-right font-mono">{inr(m.maintenance_collected)}</td>
+                    <td className="p-2 text-right font-mono">{inr(m.outstanding)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </CardContent>
       </Card>
     </>

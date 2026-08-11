@@ -20,6 +20,13 @@ with open(CONFIG_FILE, "r") as f:
     cfg = yaml.safe_load(f)
 
 vendors = cfg.get("vendors", {}).copy()
+line_item_aliases = {
+    norm_key: str(canonical).strip()
+    for norm_key, canonical in {
+        re.sub(r"\s+", " ", str(k).strip()).lower(): v
+        for k, v in cfg.get("line_item_aliases", {}).items()
+    }.items()
+}
 
 # -------------------------------------------------------
 # Expand Vendor Groups (EXOZEN, etc.)
@@ -127,6 +134,11 @@ def norm(x):
         " ",
         str(x).strip()
     ).lower()
+
+
+def canonical_line_item(value):
+    raw = str(value).strip()
+    return line_item_aliases.get(norm(raw), raw)
 
 # -------------------------------------------------------
 # Category Lookup
@@ -273,6 +285,8 @@ for file in Path(INPUT_DIR).glob("*.xls*"):
 
             if ledger.lower() == "total":
                 continue
+
+            ledger = canonical_line_item(ledger)
 
             ledger_norm = norm(ledger)
 

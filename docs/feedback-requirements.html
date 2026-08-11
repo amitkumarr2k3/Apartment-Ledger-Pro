@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CG Boulevard Apartment Ledger Portal — Business Requirements & Improvement Document</title>
+<style>
+  :root {
+    --primary: #6366f1;
+    --primary-light: #eef2ff;
+    --accent: #0ea5e9;
+    --accent-light: #e0f2fe;
+    --success: #10b981;
+    --success-light: #d1fae5;
+    --warning: #f59e0b;
+    --warning-light: #fef3c7;
+    --danger: #ef4444;
+    --danger-light: #fee2e2;
+    --muted: #6b7280;
+    --border: #e5e7eb;
+    --bg: #f9fafb;
+    --card: #ffffff;
+    --text: #111827;
+    --text-secondary: #4b5563;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; font-size: 14px; color: var(--text); background: var(--bg); }
+  .page-wrapper { max-width: 1200px; margin: 0 auto; padding: 32px 24px; }
+
+  /* Title Page */
+  .title-page { background: linear-gradient(135deg, #1e1b4b 0%, #312e81 40%, #4c1d95 70%, #1e40af 100%); color: #fff; border-radius: 16px; padding: 72px 60px; margin-bottom: 48px; position: relative; overflow: hidden; }
+  .title-page::before { content: ''; position: absolute; inset: 0; background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.04'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E"); }
+  .title-badge { display: inline-block; background: rgba(255,255,255,0.15); backdrop-filter: blur(4px); border: 1px solid rgba(255,255,255,0.25); border-radius: 999px; padding: 4px 14px; font-size: 11px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 20px; }
+  .title-page h1 { font-size: 36px; font-weight: 700; line-height: 1.2; margin-bottom: 16px; }
+  .title-page p { color: rgba(255,255,255,0.75); font-size: 15px; max-width: 680px; margin-bottom: 32px; }
+  .title-meta { display: flex; gap: 32px; flex-wrap: wrap; }
+  .title-meta-item .label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: rgba(255,255,255,0.5); margin-bottom: 4px; }
+  .title-meta-item .value { font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.9); }
+
+  /* Section */
+  .section { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-bottom: 24px; }
+  .section-title { font-size: 20px; font-weight: 700; color: var(--text); margin-bottom: 6px; display: flex; align-items: center; gap: 10px; }
+  .section-subtitle { color: var(--text-secondary); font-size: 13px; margin-bottom: 24px; }
+  .section-divider { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
+
+  /* TOC */
+  .toc { background: var(--primary-light); border: 1px solid #c7d2fe; border-radius: 12px; padding: 28px 32px; margin-bottom: 24px; }
+  .toc-title { font-size: 16px; font-weight: 700; color: var(--primary); margin-bottom: 16px; }
+  .toc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 32px; }
+  .toc-item { font-size: 13px; color: var(--primary); text-decoration: none; display: flex; align-items: center; gap: 6px; padding: 3px 0; }
+  .toc-num { font-size: 11px; font-weight: 600; color: #818cf8; min-width: 22px; }
+
+  /* Stats */
+  .stat-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+  .stat-card { color: #fff; border-radius: 10px; padding: 20px; text-align: center; }
+  .stat-card.indigo { background: linear-gradient(135deg, #6366f1, #4f46e5); }
+  .stat-card.red { background: linear-gradient(135deg, #dc2626, #ef4444); }
+  .stat-card.amber { background: linear-gradient(135deg, #d97706, #f59e0b); }
+  .stat-card.green { background: linear-gradient(135deg, #059669, #10b981); }
+  .stat-card .num { font-size: 32px; font-weight: 700; line-height: 1; }
+  .stat-card .lbl { font-size: 11px; opacity: 0.85; margin-top: 4px; }
+
+  /* Themes */
+  .exec-theme-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
+  .exec-theme { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 18px; }
+  .exec-theme .theme-tag { font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--primary); margin-bottom: 8px; }
+  .exec-theme h4 { font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+  .exec-theme p { font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
+
+  /* Req Cards */
+  .req-card { border: 1px solid var(--border); border-radius: 10px; margin-bottom: 20px; overflow: hidden; }
+  .req-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; background: var(--bg); border-bottom: 1px solid var(--border); flex-wrap: wrap; gap: 8px; }
+  .req-id { font-family: monospace; font-size: 12px; font-weight: 700; background: var(--primary); color: #fff; border-radius: 5px; padding: 3px 9px; }
+  .req-title-text { font-size: 14px; font-weight: 600; color: var(--text); flex: 1; padding: 0 12px; }
+  .req-badges { display: flex; gap: 6px; flex-wrap: wrap; }
+  .badge { font-size: 10px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; border-radius: 999px; padding: 3px 10px; border: 1px solid; }
+  .badge-high { background: #fee2e2; color: #b91c1c; border-color: #fca5a5; }
+  .badge-medium { background: var(--warning-light); color: #92400e; border-color: #fcd34d; }
+  .badge-low { background: var(--success-light); color: #065f46; border-color: #6ee7b7; }
+  .badge-defect { background: #fee2e2; color: #b91c1c; border-color: #fca5a5; }
+  .badge-enhancement { background: #ede9fe; color: #5b21b6; border-color: #c4b5fd; }
+  .badge-ux { background: #e0f2fe; color: #0369a1; border-color: #7dd3fc; }
+  .badge-data { background: #d1fae5; color: #065f46; border-color: #6ee7b7; }
+  .req-body { padding: 18px; }
+  .req-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .req-field label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: var(--muted); display: block; margin-bottom: 5px; }
+  .req-field p { font-size: 13px; line-height: 1.55; color: var(--text); }
+  .req-field.full { grid-column: span 2; }
+
+  /* Before/After */
+  .ba-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .ba-box { border-radius: 8px; padding: 14px; }
+  .ba-before { background: #fff1f2; border: 1px dashed #fca5a5; }
+  .ba-after { background: #f0fdf4; border: 1px solid #86efac; }
+  .ba-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 8px; }
+  .ba-before .ba-label { color: #b91c1c; }
+  .ba-after .ba-label { color: #059669; }
+  .ba-content { font-size: 12px; line-height: 1.55; }
+  .ba-before .ba-content { color: #9f1239; }
+  .ba-after .ba-content { color: #14532d; }
+
+  /* Mockups */
+  .mockup { background: #1e1b4b; border-radius: 12px; padding: 2px; margin: 16px 0; overflow: hidden; }
+  .mockup-bar { background: #312e81; padding: 10px 16px; display: flex; align-items: center; gap: 8px; }
+  .mockup-dot { width: 10px; height: 10px; border-radius: 50%; }
+  .mockup-dot.r { background: #ef4444; }
+  .mockup-dot.y { background: #f59e0b; }
+  .mockup-dot.g { background: #10b981; }
+  .mockup-bar span { font-size: 11px; color: rgba(255,255,255,0.5); margin-left: 8px; }
+  .mockup-body { background: #f9fafb; padding: 16px; }
+  .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 12px; }
+  .kpi-box { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; }
+  .kpi-box .kpi-label { font-size: 10px; color: #6b7280; margin-bottom: 4px; }
+  .kpi-box .kpi-value { font-size: 18px; font-weight: 700; color: #111827; }
+  .kpi-box .kpi-sub { font-size: 10px; color: #10b981; }
+  .chart-placeholder { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; }
+  .chart-placeholder .chart-title { font-size: 11px; font-weight: 600; color: #374151; margin-bottom: 8px; }
+  .chart-bars { display: flex; align-items: flex-end; gap: 4px; height: 80px; padding: 0 4px; }
+  .chart-bar { border-radius: 3px 3px 0 0; flex: 1; }
+  .chart-legend { display: flex; gap: 12px; margin-top: 6px; flex-wrap: wrap; }
+  .legend-item { display: flex; align-items: center; gap: 4px; font-size: 10px; color: #6b7280; }
+  .legend-dot { width: 8px; height: 8px; border-radius: 2px; }
+
+  /* Tables */
+  .data-table { width: 100%; border-collapse: collapse; }
+  .data-table th { background: #f3f4f6; padding: 10px 14px; font-size: 11px; font-weight: 700; text-align: left; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); }
+  .data-table td { padding: 10px 14px; border-bottom: 1px solid var(--border); font-size: 12px; vertical-align: middle; }
+  .data-table tr:last-child td { border-bottom: none; }
+  .mini-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  .mini-table th { background: #f3f4f6; padding: 6px 10px; text-align: left; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb; }
+  .mini-table td { padding: 5px 10px; border-bottom: 1px solid #f3f4f6; color: #374151; }
+  .mini-table tr:last-child td { border-bottom: none; }
+
+  /* Pills / Badges */
+  .pill { display: inline-block; border-radius: 999px; padding: 2px 10px; font-size: 10px; font-weight: 600; }
+  .pill-H { background: #fee2e2; color: #b91c1c; }
+  .pill-M { background: #fef3c7; color: #92400e; }
+  .pill-L { background: #d1fae5; color: #065f46; }
+  .pill-lo { background: #e0f2fe; color: #0369a1; }
+  .pill-me { background: #ede9fe; color: #5b21b6; }
+  .pill-hi { background: #fee2e2; color: #b91c1c; }
+
+  /* Matrix */
+  .matrix-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .matrix-col { border-radius: 10px; padding: 16px; }
+  .matrix-high { background: #fee2e2; border: 1px solid #fca5a5; }
+  .matrix-medium { background: #fef3c7; border: 1px solid #fcd34d; }
+  .matrix-low { background: #d1fae5; border: 1px solid #6ee7b7; }
+  .matrix-col h4 { font-size: 13px; font-weight: 700; margin-bottom: 10px; }
+  .matrix-high h4 { color: #b91c1c; }
+  .matrix-medium h4 { color: #92400e; }
+  .matrix-low h4 { color: #065f46; }
+  .matrix-item { font-size: 11px; background: rgba(255,255,255,0.7); border-radius: 5px; padding: 6px 9px; margin-bottom: 6px; line-height: 1.4; }
+
+  /* Gap */
+  .gap-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .gap-item { border-left: 3px solid var(--primary); padding: 12px 16px; background: var(--primary-light); border-radius: 0 8px 8px 0; }
+  .gap-item h5 { font-size: 12px; font-weight: 700; margin-bottom: 4px; color: #312e81; }
+  .gap-item p { font-size: 11px; color: #4338ca; line-height: 1.5; }
+
+  /* Callout */
+  .callout { border-left: 4px solid var(--primary); background: var(--primary-light); border-radius: 0 8px 8px 0; padding: 12px 16px; font-size: 12px; color: #3730a3; margin: 12px 0; }
+  .callout.warn { border-color: var(--warning); background: var(--warning-light); color: #92400e; }
+  .callout.success { border-color: var(--success); background: var(--success-light); color: #065f46; }
+
+  /* Checklist */
+  ul.checklist { list-style: none; padding: 0; }
+  ul.checklist li { font-size: 12px; padding: 4px 0 4px 22px; position: relative; color: var(--text-secondary); line-height: 1.5; }
+  ul.checklist li::before { content: '✓'; position: absolute; left: 0; color: var(--success); font-weight: 700; }
+  ul.risk-list li::before { content: '⚠'; color: var(--warning); }
+
+  /* Two col */
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+
+  /* Appendix */
+  .appendix-item { display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); align-items: flex-start; }
+  .appendix-item:last-child { border-bottom: none; }
+  .appendix-num { font-family: monospace; font-size: 11px; background: #f3f4f6; color: var(--muted); border-radius: 4px; padding: 2px 7px; white-space: nowrap; flex-shrink: 0; margin-top: 1px; }
+  .appendix-text { font-size: 12px; color: var(--text-secondary); line-height: 1.5; flex: 1; }
+  .appendix-ref { font-size: 10px; font-weight: 700; color: var(--primary); margin-left: 8px; white-space: nowrap; }
+
+  @media (max-width: 768px) {
+    .exec-theme-grid, .stat-row, .kpi-row, .req-grid, .matrix-grid, .gap-grid, .ba-grid, .two-col, .three-col, .toc-grid { grid-template-columns: 1fr; }
+    .title-page { padding: 40px 24px; }
+    .title-page h1 { font-size: 22px; }
+    .req-field.full { grid-column: 1; }
+  }
+</style>
+</head>
+<body>
+<div class="page-wrapper">
+
+<!-- TITLE PAGE -->
+<div class="title-page">
+  <div class="title-badge">Business Requirements &amp; Improvement Document</div>
+  <h1>CG Boulevard Apartment Ledger Portal<br/>Feedback Analysis &amp; Enhancement Specification</h1>
+  <p>A comprehensive stakeholder requirements document consolidating user feedback into actionable improvements, prioritized for implementation by the GHCP technical team.</p>
+  <div class="title-meta">
+    <div class="title-meta-item"><div class="label">Project</div><div class="value">CG Boulevard Apartment Finance Portal</div></div>
+    <div class="title-meta-item"><div class="label">Date</div><div class="value">11 August 2026</div></div>
+    <div class="title-meta-item"><div class="label">Version</div><div class="value">v1.0 — Initial Draft</div></div>
+    <div class="title-meta-item"><div class="label">Prepared For</div><div class="value">GHCP Team · Technical Assessment</div></div>
+  </div>
+</div>
+
+<!-- TOC -->
+<div class="toc" id="toc">
+  <div class="toc-title">📋 Table of Contents</div>
+  <div class="toc-grid">
+    <a href="#s1" class="toc-item"><span class="toc-num">1</span> Executive Summary</a>
+    <a href="#s2" class="toc-item"><span class="toc-num">2</span> Feedback Analysis Overview</a>
+    <a href="#s3" class="toc-item"><span class="toc-num">3</span> Resident Overview Module</a>
+    <a href="#s4" class="toc-item"><span class="toc-num">4</span> Resident Income Visibility</a>
+    <a href="#s5" class="toc-item"><span class="toc-num">5</span> Resident Cashflow &amp; Balance</a>
+    <a href="#s6" class="toc-item"><span class="toc-num">6</span> Admin Dashboards — Analytics</a>
+    <a href="#s7" class="toc-item"><span class="toc-num">7</span> Cross-Cutting — UI Consistency</a>
+    <a href="#s8" class="toc-item"><span class="toc-num">8</span> Visual Mockups &amp; Wireframes</a>
+    <a href="#s9" class="toc-item"><span class="toc-num">9</span> Prioritization Matrix</a>
+    <a href="#s10" class="toc-item"><span class="toc-num">10</span> Implementation Impact Table</a>
+    <a href="#s11" class="toc-item"><span class="toc-num">11</span> Gap &amp; Opportunity Analysis</a>
+    <a href="#s12" class="toc-item"><span class="toc-num">12</span> Risks &amp; Dependencies</a>
+    <a href="#s13" class="toc-item"><span class="toc-num">13</span> Recommendations &amp; Phasing</a>
+    <a href="#s14" class="toc-item"><span class="toc-num">14</span> Appendix — Original Feedback</a>
+  </div>
+</div>
+
+<!-- 1. EXECUTIVE SUMMARY -->
+<div class="section" id="s1">
+  <div class="section-title">📊 1. Executive Summary</div>
+  <div class="section-subtitle">Key findings, pain points, and recommended focus areas</div>
+
+  <div class="stat-row">
+    <div class="stat-card indigo"><div class="num">14</div><div class="lbl">Total Feedback Items</div></div>
+    <div class="stat-card red"><div class="num">7</div><div class="lbl">High Priority</div></div>
+    <div class="stat-card amber"><div class="num">5</div><div class="lbl">Medium Priority</div></div>
+    <div class="stat-card green"><div class="num">2</div><div class="lbl">Low Priority</div></div>
+  </div>
+
+  <div class="exec-theme-grid">
+    <div class="exec-theme"><div class="theme-tag">Theme 1</div><h4>Data Accuracy &amp; Filter Responsiveness</h4><p>Charts and KPI tiles display figures that do not react to the selected period filter, eroding stakeholder trust. Community Income is the clearest example.</p></div>
+    <div class="exec-theme"><div class="theme-tag">Theme 2</div><h4>Missing Defaulter Visibility</h4><p>Residents who have not paid maintenance are entirely absent from all dashboards. This is a major operational gap for the management committee.</p></div>
+    <div class="exec-theme"><div class="theme-tag">Theme 3</div><h4>Misleading Terminology</h4><p>"Within Budget" where no budget exists, "Non-maintenance income" being unclear, "Tax as revenue", and "Accounting Adjustment" labels all create confusion in reviews.</p></div>
+    <div class="exec-theme"><div class="theme-tag">Theme 4</div><h4>Incomplete Overview Layout</h4><p>Overview shows only 2 charts. Vendor-level expense and Income trend are missing, leaving screen space unused and navigation less informative.</p></div>
+    <div class="exec-theme"><div class="theme-tag">Theme 5</div><h4>Chart/Number Toggle Broken</h4><p>The view toggle is non-functional on multiple Admin and Resident pages, making analysis inconsistent across the application.</p></div>
+    <div class="exec-theme"><div class="theme-tag">Theme 6</div><h4>Sorting &amp; Ordering Gaps</h4><p>Expense drill-down is not sorted descending by default despite the Overview already showing Top-5. Inconsistency makes detailed analysis harder.</p></div>
+  </div>
+
+  <div class="callout success">
+    <strong>Expected Business Benefits after Implementation:</strong> Reliable financial transparency, actionable defaulter tracking enabling timely collections management, accurate terminology reducing audit confusion, and a fully interactive dashboard experience aligned to stakeholder expectations.
+  </div>
+</div>
+
+<!-- 2. FEEDBACK ANALYSIS -->
+<div class="section" id="s2">
+  <div class="section-title">🔍 2. Feedback Analysis Overview</div>
+  <div class="section-subtitle">All 14 raw feedback items categorized by module, type, and priority</div>
+  <table class="data-table">
+    <thead><tr><th>#</th><th>Feedback Summary</th><th>Module</th><th>Type</th><th>Priority</th></tr></thead>
+    <tbody>
+      <tr><td>F-01</td><td>RD-31 — Replace "Income left" with "Surplus"</td><td>Resident Income</td><td><span class="badge badge-ux">UX / Label</span></td><td><span class="pill pill-L">Low</span></td></tr>
+      <tr><td>F-02</td><td>RD-02 — Should Utilities be split?</td><td>Resident Overview</td><td><span class="badge badge-enhancement">Enhancement</span></td><td><span class="pill pill-M">Medium</span></td></tr>
+      <tr><td>F-03</td><td>RD-20 — Rename "Within Budget" (no budget exists)</td><td>Resident Cashflow</td><td><span class="badge badge-defect">Defect</span></td><td><span class="pill pill-H">High</span></td></tr>
+      <tr><td>F-04</td><td>RD-32 — Maintenance-only chart with defaulters</td><td>Resident Income</td><td><span class="badge badge-enhancement">Enhancement</span></td><td><span class="pill pill-H">High</span></td></tr>
+      <tr><td>F-05</td><td>RD-42 — Negative opening balance in last 6 months</td><td>Resident Balance</td><td><span class="badge badge-defect">Defect</span></td><td><span class="pill pill-H">High</span></td></tr>
+      <tr><td>F-06</td><td>Facility rental income ₹1.5L — is this correct?</td><td>Income module</td><td><span class="badge badge-data">Data Validation</span></td><td><span class="pill pill-M">Medium</span></td></tr>
+      <tr><td>F-07</td><td>What is included in "Recreation &amp; Wellness"?</td><td>Expense categories</td><td><span class="badge badge-ux">UX / Clarity</span></td><td><span class="pill pill-L">Low</span></td></tr>
+      <tr><td>F-08</td><td>Tax as revenue needs to be corrected</td><td>Income module</td><td><span class="badge badge-defect">Defect</span></td><td><span class="pill pill-H">High</span></td></tr>
+      <tr><td>F-09</td><td>RD-10 — Sort expense drill-down high to low</td><td>Resident Drilldown</td><td><span class="badge badge-ux">UX / Sorting</span></td><td><span class="pill pill-M">Medium</span></td></tr>
+      <tr><td>F-10</td><td>RD-10 — Rename "Accounting Adjustment"</td><td>Resident Drilldown</td><td><span class="badge badge-ux">UX / Label</span></td><td><span class="pill pill-M">Medium</span></td></tr>
+      <tr><td>F-11</td><td>RD-05 — Community Income not filter-responsive; add Defaulters section</td><td>Resident Overview</td><td><span class="badge badge-defect">Defect + Enhancement</span></td><td><span class="pill pill-H">High</span></td></tr>
+      <tr><td>F-12</td><td>Overview 4-tile redesign; remove mock income sub-text; rename labels</td><td>Resident Overview</td><td><span class="badge badge-enhancement">Enhancement</span></td><td><span class="pill pill-M">Medium</span></td></tr>
+      <tr><td>F-13</td><td>RD-03 — Show defaulter amount in Collection vs Expense chart</td><td>Resident Overview</td><td><span class="badge badge-enhancement">Enhancement</span></td><td><span class="pill pill-H">High</span></td></tr>
+      <tr><td>F-14</td><td>Chart/Number toggle broken across Admin/Resident pages</td><td>Global UI</td><td><span class="badge badge-defect">Defect</span></td><td><span class="pill pill-H">High</span></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- 3. RESIDENT OVERVIEW -->
+<div class="section" id="s3">
+  <div class="section-title">🏠 3. Resident Dashboard — Overview Module</div>
+  <div class="section-subtitle">Derived from F-02, F-03, F-11, F-12, F-13</div>
+
+  <div class="req-card">
+    <div class="req-header"><span class="req-id">REQ-01</span><span class="req-title-text">Community Income tile must respond to period filter</span><div class="req-badges"><span class="badge badge-defect">Defect</span><span class="badge badge-high">High Priority</span></div></div>
+    <div class="req-body">
+      <div class="req-grid">
+        <div class="req-field"><label>Problem Statement</label><p>The Community Income (RD-05) tile always shows the same static figure regardless of the selected date period. This breaks user trust and makes period-based financial analysis impossible.</p></div>
+        <div class="req-field"><label>Current Behaviour</label><p>Community Income figure does not change when switching between FY, monthly, or custom range filters. Sub-text "₹0 from hall rental, signage, events" appears as placeholder text even when actual data exists.</p></div>
+        <div class="req-field"><label>Expected Behaviour</label><p>Tile and all sub-breakdowns recalculate on every period filter change. When no income exists for the selected period, display: <em>"No community income recorded for this period."</em></p></div>
+        <div class="req-field"><label>Business Rationale</label><p>Management committee reviews income on FY and monthly basis. A stagnant figure invalidates the entire dashboard's credibility during stakeholder presentations.</p></div>
+        <div class="req-field full"><label>Recommended Solution</label><p>Wire the Community Income component to consume <code>sliceMonthly</code> from <code>usePeriod()</code>, consistent with all other charts. Remove all hardcoded values. Add empty-state guard with period-aware message.</p></div>
+      </div>
+      <div class="ba-grid" style="margin-top:14px">
+        <div class="ba-box ba-before"><div class="ba-label">⚠ Before</div><div class="ba-content">Community Income = ₹1,50,000 regardless of FY / Month selected. Sub-text "₹0 from hall rental..." always visible even when real data exists.</div></div>
+        <div class="ba-box ba-after"><div class="ba-label">✓ After</div><div class="ba-content">Community Income = ₹38,500 for Apr–Jul 2026 (dynamically computed). If nil: "No community income recorded for Apr–Jul 2026."</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="req-card">
+    <div class="req-header"><span class="req-id">REQ-02</span><span class="req-title-text">Redesign Overview with 4-tile layout: Expense, Income, Vendors, and Trend</span><div class="req-badges"><span class="badge badge-enhancement">Enhancement</span><span class="badge badge-medium">Medium Priority</span></div></div>
+    <div class="req-body">
+      <div class="req-grid">
+        <div class="req-field"><label>Problem Statement</label><p>Overview has only 2 charts. Vendor-level spend and Income trend are absent. The 2-chart layout underuses screen space and provides an incomplete financial picture.</p></div>
+        <div class="req-field"><label>Expected Behaviour</label><p>Four equal tiles in a responsive 2×2 grid:<br>1. Top 5 Expense Categories (with drill-down)<br>2. Community Income Sources (top 5, with drill-down, same format as expense)<br>3. Top 5 Vendors by Expense (new, with drill-down)<br>4. Monthly Collection vs Expense + Outstanding trend</p></div>
+        <div class="req-field"><label>Label / Naming Change</label><p>Rename "Non-maintenance income" to <strong>"Community Income Sources"</strong> matching expense section style. Remove sub-description "₹0 from hall rental..." Replace with actual dynamic data or proper empty state.</p></div>
+        <div class="req-field"><label>Interaction Model</label><p>Clicking any bar or count within a chart tile opens an inline drill-down table. Chart/Number toggle must work for all 4 tiles. Number view shows a formatted ranked table.</p></div>
+        <div class="req-field full"><label>Business Rationale</label><p>Vendor visibility supports payment authorization governance. Income at the same granularity as expense gives residents a balanced view. Adding the Income trend completes the financial picture on the landing screen without requiring navigation.</p></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="req-card">
+    <div class="req-header"><span class="req-id">REQ-03</span><span class="req-title-text">Add Defaulter visibility to Overview (RD-03 chart + standalone tile)</span><div class="req-badges"><span class="badge badge-enhancement">Enhancement</span><span class="badge badge-high">High Priority</span></div></div>
+    <div class="req-body">
+      <div class="req-grid">
+        <div class="req-field"><label>Problem Statement</label><p>Residents who have not paid maintenance ("defaulters") represent lost revenue and are a primary concern for the committee. Zero dashboards currently show defaulter count, outstanding amount, or trend.</p></div>
+        <div class="req-field"><label>RD-03 Enhancement</label><p>Add a third series to the Collection vs Expense chart representing <strong>"Outstanding Maintenance"</strong> (billed − collected). This shows the monthly collection gap visually without replacing existing series.</p></div>
+        <div class="req-field"><label>New Defaulter Summary Tile</label><p>Add a dedicated card showing: total units in arrears, outstanding amount for selected period, and top 5 defaulting flats (admin-configurable visibility). Can reside within or alongside the Community Income area.</p></div>
+        <div class="req-field"><label>Data Requirements</label><p>Requires: (a) Expected maintenance amount per period (units × rate), (b) Actual collected, (c) Derived: outstanding = expected − collected. If billing amount not in DB, add a community-level "monthly maintenance rate" config field.</p></div>
+        <div class="req-field full"><label>Recommended Implementation</label><p>Phase 1: Add outstanding series to RD-03 using existing collection data + configurable expected amount. Phase 2: Full Defaulters module (admin-only) with flat-level arrears list once billing data is available.</p></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="req-card">
+    <div class="req-header"><span class="req-id">REQ-04</span><span class="req-title-text">Split or annotate "Utilities" expense category</span><div class="req-badges"><span class="badge badge-enhancement">Enhancement</span><span class="badge badge-medium">Medium Priority</span></div></div>
+    <div class="req-body">
+      <div class="req-grid">
+        <div class="req-field"><label>Problem Statement</label><p>"Utilities" may aggregate BESCOM A/B/E/G blocks, water supply, and other sub-categories, making it impossible to see per-utility contribution to overall expense.</p></div>
+        <div class="req-field"><label>Recommended Solution</label><p>Option A (Preferred): Split into distinct sub-categories (Electricity — Block-wise, Water Supply, etc.) visible in drill-down.<br>Option B: Add expandable row under Utilities showing vendor/sub-category breakdown inline.</p></div>
+        <div class="req-field"><label>Dependency</label><p>Verify BESCOM sub-categories exist as separate line items in ETL output. If currently merged, a data mapping change is required before UI work begins.</p></div>
+        <div class="req-field"><label>Business Rationale</label><p>BESCOM blocks have separate meters and tariff structures. Per-utility visibility is needed to validate charges and identify consumption anomalies.</p></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 4. RESIDENT INCOME -->
+<div class="section" id="s4">
+  <div class="section-title">💰 4. Resident Dashboard — Income Visibility</div>
+  <div class="section-subtitle">Derived from F-01, F-04, F-06, F-08</div>
+
+  <div class="req-card">
+    <div class="req-header"><span class="req-id">REQ-05</span><span class="req-title-text">RD-31: Replace "Income left" with "Surplus / Deficit"</span><div class="req-badges"><span class="badge badge-ux">UX / Label</span><span class="badge badge-low">Low Priority</span></div></div>
+    <div class="req-body">
+      <div class="req-grid">
+        <div class="req-field"><label>Current</label><p>Net amount after expenses is labelled "Income left" — informal and ambiguous.</p></div>
+        <div class="req-field"><label>Expected</label><p>Dynamically display <strong>"Surplus"</strong> when the value is positive, and <strong>"Deficit"</strong> when negative. This is standard RWA financial terminology understood by residents and auditors alike.</p></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="req-card">
+    <div class="req-header"><span class="req-id">REQ-06</span><span class="req-title-text">RD-32: Add Maintenance-only chart with Defaulter overlay</span><div class="req-badges"><span class="badge badge-enhancement">Enhancement</span><span class="badge badge-high">High Priority</span></div></div>
+    <div class="req-body">
+      <div class="req-grid">
+        <div class="req-field"><label>Problem Statement</label><p>RD-32 shows a general income trend. Stakeholders require a dedicated monthly bar chart for Maintenance collections specifically, overlaid with defaulter amounts to visualize collection efficiency.</p></div>
+        <div class="req-field"><label>Expected Behaviour</label><p>Grouped/stacked monthly bar chart:<br>• Bar 1: Maintenance Collected (green)<br>• Bar 2: Outstanding / Defaulted (red/amber)<br>Tooltip on hover: unit count in arrears + amount due.</p></div>
+        <div class="req-field"><label>Data Requirements</label><p>Requires expected billing amount per month. If not currently captured, a community "monthly maintenance rate" configuration field must be added.</p></div>
+        <div class="req-field"><label>Dependencies</label><p>REQ-03 data model (defaulter schema). Phase 2 delivery after billing config is available.</p></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="req-card">
+    <div class="req-header"><span class="req-id">REQ-07</span><span class="req-title-text">Correct "Tax as revenue" — GST collections are liabilities, not income</span><div class="req-badges"><span class="badge badge-defect">Defect / Data</span><span class="badge badge-high">High Priority</span></div></div>
+    <div class="req-body">
+      <div class="req-grid">
+        <div class="req-field"><label>Problem Statement</label><p>CGST Output and SGST Output collected on community services are shown in the Income module as revenue. Tax collected is a liability payable to the government — not community income.</p></div>
+        <div class="req-field"><label>Expected Behaviour</label><p>Either: (a) Exclude CGST/SGST from income total, showing separately as "Tax Collected (Liability)", or (b) Present income figure "Ex-Tax" prominently with tax collected as a footnote. Either way, the income total must not include tax.</p></div>
+        <div class="req-field full"><label>Business Rationale</label><p>Including tax in income overstates revenue and creates compliance risk. This must be corrected before any financial report is shared with residents, auditors, or the registrar.</p></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="req-card">
+    <div class="req-header"><span class="req-id">REQ-08</span><span class="req-title-text">Validate Facility Rental income figure (₹1.5L for 6 months)</span><div class="req-badges"><span class="badge badge-data">Data Validation</span><span class="badge badge-medium">Medium Priority</span></div></div>
+    <div class="req-body">
+      <div class="req-grid">
+        <div class="req-field"><label>Observation</label><p>Facility rental income shows ₹1,50,000 for 6 months in the income breakdown. Stakeholder has raised this as a potential data anomaly that needs reconciliation against actual bookings.</p></div>
+        <div class="req-field"><label>Action Required</label><p>Reconcile against booking / receipt records outside the application. If figure is correct, no change needed. If incorrect, fix ETL mapping. Optionally add a z-score based anomaly flag in ETL pipeline for large income entries.</p></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 5. CASHFLOW & BALANCE -->
+<div class="section" id="s5">
+  <div class="section-title">📈 5. Resident Dashboard — Cash Flow &amp; Balance</div>
+  <div class="section-subtitle">Derived from F-03, F-05</div>
+
+  <div class="req-card">
+    <div class="req-header"><span class="req-id">REQ-09</span><span class="req-title-text">RD-20: Remove "Within Budget" — replace with factual expense-to-collection label</span><div class="req-badges"><span class="badge badge-defect">Defect</span><span class="badge badge-high">High Priority</span></div></div>
+    <div class="req-body">
+      <div class="req-grid">
+        <div class="req-field"><label>Problem Statement</label><p>RD-20 displays "Within Budget ✓" when expense is below collection. No budget module exists in the application. This label is factually incorrect and will cause stakeholder confusion during financial reviews and audits.</p></div>
+        <div class="req-field"><label>Expected Behaviour</label><p>Replace with accurate comparison label:<br>• <strong>"Expense below collection"</strong> (expense &lt; collection)<br>• <strong>"Expense exceeds collection"</strong> (expense &gt; collection)<br>Or show numeric surplus/deficit value without a qualitative badge.</p></div>
+      </div>
+      <div class="ba-grid" style="margin-top:14px">
+        <div class="ba-box ba-before"><div class="ba-label">⚠ Before</div><div class="ba-content">Badge: "Within Budget ✓" — implies an approved budget approval process exists. Misleading during audit reviews.</div></div>
+        <div class="ba-box ba-after"><div class="ba-label">✓ After</div><div class="ba-content">Label: "Expense below collection" OR show "Surplus ₹42,000" — factually accurate, no false budget implication.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="req-card">
+    <div class="req-header"><span class="req-id">REQ-10</span><span class="req-title-text">RD-42: Fix negative opening balance in 6-month view</span><div class="req-badges"><span class="badge badge-defect">Defect</span><span class="badge badge-high">High Priority</span></div></div>
+    <div class="req-body">
+      <div class="req-grid">
+        <div class="req-field"><label>Problem Statement</label><p>The balance strip shows a negative opening balance when "Last 6 months" is selected. A negative opening balance is financially incorrect for a housing society fund and signals a data aggregation error.</p></div>
+        <div class="req-field"><label>Likely Root Causes</label><p>1. Prior period ETL data is incomplete, causing incorrect opening balance computation.<br>2. Refund/adjustment transactions may be double-counted in balance calculations.</p></div>
+        <div class="req-field"><label>Expected Behaviour</label><p>Opening balance must reflect actual fund balance at start of selected period. If data is insufficient, show "N/A" with tooltip explaining the data gap rather than displaying a negative number.</p></div>
+        <div class="req-field"><label>Action Required</label><p>1. Audit the balance strip SQL for the selected period.<br>2. Verify ETL imports cover contiguous months.<br>3. Add data-completeness warning if months are missing.<br>4. Guard against negative opening balance with a validation flag.</p></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 6. ADMIN DASHBOARDS -->
+<div class="section" id="s6">
+  <div class="section-title">🔧 6. Admin Dashboards — Analytics</div>
+  <div class="section-subtitle">Derived from F-09, F-10</div>
+
+  <div class="req-card">
+    <div class="req-header"><span class="req-id">REQ-11</span><span class="req-title-text">RD-10: Sort expense drill-down descending by default</span><div class="req-badges"><span class="badge badge-ux">UX / Sorting</span><span class="badge badge-medium">Medium Priority</span></div></div>
+    <div class="req-body">
+      <div class="req-grid">
+        <div class="req-field"><label>Problem Statement</label><p>Expense drill-down lists categories in an arbitrary order. The Overview already shows Top-5 descending but the full list in drill-down is not sorted, making it harder to locate largest expense items.</p></div>
+        <div class="req-field"><label>Expected Behaviour</label><p>Default sort: descending by total amount for the selected period. Consistent with the Overview top-5 ordering in descending order.</p></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="req-card">
+    <div class="req-header"><span class="req-id">REQ-12</span><span class="req-title-text">RD-10: Rename "Accounting Adjustment" to a descriptive label</span><div class="req-badges"><span class="badge badge-ux">UX / Label</span><span class="badge badge-medium">Medium Priority</span></div></div>
+    <div class="req-body">
+      <div class="req-grid">
+        <div class="req-field"><label>Problem Statement</label><p>"Accounting Adjustment" is a vague catch-all that gives residents and committee members no context about what transactions are grouped here. It consistently raises questions during reviews.</p></div>
+        <div class="req-field"><label>Expected Behaviour</label><p>Rename to a specific, meaningful label such as <strong>"Adjustments &amp; Corrections"</strong> or <strong>"Prior Period Entries"</strong>. Add a tooltip or help icon with a brief description of qualifying transactions.</p></div>
+        <div class="req-field full"><label>Note</label><p>Ensure this rename is applied consistently across all drill-down views, expense category selectors, and ETL category mappings. Coordinate with data/ETL team to avoid breaking existing category filters.</p></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="req-card">
+    <div class="req-header"><span class="req-id">REQ-13</span><span class="req-title-text">Annotate "Recreation &amp; Wellness" with sub-item description</span><div class="req-badges"><span class="badge badge-ux">UX / Clarity</span><span class="badge badge-low">Low Priority</span></div></div>
+    <div class="req-body">
+      <div class="req-grid">
+        <div class="req-field"><label>Problem Statement</label><p>Residents are unclear about what is included under "Recreation &amp; Wellness" in the expense breakdown, raising the same questions every review cycle.</p></div>
+        <div class="req-field"><label>Expected Behaviour</label><p>Add a category description visible as a tooltip on hover, or as a sub-header in drill-down, listing contributing vendor types (e.g. Swimming Pool Services, Fitness Trainer, Club House Operations).</p></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 7. CROSS-CUTTING -->
+<div class="section" id="s7">
+  <div class="section-title">⚙️ 7. Cross-Cutting — UI Consistency</div>
+  <div class="section-subtitle">Derived from F-14</div>
+
+  <div class="req-card">
+    <div class="req-header"><span class="req-id">REQ-14</span><span class="req-title-text">Chart ↔ Number view toggle must function on ALL dashboard pages</span><div class="req-badges"><span class="badge badge-defect">Defect</span><span class="badge badge-high">High Priority</span></div></div>
+    <div class="req-body">
+      <div class="req-grid">
+        <div class="req-field"><label>Problem Statement</label><p>The Chart / Number toggle in the header bar is non-functional or hidden on multiple Admin and Resident pages. Toggling to "Number" has no effect, or the toggle itself is absent.</p></div>
+        <div class="req-field"><label>Expected Behaviour</label><p>On every dashboard page, "Number" view replaces charts with a formatted ranked data table showing the same data. "Chart" view restores visuals. Behaviour must be identical across: RD Overview, RD Income, RD Cashflow, RD Balance, AD Alerts, AD Collections, AD Income, AD Actions, AD Vendors.</p></div>
+        <div class="req-field"><label>Root Cause (Suspected)</label><p>Components check the <code>view</code> context from <code>usePeriod()</code> but not all chart components branch on this value. Some pages pass <code>showViewToggle={false}</code> to PortalShell, hiding the toggle entirely without a table fallback.</p></div>
+        <div class="req-field"><label>Action Required</label><p>1. Audit all route components for <code>showViewToggle</code> usage.<br>2. Ensure every chart-bearing page has a parallel table / number render path.<br>3. Create a shared <code>NumberTable</code> component to standardize this.<br>4. Regression-test the toggle on all 9+ affected pages before Phase 3 work begins.</p></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 8. MOCKUPS -->
+<div class="section" id="s8">
+  <div class="section-title">🎨 8. Visual Mockups &amp; Wireframes</div>
+  <div class="section-subtitle">Illustrative representations of key proposed changes</div>
+
+  <h3 style="font-size:14px;font-weight:700;margin-bottom:12px;">Mockup A — Proposed 4-tile Overview (REQ-02)</h3>
+  <div class="mockup">
+    <div class="mockup-bar"><div class="mockup-dot r"></div><div class="mockup-dot y"></div><div class="mockup-dot g"></div><span>CG Boulevard Ledger — Resident Overview · FY 25-26</span></div>
+    <div class="mockup-body">
+      <div class="kpi-row">
+        <div class="kpi-box"><div class="kpi-label">Total Collection</div><div class="kpi-value">₹24,80,000</div><div class="kpi-sub">▲ 3.2% vs prior period</div></div>
+        <div class="kpi-box"><div class="kpi-label">Total Expense</div><div class="kpi-value">₹19,64,000</div><div class="kpi-sub" style="color:#ef4444">▲ 5.1%</div></div>
+        <div class="kpi-box"><div class="kpi-label">Surplus</div><div class="kpi-value">₹5,16,000</div><div class="kpi-sub">Healthy</div></div>
+        <div class="kpi-box"><div class="kpi-label">Outstanding</div><div class="kpi-value">₹2,40,000</div><div class="kpi-sub" style="color:#f59e0b">12 units in arrears</div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div class="chart-placeholder">
+          <div class="chart-title">Top 5 Expense Categories · click to drill-down</div>
+          <div class="chart-bars"><div class="chart-bar" style="background:#818cf8;height:80%"></div><div class="chart-bar" style="background:#818cf8;height:60%"></div><div class="chart-bar" style="background:#818cf8;height:50%"></div><div class="chart-bar" style="background:#818cf8;height:38%"></div><div class="chart-bar" style="background:#818cf8;height:25%"></div></div>
+          <div class="chart-legend"><div class="legend-item"><div class="legend-dot" style="background:#818cf8"></div>Expense</div></div>
+        </div>
+        <div class="chart-placeholder">
+          <div class="chart-title">Community Income Sources · click to drill-down</div>
+          <div class="chart-bars"><div class="chart-bar" style="background:#60a5fa;height:70%"></div><div class="chart-bar" style="background:#60a5fa;height:45%"></div><div class="chart-bar" style="background:#60a5fa;height:30%"></div><div class="chart-bar" style="background:#60a5fa;height:18%"></div><div class="chart-bar" style="background:#60a5fa;height:8%"></div></div>
+          <div class="chart-legend"><div class="legend-item"><div class="legend-dot" style="background:#60a5fa"></div>Income Source</div></div>
+        </div>
+        <div class="chart-placeholder">
+          <div class="chart-title">Top 5 Vendors by Expense · click to drill-down</div>
+          <div class="chart-bars"><div class="chart-bar" style="background:#f472b6;height:75%"></div><div class="chart-bar" style="background:#f472b6;height:55%"></div><div class="chart-bar" style="background:#f472b6;height:42%"></div><div class="chart-bar" style="background:#f472b6;height:28%"></div><div class="chart-bar" style="background:#f472b6;height:16%"></div></div>
+          <div class="chart-legend"><div class="legend-item"><div class="legend-dot" style="background:#f472b6"></div>Vendor Spend</div></div>
+        </div>
+        <div class="chart-placeholder">
+          <div class="chart-title">Monthly Collection vs Expense + Outstanding</div>
+          <div class="chart-bars">
+            <div class="chart-bar" style="background:#34d399;height:68%"></div><div class="chart-bar" style="background:#818cf8;height:52%"></div><div style="width:5px;background:#fbbf24;border-radius:2px 2px 0 0;height:14%;flex:none"></div>
+            <div class="chart-bar" style="background:#34d399;height:72%"></div><div class="chart-bar" style="background:#818cf8;height:56%"></div><div style="width:5px;background:#fbbf24;border-radius:2px 2px 0 0;height:10%;flex:none"></div>
+            <div class="chart-bar" style="background:#34d399;height:66%"></div><div class="chart-bar" style="background:#818cf8;height:58%"></div><div style="width:5px;background:#fbbf24;border-radius:2px 2px 0 0;height:16%;flex:none"></div>
+          </div>
+          <div class="chart-legend">
+            <div class="legend-item"><div class="legend-dot" style="background:#34d399"></div>Collection</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#818cf8"></div>Expense</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#fbbf24"></div>Outstanding</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <hr class="section-divider"/>
+
+  <h3 style="font-size:14px;font-weight:700;margin-bottom:12px;">Mockup B — RD-32 Maintenance + Defaulter Overlay (REQ-06)</h3>
+  <div class="mockup">
+    <div class="mockup-bar"><div class="mockup-dot r"></div><div class="mockup-dot y"></div><div class="mockup-dot g"></div><span>Income Visibility — Maintenance Collection Trend</span></div>
+    <div class="mockup-body">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="chart-placeholder">
+          <div class="chart-title">Maintenance Collected vs Defaulted — Monthly</div>
+          <div class="chart-bars" style="height:100px">
+            <div style="display:flex;flex-direction:column;justify-content:flex-end;flex:1;gap:2px"><div style="background:#34d399;border-radius:2px 2px 0 0;height:68%"></div><div style="background:#ef4444;border-radius:2px 2px 0 0;height:14%"></div></div>
+            <div style="display:flex;flex-direction:column;justify-content:flex-end;flex:1;gap:2px"><div style="background:#34d399;border-radius:2px 2px 0 0;height:73%"></div><div style="background:#ef4444;border-radius:2px 2px 0 0;height:10%"></div></div>
+            <div style="display:flex;flex-direction:column;justify-content:flex-end;flex:1;gap:2px"><div style="background:#34d399;border-radius:2px 2px 0 0;height:65%"></div><div style="background:#ef4444;border-radius:2px 2px 0 0;height:17%"></div></div>
+            <div style="display:flex;flex-direction:column;justify-content:flex-end;flex:1;gap:2px"><div style="background:#34d399;border-radius:2px 2px 0 0;height:70%"></div><div style="background:#ef4444;border-radius:2px 2px 0 0;height:12%"></div></div>
+          </div>
+          <div class="chart-legend"><div class="legend-item"><div class="legend-dot" style="background:#34d399"></div>Collected</div><div class="legend-item"><div class="legend-dot" style="background:#ef4444"></div>Defaulted</div></div>
+        </div>
+        <div class="chart-placeholder">
+          <div class="chart-title">Top Defaulting Flats — Current Period</div>
+          <table class="mini-table">
+            <thead><tr><th>Flat</th><th>Months Overdue</th><th>Amount Due</th></tr></thead>
+            <tbody>
+              <tr><td>B-204</td><td>3</td><td style="color:#ef4444">₹15,000</td></tr>
+              <tr><td>A-101</td><td>2</td><td style="color:#ef4444">₹10,000</td></tr>
+              <tr><td>C-305</td><td>2</td><td style="color:#ef4444">₹10,000</td></tr>
+              <tr><td>D-102</td><td>1</td><td style="color:#f59e0b">₹5,000</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <hr class="section-divider"/>
+
+  <h3 style="font-size:14px;font-weight:700;margin-bottom:12px;">Mockup C — Chart ↔ Number Toggle (REQ-14)</h3>
+  <div class="mockup">
+    <div class="mockup-bar"><div class="mockup-dot r"></div><div class="mockup-dot y"></div><div class="mockup-dot g"></div><span>Admin — Collections Dashboard · Number View</span></div>
+    <div class="mockup-body">
+      <div style="display:flex;justify-content:flex-end;gap:6px;margin-bottom:10px">
+        <div style="background:#e0e7ff;border:1px solid #818cf8;border-radius:5px;padding:4px 10px;font-size:11px;font-weight:600;color:#4338ca">📊 Chart</div>
+        <div style="background:#6366f1;border-radius:5px;padding:4px 10px;font-size:11px;font-weight:600;color:#fff">🔢 Number</div>
+      </div>
+      <table class="mini-table">
+        <thead><tr><th>Month</th><th>Collection (₹)</th><th>Expense (₹)</th><th>Net (₹)</th><th>Outstanding (₹)</th></tr></thead>
+        <tbody>
+          <tr><td>Apr '26</td><td>4,20,000</td><td>3,35,000</td><td style="color:#10b981">+85,000</td><td style="color:#f59e0b">40,000</td></tr>
+          <tr><td>May '26</td><td>4,35,000</td><td>3,20,000</td><td style="color:#10b981">+1,15,000</td><td style="color:#f59e0b">25,000</td></tr>
+          <tr><td>Jun '26</td><td>4,10,000</td><td>3,45,000</td><td style="color:#10b981">+65,000</td><td style="color:#f59e0b">50,000</td></tr>
+          <tr><td>Jul '26</td><td>4,50,000</td><td>3,60,000</td><td style="color:#10b981">+90,000</td><td style="color:#f59e0b">30,000</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- 9. PRIORITY MATRIX -->
+<div class="section" id="s9">
+  <div class="section-title">🎯 9. Prioritization Matrix</div>
+  <div class="section-subtitle">Requirements grouped by implementation priority</div>
+  <div class="matrix-grid">
+    <div class="matrix-col matrix-high">
+      <h4>🔴 High Priority</h4>
+      <div class="matrix-item"><strong>REQ-01</strong> — Community Income filter-responsive</div>
+      <div class="matrix-item"><strong>REQ-03</strong> — Defaulter visibility in Overview</div>
+      <div class="matrix-item"><strong>REQ-06</strong> — RD-32 Maintenance + Defaulter chart</div>
+      <div class="matrix-item"><strong>REQ-07</strong> — Fix Tax as revenue</div>
+      <div class="matrix-item"><strong>REQ-09</strong> — Remove "Within Budget" label</div>
+      <div class="matrix-item"><strong>REQ-10</strong> — Fix negative opening balance</div>
+      <div class="matrix-item"><strong>REQ-14</strong> — Chart/Number toggle all pages</div>
+    </div>
+    <div class="matrix-col matrix-medium">
+      <h4>🟡 Medium Priority</h4>
+      <div class="matrix-item"><strong>REQ-02</strong> — 4-tile Overview redesign</div>
+      <div class="matrix-item"><strong>REQ-04</strong> — Split Utilities category</div>
+      <div class="matrix-item"><strong>REQ-08</strong> — Validate Facility Rental data</div>
+      <div class="matrix-item"><strong>REQ-11</strong> — Sort expense drill-down descending</div>
+      <div class="matrix-item"><strong>REQ-12</strong> — Rename "Accounting Adjustment"</div>
+    </div>
+    <div class="matrix-col matrix-low">
+      <h4>🟢 Low Priority</h4>
+      <div class="matrix-item"><strong>REQ-05</strong> — RD-31: "Income left" → "Surplus/Deficit"</div>
+      <div class="matrix-item"><strong>REQ-13</strong> — Annotate "Recreation &amp; Wellness"</div>
+    </div>
+  </div>
+</div>
+
+<!-- 10. IMPACT TABLE -->
+<div class="section" id="s10">
+  <div class="section-title">📐 10. Implementation Impact Table</div>
+  <div class="section-subtitle">Effort, business impact, and technical complexity per requirement</div>
+  <table class="data-table">
+    <thead><tr><th>REQ</th><th>Requirement</th><th>Business Impact</th><th>User Impact</th><th>Complexity</th><th>Key Dependency</th></tr></thead>
+    <tbody>
+      <tr><td>REQ-01</td><td>Community Income filter-responsive</td><td><span class="pill pill-H">High</span></td><td><span class="pill pill-H">High</span></td><td><span class="pill pill-lo">Low</span></td><td>None</td></tr>
+      <tr><td>REQ-02</td><td>4-tile Overview redesign</td><td><span class="pill pill-H">High</span></td><td><span class="pill pill-H">High</span></td><td><span class="pill pill-me">Medium</span></td><td>REQ-01, REQ-03</td></tr>
+      <tr><td>REQ-03</td><td>Defaulter visibility</td><td><span class="pill pill-H">High</span></td><td><span class="pill pill-H">High</span></td><td><span class="pill pill-hi">High</span></td><td>New billing schema</td></tr>
+      <tr><td>REQ-04</td><td>Split Utilities category</td><td><span class="pill pill-M">Medium</span></td><td><span class="pill pill-M">Medium</span></td><td><span class="pill pill-me">Medium</span></td><td>ETL sub-category mapping</td></tr>
+      <tr><td>REQ-05</td><td>RD-31 label change</td><td><span class="pill pill-L">Low</span></td><td><span class="pill pill-M">Medium</span></td><td><span class="pill pill-lo">Low</span></td><td>None</td></tr>
+      <tr><td>REQ-06</td><td>RD-32 Maintenance + Defaulter chart</td><td><span class="pill pill-H">High</span></td><td><span class="pill pill-H">High</span></td><td><span class="pill pill-hi">High</span></td><td>REQ-03 data model</td></tr>
+      <tr><td>REQ-07</td><td>Fix Tax as revenue</td><td><span class="pill pill-H">High</span></td><td><span class="pill pill-M">Medium</span></td><td><span class="pill pill-me">Medium</span></td><td>ETL income classification</td></tr>
+      <tr><td>REQ-08</td><td>Validate Facility Rental data</td><td><span class="pill pill-M">Medium</span></td><td><span class="pill pill-L">Low</span></td><td><span class="pill pill-lo">Low</span></td><td>Source data access</td></tr>
+      <tr><td>REQ-09</td><td>Remove "Within Budget"</td><td><span class="pill pill-H">High</span></td><td><span class="pill pill-H">High</span></td><td><span class="pill pill-lo">Low</span></td><td>None</td></tr>
+      <tr><td>REQ-10</td><td>Fix negative opening balance</td><td><span class="pill pill-H">High</span></td><td><span class="pill pill-H">High</span></td><td><span class="pill pill-me">Medium</span></td><td>ETL data completeness</td></tr>
+      <tr><td>REQ-11</td><td>Sort drill-down descending</td><td><span class="pill pill-M">Medium</span></td><td><span class="pill pill-M">Medium</span></td><td><span class="pill pill-lo">Low</span></td><td>None</td></tr>
+      <tr><td>REQ-12</td><td>Rename "Accounting Adjustment"</td><td><span class="pill pill-M">Medium</span></td><td><span class="pill pill-M">Medium</span></td><td><span class="pill pill-lo">Low</span></td><td>ETL category name sync</td></tr>
+      <tr><td>REQ-13</td><td>Annotate Recreation &amp; Wellness</td><td><span class="pill pill-L">Low</span></td><td><span class="pill pill-L">Low</span></td><td><span class="pill pill-lo">Low</span></td><td>None</td></tr>
+      <tr><td>REQ-14</td><td>Chart/Number toggle all pages</td><td><span class="pill pill-H">High</span></td><td><span class="pill pill-H">High</span></td><td><span class="pill pill-me">Medium</span></td><td>All dashboard pages</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- 11. GAP ANALYSIS -->
+<div class="section" id="s11">
+  <div class="section-title">🔎 11. Gap &amp; Opportunity Analysis</div>
+  <div class="section-subtitle">Missing capabilities and improvement areas not directly captured in submitted feedback</div>
+  <div class="gap-grid">
+    <div class="gap-item"><h5>No Maintenance Billing Module</h5><p>Collections are recorded but no expected billing per unit exists. Without this, defaulter detection, collection efficiency %, and expected vs actual reporting cannot be computed. A configurable billing schedule per community is a foundational gap.</p></div>
+    <div class="gap-item"><h5>No Budget Planning Feature</h5><p>The "Within Budget" label implies budget tracking exists but it does not. Until a budget module is built, all budget-related language must be removed. Long-term, a budget input and variance dashboard would provide genuine financial planning capability.</p></div>
+    <div class="gap-item"><h5>Chart/Number Toggle Incomplete</h5><p>Multiple pages either suppress the toggle or lack the table fallback. A shared <code>NumberTableView</code> component standardizing this across all 9+ pages would reduce maintenance effort and ensure consistent UX.</p></div>
+    <div class="gap-item"><h5>Income Category Classification Gap</h5><p>GST/Tax collections appear in income totals. A clear ETL-level separation of "Operating Income" vs "Tax Collected (Liability)" is needed to ensure accurate financial reporting.</p></div>
+    <div class="gap-item"><h5>Vendor Granularity Missing from Overview</h5><p>Expense categories are shown but not vendor-level. Vendors are the actual payees for most expenses. Vendor analytics directly support payment authorization governance and committee oversight.</p></div>
+    <div class="gap-item"><h5>Mobile Drill-Down UX</h5><p>Drill-down tables and charts may have small tap targets and horizontal scroll issues on mobile. The interactive experience should be tested and optimized across small-screen devices.</p></div>
+    <div class="gap-item"><h5>Data Completeness Indicator</h5><p>Users have no way to know if data shown for a period is complete or if ETL imports are missing months. A data freshness / completeness flag on each dashboard would significantly improve stakeholder trust.</p></div>
+    <div class="gap-item"><h5>Extended Export for Audit Workflows</h5><p>Current CSV export covers monthly totals only. A full export per period including income classification, vendor breakdown, and balance reconciliation would support external auditor and management committee review.</p></div>
+  </div>
+</div>
+
+<!-- 12. RISKS -->
+<div class="section" id="s12">
+  <div class="section-title">⚠️ 12. Risks &amp; Dependencies</div>
+  <div class="section-subtitle">Key considerations for technical planning and scope management</div>
+  <div class="two-col">
+    <div>
+      <h4 style="font-size:13px;font-weight:700;margin-bottom:12px;color:#374151">Technical Risks</h4>
+      <ul class="checklist risk-list">
+        <li>REQ-03 &amp; REQ-06 require a new DB schema for expected billing amounts. A backend migration and community admin configuration step is needed before data populates.</li>
+        <li>REQ-10 (negative opening balance) may require backfilling ETL imports for prior months if transaction history is incomplete. Data availability must be confirmed before scope is estimated.</li>
+        <li>REQ-07 (tax reclassification) touches ETL income categorization. Retroactive category mapping changes may alter historical income totals in past-period filters, affecting FY comparisons.</li>
+        <li>Removal of <code>retainSearchParams</code> (already done) may break period state persistence on drill-down back-navigation. Regression test required.</li>
+      </ul>
+    </div>
+    <div>
+      <h4 style="font-size:13px;font-weight:700;margin-bottom:12px;color:#374151">Functional Dependencies</h4>
+      <ul class="checklist">
+        <li>REQ-03 &amp; REQ-06 depend on a "Monthly maintenance amount" configuration setting added to the community settings page.</li>
+        <li>REQ-04 (Utilities split) depends on BESCOM sub-categories existing as separate ETL line items. Confirm with data team before scheduling.</li>
+        <li>REQ-08 (Facility rental validation) requires access to original booking records outside the application.</li>
+        <li>REQ-12 (rename Accounting Adjustment) must be coordinated with ETL team to keep imports consistent post-rename.</li>
+        <li>REQ-14 (toggle audit) must be completed before new Phase 3 chart features are added to avoid compounding breakage across pages.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- 13. RECOMMENDATIONS -->
+<div class="section" id="s13">
+  <div class="section-title">💡 13. Recommendations &amp; Implementation Phasing</div>
+  <div class="section-subtitle">Suggested sprint-level grouping for the GHCP team</div>
+  <div class="three-col">
+    <div style="background:linear-gradient(135deg,#fef3c7,#fffbeb);border:1px solid #fcd34d;border-radius:10px;padding:18px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#92400e;margin-bottom:10px">Phase 1 — Quick Wins · 1–2 weeks</div>
+      <ul class="checklist">
+        <li>REQ-01: Wire Community Income to period filter</li>
+        <li>REQ-05: "Income left" → "Surplus / Deficit"</li>
+        <li>REQ-09: Remove "Within Budget" label</li>
+        <li>REQ-11: Sort expense drill-down descending</li>
+        <li>REQ-12: Rename "Accounting Adjustment"</li>
+        <li>REQ-13: Annotate Recreation &amp; Wellness</li>
+      </ul>
+    </div>
+    <div style="background:linear-gradient(135deg,#e0f2fe,#f0f9ff);border:1px solid #7dd3fc;border-radius:10px;padding:18px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#0369a1;margin-bottom:10px">Phase 2 — Core Fixes · 2–4 weeks</div>
+      <ul class="checklist">
+        <li>REQ-07: Fix Tax as revenue classification</li>
+        <li>REQ-08: Validate Facility Rental data</li>
+        <li>REQ-10: Fix negative opening balance</li>
+        <li>REQ-14: Audit &amp; fix toggle all pages</li>
+        <li>REQ-02: 4-tile Overview layout + Vendor tile</li>
+      </ul>
+    </div>
+    <div style="background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:1px solid #86efac;border-radius:10px;padding:18px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#15803d;margin-bottom:10px">Phase 3 — New Capabilities · 4–8 weeks</div>
+      <ul class="checklist">
+        <li>REQ-03: Defaulter schema + Overview tile</li>
+        <li>REQ-04: Split Utilities category</li>
+        <li>REQ-06: RD-32 Maintenance + Defaulter chart</li>
+        <li>Data completeness indicator</li>
+        <li>Extended CSV export for audit</li>
+      </ul>
+    </div>
+  </div>
+  <div class="callout" style="margin-top:20px">
+    <strong>Key Recommendation to GHCP Team:</strong> Treat REQ-14 (Chart/Number toggle audit) as a foundation task in Phase 2. It touches all dashboard pages and must be stable before Phase 3 new charts are added. Also verify ETL data coverage is contiguous before scoping REQ-10 — incomplete imports are the most likely root cause of the negative opening balance.
+  </div>
+</div>
+
+<!-- 14. APPENDIX -->
+<div class="section" id="s14">
+  <div class="section-title">📎 14. Appendix — Original Feedback Mapping</div>
+  <div class="section-subtitle">Verbatim feedback items mapped to their consolidated requirements</div>
+
+  <div class="appendix-item"><span class="appendix-num">F-01</span><span class="appendix-text">"RD31 - Replace income left with Surplus"<span class="appendix-ref">→ REQ-05</span></span></div>
+  <div class="appendix-item"><span class="appendix-num">F-02</span><span class="appendix-text">"RD02 - should we split Utilities?"<span class="appendix-ref">→ REQ-04</span></span></div>
+  <div class="appendix-item"><span class="appendix-num">F-03</span><span class="appendix-text">"RD20 - can we give some other comment than within Budget? Yes, the expense is below collection but we are not comparing this against a budget."<span class="appendix-ref">→ REQ-09</span></span></div>
+  <div class="appendix-item"><span class="appendix-num">F-04</span><span class="appendix-text">"RD32 - can we do one graph particularly for maintenance only with the defaulters part too?"<span class="appendix-ref">→ REQ-06</span></span></div>
+  <div class="appendix-item"><span class="appendix-num">F-05</span><span class="appendix-text">"RD42 - negative opening balance that we discussed (last 6 months)"<span class="appendix-ref">→ REQ-10</span></span></div>
+  <div class="appendix-item"><span class="appendix-num">F-06</span><span class="appendix-text">"How comfortable are we with underlying data? Facility rental income shows 150k for 6 months"<span class="appendix-ref">→ REQ-08</span></span></div>
+  <div class="appendix-item"><span class="appendix-num">F-07</span><span class="appendix-text">"What is included within recreation and wellness?"<span class="appendix-ref">→ REQ-13</span></span></div>
+  <div class="appendix-item"><span class="appendix-num">F-08</span><span class="appendix-text">"Tax as revenue needs to be updated."<span class="appendix-ref">→ REQ-07</span></span></div>
+  <div class="appendix-item"><span class="appendix-num">F-09</span><span class="appendix-text">"RD10 - can we sort high to low?"<span class="appendix-ref">→ REQ-11</span></span></div>
+  <div class="appendix-item"><span class="appendix-num">F-10</span><span class="appendix-text">"RD10 - Accounting adjustment needs to be renamed"<span class="appendix-ref">→ REQ-12</span></span></div>
+  <div class="appendix-item"><span class="appendix-num">F-11</span><span class="appendix-text">"RD-05 Community Income - currently stagnant, does not get applied to dropdown filter. Also need suggestion for Defaulters (opportunity loss)."<span class="appendix-ref">→ REQ-01, REQ-03</span></span></div>
+  <div class="appendix-item"><span class="appendix-num">F-12</span><span class="appendix-text">"RD-10 drill-down sort descending. RD-02 top 5 expenses + 4-tile Overview redesign. 'Non-maintenance income' label doesn't make sense. Remove mock '₹0 from hall rental...' message. Show actual data based on filter or empty state."<span class="appendix-ref">→ REQ-01, REQ-02, REQ-11</span></span></div>
+  <div class="appendix-item"><span class="appendix-num">F-13</span><span class="appendix-text">"RD-03 - how to show defaulter amount in the Collection vs Expense chart? Introduce third element?"<span class="appendix-ref">→ REQ-03</span></span></div>
+  <div class="appendix-item"><span class="appendix-num">F-14</span><span class="appendix-text">"Chart &amp; Number view toggle is not working in all pages of Admin/Resident. It should be consistent."<span class="appendix-ref">→ REQ-14</span></span></div>
+
+  <hr class="section-divider"/>
+  <div style="text-align:center;color:#9ca3af;font-size:11px;margin-top:16px">
+    CG Boulevard Apartment Ledger Portal — Business Requirements &amp; Improvement Document v1.0 · 11 August 2026 · For GHCP Team Technical Assessment
+  </div>
+</div>
+
+</div>
+</body>
+</html>

@@ -52,25 +52,25 @@ export const verifyMagicLink = verifyOtp;
 // --- Reads (fall back to mock if the API is not present) ---
 export async function getMonthlyTotals() {
   try { return await get<any[]>("/dashboard/monthly-totals"); }
-  catch { return canUseMockFallback() ? mock.monthlyTotals : []; }
+  catch { return []; }
 }
 export async function getBalanceStrip() {
   try { return await get<any>("/dashboard/balance-strip"); }
   catch {
-    return canUseMockFallback() ? mock.balanceStrip : { opening: 0, income: 0, expense: 0, net: 0, closing: 0 };
+    return { opening: 0, income: 0, expense: 0, net: 0, closing: 0 };
   }
 }
 export async function getExpenseCategoryTotals() {
   try { return await get<any[]>("/expenses/category-totals"); }
-  catch { return canUseMockFallback() ? mock.expenseCategoryTotals : []; }
+  catch { return []; }
 }
 export async function getIncomeCategoryTotals() {
   try { return await get<any[]>("/income/category-totals"); }
-  catch { return canUseMockFallback() ? mock.incomeCategoryTotals : []; }
+  catch { return []; }
 }
 export async function getVendorRanking() {
   try { return await get<any[]>("/vendors/ranking"); }
-  catch { return canUseMockFallback() ? mock.vendorRanking : []; }
+  catch { return []; }
 }
 export async function getDashboardSettings() {
   try { return await get<any[]>("/admin/settings/dashboards"); }

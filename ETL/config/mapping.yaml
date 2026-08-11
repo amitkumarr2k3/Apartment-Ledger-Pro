@@ -2,6 +2,17 @@ defaults:
   expense_head: expense
   income_head: income
 
+line_item_aliases:
+  Flea Market: Flee Market
+  Move In/Out Charges: Move in/out Charges
+  Move In / Out (Manual): Move In/Out (Manual)
+  CGST: CGST Output
+  SGST: SGST Output
+  Maintenance Outstanding: Maintenance Outstanding Amount
+  Maintenance Arrears: Maintenance Outstanding Amount
+  Defaulter Outstanding: Maintenance Outstanding Amount
+  Previous Arrears B/F: Previous Arrears Brought Forward
+
 expense_categories:
 
   Utilities:
@@ -85,6 +96,11 @@ income_categories:
   Maintenance Collection:
     - Maintenance Charge
 
+  Maintenance Outstanding:
+    - Maintenance Outstanding Amount
+    - Previous Arrears Brought Forward
+    - Current Month Unpaid Maintenance
+
   Facility Rental:
     - AV room
     - Business Center
@@ -106,7 +122,7 @@ income_categories:
     - Flee Market
     - Community Curriculum Activities
 
-  Tax:
+  Tax Collected (Liability):
     - CGST Output
     - SGST Output
 

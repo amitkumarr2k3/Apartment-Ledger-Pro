@@ -4,10 +4,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Tooltip, Bar, BarChart, CartesianGrid, ComposedChart, Line, ResponsiveContainer, XAxis, YAxis, Legend, Area, AreaChart } from "recharts";
 import { SmartTooltipContent, getTooltipTrigger } from "@/components/smart-tooltip";
-import { inr, pct, monthlyTotals as monthlyTotalsMock } from "@/lib/finance-mock";
+import { inr, pct } from "@/lib/finance-mock";
 import { AlertTriangle } from "lucide-react";
 import { useMonthlyTotals } from "@/lib/hooks";
-import { useShowMockData, NoDbData } from "@/components/mock-gate";
+import { NoDbData } from "@/components/mock-gate";
 
 export const Route = createFileRoute("/admin/collections")({
   component: Page,
@@ -23,17 +23,16 @@ function Page() {
 }
 
 function Inner() {
-  const { sliceMonthly } = usePeriod();
-  const showMock = useShowMockData();
+  const { sliceMonthly, view } = usePeriod();
   const { data: apiMonthly } = useMonthlyTotals();
-  const source = showMock ? monthlyTotalsMock : (apiMonthly ?? []);
-  if (!showMock && source.length === 0) {
+  const source = apiMonthly ?? [];
+  if (source.length === 0) {
     return <NoDbData note="Collection charts appear once monthly income transactions are recorded." />;
   }
   const data = sliceMonthly(source).map((m, i, arr) => {
     const prev = arr[i - 1]?.collection;
     const change = prev ? ((m.collection - prev) / prev) * 100 : 0;
-    return { ...m, change, expected: 400000 };
+    return { ...m, change };
   });
 
   const sharpDrops = data.filter((d) => d.change < -10);
@@ -68,21 +67,45 @@ function Inner() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Monthly collection vs expense vs expected</CardTitle>
-          <CardDescription>AD-20, AD-24 · Aggregate</CardDescription>
+          <CardDescription>AD-20, AD-24 · Aggregate (uploaded data only)</CardDescription>
         </CardHeader>
         <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
-            <ComposedChart data={data}>
-              <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-              <XAxis dataKey="month" fontSize={11} />
-              <YAxis tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} fontSize={11} />
-              <Tooltip trigger={getTooltipTrigger()} cursor={{ fill: "var(--color-muted)", opacity: 0.35 }} content={<SmartTooltipContent labelPrefix="Period" valueFormatter={(v) => inr(v)} />} />
-              <Legend />
-              <Bar dataKey="collection" name="Collection" fill="var(--color-chart-2)" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="expense" name="Expense" fill="var(--color-chart-1)" radius={[4, 4, 0, 0]} />
-              <Line type="monotone" dataKey="expected" name="Expected collection" stroke="var(--color-chart-4)" strokeWidth={2} strokeDasharray="6 4" dot={false} />
-            </ComposedChart>
-          </ResponsiveContainer>
+          {view === "chart" ? (
+            <ResponsiveContainer width="100%" height={300}>
+              <ComposedChart data={data}>
+                <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                <XAxis dataKey="month" fontSize={11} />
+                <YAxis tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} fontSize={11} />
+                <Tooltip trigger={getTooltipTrigger()} cursor={{ fill: "var(--color-muted)", opacity: 0.35 }} content={<SmartTooltipContent labelPrefix="Period" valueFormatter={(v) => inr(v)} />} />
+                <Legend />
+                <Bar dataKey="collection" name="Collection" fill="var(--color-chart-2)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="expense" name="Expense" fill="var(--color-chart-1)" radius={[4, 4, 0, 0]} />
+              </ComposedChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="rounded-md border border-border overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-muted/40">
+                  <tr>
+                    <th className="text-left p-2">Month</th>
+                    <th className="text-right p-2">Collection</th>
+                    <th className="text-right p-2">Expense</th>
+                    <th className="text-right p-2">Change</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.map((d) => (
+                    <tr key={d.month} className="border-t border-border">
+                      <td className="p-2">{d.month}</td>
+                      <td className="p-2 text-right font-mono">{inr(d.collection)}</td>
+                      <td className="p-2 text-right font-mono">{inr(d.expense)}</td>
+                      <td className="p-2 text-right font-mono">{pct(d.change, 1)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -93,15 +116,36 @@ function Inner() {
             <CardDescription>Running collections − expenses over the period</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={220}>
-              <AreaChart data={cumulative}>
-                <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                <XAxis dataKey="month" fontSize={11} />
-                <YAxis tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} fontSize={11} />
-                <Tooltip trigger={getTooltipTrigger()} cursor={{ fill: "var(--color-muted)", opacity: 0.35 }} content={<SmartTooltipContent labelPrefix="Period" valueFormatter={(v) => inr(v)} />} />
-                <Area type="monotone" dataKey="cumulative" stroke="var(--color-chart-3)" fill="var(--color-chart-3)" fillOpacity={0.2} />
-              </AreaChart>
-            </ResponsiveContainer>
+            {view === "chart" ? (
+              <ResponsiveContainer width="100%" height={220}>
+                <AreaChart data={cumulative}>
+                  <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                  <XAxis dataKey="month" fontSize={11} />
+                  <YAxis tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} fontSize={11} />
+                  <Tooltip trigger={getTooltipTrigger()} cursor={{ fill: "var(--color-muted)", opacity: 0.35 }} content={<SmartTooltipContent labelPrefix="Period" valueFormatter={(v) => inr(v)} />} />
+                  <Area type="monotone" dataKey="cumulative" stroke="var(--color-chart-3)" fill="var(--color-chart-3)" fillOpacity={0.2} />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="rounded-md border border-border overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/40">
+                    <tr>
+                      <th className="text-left p-2">Month</th>
+                      <th className="text-right p-2">Cumulative net</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {cumulative.map((c) => (
+                      <tr key={c.month} className="border-t border-border">
+                        <td className="p-2">{c.month}</td>
+                        <td className="p-2 text-right font-mono">{inr(c.cumulative)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -114,17 +158,40 @@ function Inner() {
             {quarters.length === 0 ? (
               <p className="text-sm text-muted-foreground">Not enough months in this range for a quarterly view.</p>
             ) : (
-              <ResponsiveContainer width="100%" height={220}>
-                <BarChart data={quarters}>
-                  <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                  <XAxis dataKey="q" fontSize={11} />
-                  <YAxis tickFormatter={(v) => `₹${(v / 100000).toFixed(1)}L`} fontSize={11} />
-                  <Tooltip trigger={getTooltipTrigger()} cursor={{ fill: "var(--color-muted)", opacity: 0.35 }} content={<SmartTooltipContent labelPrefix="Period" valueFormatter={(v) => inr(v)} />} />
-                  <Legend />
-                  <Bar dataKey="collection" fill="var(--color-chart-2)" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="expense" fill="var(--color-chart-1)" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              view === "chart" ? (
+                <ResponsiveContainer width="100%" height={220}>
+                  <BarChart data={quarters}>
+                    <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                    <XAxis dataKey="q" fontSize={11} />
+                    <YAxis tickFormatter={(v) => `₹${(v / 100000).toFixed(1)}L`} fontSize={11} />
+                    <Tooltip trigger={getTooltipTrigger()} cursor={{ fill: "var(--color-muted)", opacity: 0.35 }} content={<SmartTooltipContent labelPrefix="Period" valueFormatter={(v) => inr(v)} />} />
+                    <Legend />
+                    <Bar dataKey="collection" fill="var(--color-chart-2)" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="expense" fill="var(--color-chart-1)" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="rounded-md border border-border overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/40">
+                      <tr>
+                        <th className="text-left p-2">Quarter</th>
+                        <th className="text-right p-2">Collection</th>
+                        <th className="text-right p-2">Expense</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {quarters.map((q) => (
+                        <tr key={q.q} className="border-t border-border">
+                          <td className="p-2">{q.q}</td>
+                          <td className="p-2 text-right font-mono">{inr(q.collection)}</td>
+                          <td className="p-2 text-right font-mono">{inr(q.expense)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )
             )}
           </CardContent>
         </Card>

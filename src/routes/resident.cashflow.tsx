@@ -22,7 +22,7 @@ function Page() {
 }
 
 function Inner() {
-  const { sliceMonthly } = usePeriod();
+  const { sliceMonthly, view } = usePeriod();
   const { data: monthlyTotals = [] } = useMonthlyTotals();
   const period = sliceMonthly(monthlyTotals);
 
@@ -51,7 +51,7 @@ function Inner() {
           <CardContent>
             <div className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded ${ratio <= 100 ? "bg-emerald-500/10 text-emerald-600" : "bg-amber-500/10 text-amber-600"}`}>
               {ratio <= 100 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-              {ratio <= 100 ? "Within budget" : "Over-spent"}
+              {ratio <= 100 ? "Expense below collection" : "Expense exceeds collection"}
             </div>
           </CardContent>
         </Card>
@@ -83,18 +83,43 @@ function Inner() {
           <CardDescription>RD-21 · Community-level totals</CardDescription>
         </CardHeader>
         <CardContent>
-          <ResponsiveContainer width="100%" height={320}>
-            <ComposedChart data={period}>
-              <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-              <XAxis dataKey="month" fontSize={11} />
-              <YAxis tickFormatter={(v) => `₹${(v/1000).toFixed(0)}k`} fontSize={11} />
-              <Tooltip trigger={getTooltipTrigger()} cursor={{ fill: "var(--color-muted)", opacity: 0.35 }} content={<SmartTooltipContent labelPrefix="Month" valueFormatter={(v) => inr(v)} />} />
-              <Legend />
-              <Bar dataKey="collection" fill="var(--color-chart-2)" name="Collection" radius={[4,4,0,0]} />
-              <Bar dataKey="expense" fill="var(--color-chart-1)" name="Expense" radius={[4,4,0,0]} />
-              <Line type="monotone" dataKey="net" stroke="var(--color-chart-4)" strokeWidth={2} name="Net" />
-            </ComposedChart>
-          </ResponsiveContainer>
+          {view === "chart" ? (
+            <ResponsiveContainer width="100%" height={320}>
+              <ComposedChart data={period}>
+                <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                <XAxis dataKey="month" fontSize={11} />
+                <YAxis tickFormatter={(v) => `₹${(v/1000).toFixed(0)}k`} fontSize={11} />
+                <Tooltip trigger={getTooltipTrigger()} cursor={{ fill: "var(--color-muted)", opacity: 0.35 }} content={<SmartTooltipContent labelPrefix="Month" valueFormatter={(v) => inr(v)} />} />
+                <Legend />
+                <Bar dataKey="collection" fill="var(--color-chart-2)" name="Collection" radius={[4,4,0,0]} />
+                <Bar dataKey="expense" fill="var(--color-chart-1)" name="Expense" radius={[4,4,0,0]} />
+                <Line type="monotone" dataKey="net" stroke="var(--color-chart-4)" strokeWidth={2} name="Net" />
+              </ComposedChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="rounded-md border border-border overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-muted/40">
+                  <tr>
+                    <th className="text-left p-2">Month</th>
+                    <th className="text-right p-2">Collection</th>
+                    <th className="text-right p-2">Expense</th>
+                    <th className="text-right p-2">Net</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {period.map((m) => (
+                    <tr key={m.month} className="border-t border-border">
+                      <td className="p-2">{m.month}</td>
+                      <td className="p-2 text-right font-mono">{inr(m.collection)}</td>
+                      <td className="p-2 text-right font-mono">{inr(m.expense)}</td>
+                      <td className="p-2 text-right font-mono">{inr(m.net)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </CardContent>
       </Card>
     </>

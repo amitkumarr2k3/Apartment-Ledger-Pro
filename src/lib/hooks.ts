@@ -82,7 +82,7 @@ export function useMonthlyTotals() {
           net: paiseToRupees(r.net_paise),
         }));
       }
-      return raw as typeof mock.monthlyTotals;
+      return [] as Array<{ month: string; collection: number; expense: number; net: number }>;
     },
     staleTime: 60_000,
   });
@@ -104,7 +104,7 @@ export function useBalanceStrip() {
           closing: paiseToRupees(r.closing),
         };
       }
-      return r as typeof mock.balanceStrip;
+      return { opening: 0, income: 0, expense: 0, net: 0, closing: 0 };
     },
     staleTime: 60_000,
   });
@@ -118,7 +118,7 @@ export function useIncomeCategoryTotals() {
       if (hasPaiseTotal(r)) {
         return r.map((x) => ({ name: x.name, total: paiseToRupees(x.total) }));
       }
-      return r as typeof mock.incomeCategoryTotals;
+      return [] as Array<{ name: string; total: number }>;
     },
     staleTime: 60_000,
   });
@@ -132,7 +132,7 @@ export function useExpenseCategoryTotals() {
       if (hasPaiseTotal(r)) {
         return r.map((x) => ({ name: x.name, total: paiseToRupees(x.total) }));
       }
-      return r as typeof mock.expenseCategoryTotals;
+      return [] as Array<{ name: string; total: number }>;
     },
     staleTime: 60_000,
   });
@@ -147,11 +147,11 @@ export function useIncomeTree() {
     queryFn: async () => {
       try {
         const r = await fetch("/api/income/tree", authHeaders());
-        if (!r.ok) return hasStoredAuth() ? [] : mock.incomeTree;
+        if (!r.ok) return [];
         const rows: any[] = await r.json();
         return Array.isArray(rows) ? buildTree(rows) : [];
       } catch {
-        return hasStoredAuth() ? [] : mock.incomeTree;
+        return [];
       }
     },
     staleTime: 60_000,
@@ -166,11 +166,11 @@ export function useExpenseTree() {
     queryFn: async () => {
       try {
         const r = await fetch("/api/expenses/tree", authHeaders());
-        if (!r.ok) return hasStoredAuth() ? [] : mock.expenseTree;
+        if (!r.ok) return [];
         const rows: any[] = await r.json();
         return Array.isArray(rows) ? buildTree(rows) : [];
       } catch {
-        return hasStoredAuth() ? [] : mock.expenseTree;
+        return [];
       }
     },
     staleTime: 60_000,

@@ -1,0 +1,38 @@
+1. RD31 - Replace income left with Surplus
+2. RD02 - should we split Utilities?
+3. RD20 - can we give some other comment than within Budget? Yes, the expense is below collaction but we are not comparing this against a budget.
+4. RD32 - can we do one graph particularly for maintenance only with the defaulters part too?
+5. RD42 - negative opening balance that we discussed (last 6 months)
+6. @Gaurav - how comfortable are we with underlying data? Facility rental income shows 150k for 6 months
+7. What is included within recreation and wellness?
+[3:23 pm, 11/08/2026] Deepak: Just sharing thoughts without prioritising in any particular order
+8. Tax as revenue needs to be updated.
+9. RD10 - can we sort high to low?
+RD10 - Accounting adjustment needs to be renamed
+
+
+
+
+
+Overview (for a Given Dropdown Filter)
+
+1. RD-05
+    - Community Income -> Currently, this is stagnant and does not get applied to the dropdown filter (FY-based or Month-based).
+	- Also need suggestion as there is another categoty of data (Defaulters) those who are not paying maintence. How to show thios data into this section or any other section as this is oppuritnity loss
+
+2. RD-10 - Heads Expense drill down
+     -  This looks fine. However, we show Top 5 Expenses in the Overview, while complete details are available in the Drill-down. If we can sort in decending order the Drill-down, we will have the complete list of expenses in order.
+
+4. RD-10 If we get a Total Collection Drill-down, do we still need Community Income in the Overview? We could use this space for other graphs. Just like for RD-02 whe are shwoing top 5 expenses with drill down in the same manner Communinity income also show the top five income with option to drill down just like RD-02. Just ensrue to match the format (one section for expense and another for income). "Non-maintenance income" does not make sense, make this descript similar to that of expense. Also remove message "0 from harl rental , sinage , events" this looks like mock data, rather fix this issue show actual data based on date filter selection and put some message as for given period no income generate
+
+    5. Overview has 2 graphs for now:
+
+           - Top 5 Expense Categories → Can we replace/rename this as Vendor-wise Expense Trend?
+           - Monthly Trend – Collection vs. Expense → Point 3 is already covered here.
+           -  Income Trend → We can add this graph.
+		   
+6 RD-03 - In this graph we are showing Collection Vs Expense , suggest as how in this grapph we can show defaluter amunt as well based on selected filter ( intorduce thrid element or what?)
+
+In Overview section : Add one more dashboard tile for showing the top 5 Vendors in terms expenses with option to drill down . As this page is going to have 4 dashboard so please aling to adjust all the 4 dashboards alike. All 3 (top 5 expsne , community income and vendor , there should be chart with drill down options) and on click at number, it should show the table for all charts.
+
+Also dashboard type )Chart & Number is not working in all the pages of Admin/Resident. It should be consistent. 

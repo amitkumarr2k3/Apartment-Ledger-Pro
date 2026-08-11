@@ -55,7 +55,7 @@ function Page() {
 
 function Inner() {
   const { data: expenseTree = [], isLoading } = useExpenseTree();
-  const { sliceMonthly, priorSliceMonthly, labels } = usePeriod();
+  const { sliceMonthly, priorSliceMonthly, labels, view } = usePeriod();
   const [selected, setSelected] = useState<string | null>(null);
   const { momChanges, anomalies } = useMemo(
     () => deriveAnalytics(expenseTree, sliceMonthly, priorSliceMonthly),
@@ -161,17 +161,40 @@ function Inner() {
             </Select>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={280}>
-              <ComposedChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                <XAxis dataKey="month" fontSize={11} />
-                <YAxis tickFormatter={(v) => `₹${(v/1000).toFixed(0)}k`} fontSize={11} />
-                <Tooltip trigger={getTooltipTrigger()} cursor={{ fill: "var(--color-muted)", opacity: 0.35 }} content={<SmartTooltipContent labelPrefix="Month" valueFormatter={(v) => inr(v)} />} />
-                <Legend />
-                <Bar dataKey="value" name="Monthly spend" fill="var(--color-chart-1)" radius={[4,4,0,0]} />
-                <Line type="monotone" dataKey="sma" name="3-mo moving avg" stroke="var(--color-chart-4)" strokeWidth={2} dot={false} />
-              </ComposedChart>
-            </ResponsiveContainer>
+            {view === "chart" ? (
+              <ResponsiveContainer width="100%" height={280}>
+                <ComposedChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                  <XAxis dataKey="month" fontSize={11} />
+                  <YAxis tickFormatter={(v) => `₹${(v/1000).toFixed(0)}k`} fontSize={11} />
+                  <Tooltip trigger={getTooltipTrigger()} cursor={{ fill: "var(--color-muted)", opacity: 0.35 }} content={<SmartTooltipContent labelPrefix="Month" valueFormatter={(v) => inr(v)} />} />
+                  <Legend />
+                  <Bar dataKey="value" name="Monthly spend" fill="var(--color-chart-1)" radius={[4,4,0,0]} />
+                  <Line type="monotone" dataKey="sma" name="3-mo moving avg" stroke="var(--color-chart-4)" strokeWidth={2} dot={false} />
+                </ComposedChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="rounded-md border border-border overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/40">
+                    <tr>
+                      <th className="text-left p-2">Month</th>
+                      <th className="text-right p-2">Spend</th>
+                      <th className="text-right p-2">3-mo avg</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {chartData.map((r) => (
+                      <tr key={r.month} className="border-t border-border">
+                        <td className="p-2">{r.month}</td>
+                        <td className="p-2 text-right font-mono">{inr(r.value)}</td>
+                        <td className="p-2 text-right font-mono">{inr(r.sma)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

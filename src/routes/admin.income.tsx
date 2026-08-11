@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid } from "recharts";
 import { SmartTooltipContent, getTooltipTrigger } from "@/components/smart-tooltip";
-import { inr, total } from "@/lib/finance-mock";
+import { inr, sumMonthly, total } from "@/lib/finance-mock";
 import { useIncomeTree, useMonthlyTotals } from "@/lib/hooks";
 import { Lightbulb } from "lucide-react";
 
@@ -26,7 +26,7 @@ function Page() {
 function Inner() {
   const { data: incomeTree = [] } = useIncomeTree();
   const { data: monthlyTotals = [] } = useMonthlyTotals();
-  const { sliceMonthly, labels } = usePeriod();
+  const { sliceMonthly, labels, view } = usePeriod();
   const rows = incomeTree.flatMap((c) =>
     c.vendors.flatMap((v) =>
       v.items.map((it) => {
@@ -51,12 +51,19 @@ function Inner() {
   const totalIncome = rows.reduce((s, r) => s + r.total, 0);
 
   // AD-31: expense-to-income ratio per month.
-  // Use monthlyTotals directly (has real month labels) so FY filters align
-  // correctly regardless of which month the backend data starts from.
+  // Income is derived from income sources (already ex-tax), while expense
+  // continues to use monthly totals.
+  const monthlyIncome = sliceMonthly(
+    sumMonthly(
+      incomeTree.flatMap((c) =>
+        c.vendors.flatMap((v) => v.items.map((it) => it.monthly)),
+      ),
+    ),
+  );
   const slicedTotals = sliceMonthly(monthlyTotals);
-  const coverage = slicedTotals.map((m) => ({
-    month: m.month,
-    ratio: m.collection > 0 ? Math.round((m.expense / m.collection) * 100) : 0,
+  const coverage = labels.map((month, i) => ({
+    month,
+    ratio: monthlyIncome[i] > 0 ? Math.round((Number(slicedTotals[i]?.expense ?? 0) / monthlyIncome[i]) * 100) : 0,
   }));
 
   const irregular = rows.filter((r) => r.irregular || r.dropped);
@@ -108,18 +115,39 @@ function Inner() {
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle className="text-base">Expense-to-income ratio trend · AD-31</CardTitle>
-            <CardDescription>% of income spent on expenses per month</CardDescription>
+            <CardDescription>% of income spent on expenses per month (lower is healthier)</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={240}>
-              <LineChart data={coverage}>
-                <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                <XAxis dataKey="month" fontSize={11} />
-                <YAxis tickFormatter={(v) => `${v}%`} fontSize={11} />
-                <Tooltip trigger={getTooltipTrigger()} cursor={{ fill: "var(--color-muted)", opacity: 0.35 }} content={<SmartTooltipContent labelPrefix="Month" valueFormatter={(v) => `${v}%`} />} />
-                <Line type="monotone" dataKey="ratio" stroke="var(--color-chart-2)" strokeWidth={2} />
-              </LineChart>
-            </ResponsiveContainer>
+            {view === "chart" ? (
+              <ResponsiveContainer width="100%" height={240}>
+                <LineChart data={coverage}>
+                  <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                  <XAxis dataKey="month" fontSize={11} />
+                  <YAxis tickFormatter={(v) => `${v}%`} fontSize={11} />
+                  <Tooltip trigger={getTooltipTrigger()} cursor={{ fill: "var(--color-muted)", opacity: 0.35 }} content={<SmartTooltipContent labelPrefix="Month" valueFormatter={(v) => `${v}%`} />} />
+                  <Line type="monotone" dataKey="ratio" stroke="var(--color-chart-2)" strokeWidth={2} />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="rounded-md border border-border overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/40">
+                    <tr>
+                      <th className="text-left p-2">Month</th>
+                      <th className="text-right p-2">Expense / income</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {coverage.map((c) => (
+                      <tr key={c.month} className="border-t border-border">
+                        <td className="p-2">{c.month}</td>
+                        <td className="p-2 text-right font-mono">{c.ratio}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -147,11 +175,11 @@ function Inner() {
           <CardTitle className="text-base flex items-center gap-2">
             <Lightbulb className="h-4 w-4 text-amber-500" /> Income notes · AD-33
           </CardTitle>
-          <CardDescription>Free-text notes (persisted in Settings)</CardDescription>
+          <CardDescription>Free-text brainstorming panel (persisted in Settings)</CardDescription>
         </CardHeader>
         <CardContent>
           <Textarea
-            defaultValue={""}
+            defaultValue={"• Banner ads on entrance gate LED display\n• Paid parking for visitors (weekend rate)\n• Rooftop solar lease-back with vendor\n• Monthly car-wash tie-up (revenue share)"}
             className="min-h-[140px] font-mono text-sm"
           />
         </CardContent>

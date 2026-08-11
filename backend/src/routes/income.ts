@@ -1,6 +1,8 @@
 import { FastifyInstance } from "fastify";
 import { pool } from "../db";
 
+const EXCLUDED_INCOME_CATEGORIES = ["Tax", "Tax Collected (Liability)"];
+
 export async function routes(app: FastifyInstance) {
   app.get("/tree", { preHandler: app.auth }, async (req) => {
     const p = req.user;
@@ -13,9 +15,10 @@ export async function routes(app: FastifyInstance) {
        LEFT JOIN vendors v ON v.id=t.vendor_id
        LEFT JOIN line_items li ON li.id=t.line_item_id
        WHERE t.community_id=$1
+         AND c.name <> ALL($2::text[])
        GROUP BY c.name, v.name, li.name, t.period_month
        ORDER BY c.name, v.name, li.name, t.period_month`,
-      [p.cid],
+      [p.cid, EXCLUDED_INCOME_CATEGORIES],
     );
     return rows;
   });
@@ -26,9 +29,10 @@ export async function routes(app: FastifyInstance) {
       `SELECT category_name AS name, SUM(amount_paise)::bigint AS total
        FROM mv_category_monthly
        WHERE community_id=$1 AND head_kind='income'
+         AND category_name <> ALL($2::text[])
        GROUP BY category_name
        ORDER BY total DESC`,
-      [p.cid],
+      [p.cid, EXCLUDED_INCOME_CATEGORIES],
     );
     return rows;
   });

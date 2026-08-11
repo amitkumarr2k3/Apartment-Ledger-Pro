@@ -26,7 +26,7 @@ function Page() {
 
 function Inner() {
   const { data: expenseTree = [], isLoading } = useExpenseTree();
-  const { sliceMonthly, priorSliceMonthly, labels } = usePeriod();
+  const { sliceMonthly, priorSliceMonthly, labels, view } = usePeriod();
   const [openVendor, setOpenVendor] = useState<string | null>(null);
 
   const vendorRanking = useMemo(() => expenseTree
@@ -135,15 +135,36 @@ function Inner() {
               <CardDescription>AD-11 · Steady rise pattern shows here</CardDescription>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={240}>
-                <BarChart data={trendData}>
-                  <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                  <XAxis dataKey="month" fontSize={11} />
-                  <YAxis tickFormatter={(v) => `₹${(v/1000).toFixed(0)}k`} fontSize={11} />
-                  <Tooltip trigger={getTooltipTrigger()} cursor={{ fill: "var(--color-muted)", opacity: 0.35 }} content={<SmartTooltipContent labelPrefix="Vendor" valueFormatter={(v) => inr(v)} />} />
-                  <Bar dataKey="value" fill="var(--color-chart-3)" radius={[4,4,0,0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              {view === "chart" ? (
+                <ResponsiveContainer width="100%" height={240}>
+                  <BarChart data={trendData}>
+                    <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                    <XAxis dataKey="month" fontSize={11} />
+                    <YAxis tickFormatter={(v) => `₹${(v/1000).toFixed(0)}k`} fontSize={11} />
+                    <Tooltip trigger={getTooltipTrigger()} cursor={{ fill: "var(--color-muted)", opacity: 0.35 }} content={<SmartTooltipContent labelPrefix="Vendor" valueFormatter={(v) => inr(v)} />} />
+                    <Bar dataKey="value" fill="var(--color-chart-3)" radius={[4,4,0,0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="rounded-md border border-border overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/40">
+                      <tr>
+                        <th className="text-left p-2">Month</th>
+                        <th className="text-right p-2">Spend</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {trendData.map((r) => (
+                        <tr key={r.month} className="border-t border-border">
+                          <td className="p-2">{r.month}</td>
+                          <td className="p-2 text-right font-mono">{inr(r.value)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </CardContent>
           </Card>
 

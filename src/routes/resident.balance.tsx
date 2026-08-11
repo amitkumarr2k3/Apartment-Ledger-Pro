@@ -31,6 +31,7 @@ function Inner() {
     .reduce((s, m) => s + m.collection - m.expense, 0);
   let running = balanceStrip.opening + priorNet;
   const rangeOpening = running;
+  const hasOpeningGap = !Number.isFinite(rangeOpening) || rangeOpening < 0;
   const rows = period.map((m) => {
     const opening = running;
     const closing = opening + m.collection - m.expense;
@@ -53,7 +54,9 @@ function Inner() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-            <StripCell label="Opening balance" value={inr(rangeOpening)} muted note="RD-42" />
+            {/* If historical carry-forward is incomplete and opening computes
+                to a negative value, show N/A instead of a misleading amount. */}
+            <StripCell label="Opening balance" value={hasOpeningGap ? "N/A" : inr(rangeOpening)} muted note="RD-42" />
             <StripCell label="Total income" value={inr(totalIncome)} tone="emerald" />
             <StripCell label="Total expense" value={inr(totalExpense)} tone="rose" />
             <StripCell label="Net movement" value={inr(net)} tone={net >= 0 ? "emerald" : "rose"} />
@@ -61,6 +64,15 @@ function Inner() {
           </div>
         </CardContent>
       </Card>
+
+      {hasOpeningGap && (
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertDescription>
+            Opening balance is marked as N/A because the selected range does not have a reliable historical carry-forward.
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* RD-44 derived warning */}
       <Alert>

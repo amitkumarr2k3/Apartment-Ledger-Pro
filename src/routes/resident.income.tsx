@@ -25,8 +25,10 @@ function Page() {
 function Inner() {
   const { data: incomeTree = [] } = useIncomeTree();
   const { data: monthlyTotals = [] } = useMonthlyTotals();
-  const { sliceMonthly, labels } = usePeriod();
+  const { sliceMonthly, labels, view } = usePeriod();
+  const isLiabilityCategory = (name: string) => /outstanding|arrears|default/.test(name.toLowerCase());
   const rows = incomeTree
+    .filter((c) => !isLiabilityCategory(c.name))
     .map((c) => ({ name: c.name, value: total(sliceMonthly(categoryMonthly(c))) }))
     .sort((a, b) => b.value - a.value);
   const totalIncome = rows.reduce((s, r) => s + r.value, 0);
@@ -48,6 +50,28 @@ function Inner() {
 
   const monthlyIncomeFull = sumMonthly(incomeTree.flatMap((c) => c.vendors.flatMap((v) => v.items.map((i) => i.monthly))));
   const monthlyIncome = sliceMonthly(monthlyIncomeFull);
+  const maintenanceMonthly = sliceMonthly(
+    sumMonthly(
+      incomeTree
+        .filter((c) => c.name.toLowerCase().includes("maintenance"))
+        .flatMap((c) => c.vendors.flatMap((v) => v.items.map((i) => i.monthly))),
+    ),
+  );
+  const outstandingMonthly = sliceMonthly(
+    sumMonthly(
+      incomeTree
+        .filter((c) => isLiabilityCategory(c.name))
+        .flatMap((c) => c.vendors.flatMap((v) => v.items.map((i) => i.monthly))),
+    ),
+  );
+  const monthlyMaintenanceData = labels.map((m, i) => {
+    const collected = maintenanceMonthly[i] ?? 0;
+    return {
+      month: m,
+      collected,
+      outstanding: Math.max(0, outstandingMonthly[i] ?? 0),
+    };
+  });
 
   return (
     <>
@@ -108,7 +132,7 @@ function Inner() {
             <div className="text-sm space-y-1">
               <div className="flex justify-between"><span className="text-muted-foreground">Total income</span><span className="font-mono">{inr(totalIncome)}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Total expense</span><span className="font-mono">{inr(totalExpense)}</span></div>
-              <div className="flex justify-between border-t border-border pt-1 mt-1"><span>{spentRatio <= 100 ? "Income left" : "Over-spent"}</span><span className="font-mono">{inr(Math.abs(totalIncome - totalExpense))}</span></div>
+              <div className="flex justify-between border-t border-border pt-1 mt-1"><span>{totalIncome >= totalExpense ? "Surplus" : "Deficit"}</span><span className="font-mono">{inr(Math.abs(totalIncome - totalExpense))}</span></div>
             </div>
           </CardContent>
         </Card>
@@ -117,20 +141,44 @@ function Inner() {
       {/* RD-32 */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Income trend · RD-32</CardTitle>
-          <CardDescription>Monthly total income across selected range</CardDescription>
+          <CardTitle className="text-base">Maintenance collection vs outstanding · RD-32</CardTitle>
+          <CardDescription>Monthly maintenance collected with outstanding overlay</CardDescription>
         </CardHeader>
         <CardContent>
-          <ResponsiveContainer width="100%" height={260}>
-            <BarChart data={labels.map((m, i) => ({ month: m, value: monthlyIncome[i] }))}>
-              <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-              <XAxis dataKey="month" fontSize={11} />
-              <YAxis tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} fontSize={11} />
-              <Tooltip trigger={getTooltipTrigger()} cursor={{ fill: "var(--color-muted)", opacity: 0.35 }} content={<SmartTooltipContent labelPrefix="Month" valueFormatter={(v) => inr(v)} />} />
-              <Legend />
-              <Bar dataKey="value" name="Total income" fill="var(--color-chart-2)" radius={[4,4,0,0]} />
-            </BarChart>
-          </ResponsiveContainer>
+          {view === "chart" ? (
+            <ResponsiveContainer width="100%" height={260}>
+              <BarChart data={monthlyMaintenanceData}>
+                <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                <XAxis dataKey="month" fontSize={11} />
+                <YAxis tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} fontSize={11} />
+                <Tooltip trigger={getTooltipTrigger()} cursor={{ fill: "var(--color-muted)", opacity: 0.35 }} content={<SmartTooltipContent labelPrefix="Month" valueFormatter={(v) => inr(v)} />} />
+                <Legend />
+                <Bar dataKey="collected" name="Maintenance collected" fill="var(--color-chart-2)" radius={[4,4,0,0]} />
+                <Bar dataKey="outstanding" name="Outstanding / defaulted" fill="var(--color-chart-1)" radius={[4,4,0,0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="rounded-md border border-border overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-muted/40">
+                  <tr>
+                    <th className="text-left p-2">Month</th>
+                    <th className="text-right p-2">Collected</th>
+                    <th className="text-right p-2">Outstanding</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {monthlyMaintenanceData.map((m) => (
+                    <tr key={m.month} className="border-t border-border">
+                      <td className="p-2">{m.month}</td>
+                      <td className="p-2 text-right font-mono">{inr(m.collected)}</td>
+                      <td className="p-2 text-right font-mono">{inr(m.outstanding)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </CardContent>
       </Card>
     </>
