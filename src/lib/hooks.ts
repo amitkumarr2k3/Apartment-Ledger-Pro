@@ -45,13 +45,17 @@ function toYmd(v: unknown): string {
   return s.length >= 10 ? s.slice(0, 10) : s;
 }
 
-function isoMonthToLabel(iso: string): string {
-  // "2025-08-01" -> "Aug '25"
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return iso;
-  const mon = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][d.getMonth()] ?? "Jan";
-  const yr = String(d.getFullYear()).slice(-2);
-  return `${mon} '${yr}`;
+function isoMonthToLabel(iso: string | Date): string {
+  // Parse year-month directly from the ISO string to avoid local-timezone skew.
+  // Postgres DATE columns arrive as "YYYY-MM-DD" or "YYYY-MM-DDT00:00:00.000Z";
+  // both start with YYYY-MM which we can slice without creating a Date object.
+  const s = iso instanceof Date ? iso.toISOString() : String(iso);
+  const yr4 = s.slice(0, 4);
+  const mo2 = s.slice(5, 7);
+  const monthIdx = Number(mo2) - 1; // 0-indexed
+  if (isNaN(monthIdx) || monthIdx < 0 || monthIdx > 11) return s;
+  const ABBRS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  return `${ABBRS[monthIdx]} '${yr4.slice(-2)}`;
 }
 
 function looksLikeBackendMonthly(rows: any[]): boolean {
@@ -84,7 +88,7 @@ export function useMonthlyTotals() {
       }
       return [] as Array<{ month: string; collection: number; expense: number; net: number }>;
     },
-    staleTime: 60_000,
+    staleTime: 10_000,
   });
 }
 
