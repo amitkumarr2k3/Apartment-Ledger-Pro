@@ -166,7 +166,7 @@ function Inner() {
         <Card className={topCardsClass}>
           <CardHeader>
             <CardTitle className="text-base">Top 5 expense categories</CardTitle>
-            <CardDescription>RD-02 · Click any category to drill down</CardDescription>
+            <CardDescription>RD-02 · Click any expense category to drill down</CardDescription>
           </CardHeader>
           <CardContent className="flex-1 overflow-hidden">
             {view === "chart" ? (
@@ -214,10 +214,8 @@ function Inner() {
         {/* RD-05 community income */}
         <Card className={topCardsClass}>
           <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <Wallet className="h-4 w-4" /> Community income
-            </CardTitle>
-            <CardDescription>RD-05 · Top 5 income sources with drill down</CardDescription>
+            <CardTitle className="text-base">Top 5 income sources(Excluding Maintainence)</CardTitle>
+            <CardDescription>RD-05 · Click any income category to drill down</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 flex-1 overflow-hidden">
             {top5Income.length === 0 ? (
@@ -269,7 +267,7 @@ function Inner() {
         <Card className={topCardsClass}>
           <CardHeader>
             <CardTitle className="text-base">Top 5 vendors by expense</CardTitle>
-            <CardDescription>Actual vendor spend · click any vendor to drill down</CardDescription>
+            <CardDescription>Actual vendor spend click any vendor to drill down</CardDescription>
           </CardHeader>
           <CardContent className="flex-1 overflow-hidden">
             {top5Vendors.length === 0 ? (

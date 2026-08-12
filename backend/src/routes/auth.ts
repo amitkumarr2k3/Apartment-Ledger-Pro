@@ -87,13 +87,20 @@ function otpEmailHtml(otp: string, appUrl: string): string {
   return `
 <!DOCTYPE html><html><body style="font-family:sans-serif;max-width:480px;margin:40px auto;color:#1a1a1a">
   <h2 style="margin-bottom:4px">Your sign-in code</h2>
-  <p style="color:#555;margin-top:0">Use this code to sign in to Apartment Finance.</p>
+  <p style="color:#555;margin-top:0">Use this code to sign in to Apartment Ledger Portal.</p>
   <div style="background:#f4f4f5;border-radius:8px;padding:24px;text-align:center;margin:24px 0">
     <span style="font-size:40px;letter-spacing:10px;font-family:monospace;font-weight:700">${otp}</span>
   </div>
   <p style="color:#555;font-size:14px">Valid for <strong>15 minutes</strong>. Do not share this code with anyone.</p>
   <hr style="border:none;border-top:1px solid #e4e4e7;margin:24px 0">
   <p style="color:#999;font-size:12px">If you didn't request this, you can safely ignore this email.</p>
+  <div style="margin-top:24px;color:#555;font-size:14px;line-height:1.6;">
+  <p>
+    Regards,<br>
+    <strong>CG Boulevard Treasurer</strong><br>
+    Apartment Ledger Portal Administration
+  </p>
+</div>
 </body></html>`;
 }
 
@@ -142,9 +149,9 @@ async function issueOtp(app: FastifyInstance, email: string): Promise<void> {
   const appUrl = process.env.APP_URL ?? "";
   try {
     await transporter.sendMail({
-      from: FROM_EMAIL,
+      from: `"CG Boulevard Treasurer" <${FROM_EMAIL}>`,
       to: lower,
-      subject: "Your sign-in code",
+      subject: "Resident CG Boulevard Ledger Portal OTP Service",
       text: `Your sign-in code is ${otp} — valid for 15 minutes. Do not share this code.`,
       html: otpEmailHtml(otp, appUrl),
     });
