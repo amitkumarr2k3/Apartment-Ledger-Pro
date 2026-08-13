@@ -26,7 +26,7 @@ type FieldSpec = { key: string; required: boolean; validate?: (v: string) => str
 const SCHEMAS: Record<ImportBatch["kind"], FieldSpec[]> = {
   transactions: [
     { key: "date", required: true, validate: (v) => (/^\d{4}-\d{2}-\d{2}$/.test(v) ? null : "date must be YYYY-MM-DD") },
-    { key: "head", required: true, validate: (v) => (["expense", "income"].includes(v.toLowerCase()) ? null : "head must be expense or income") },
+    { key: "head", required: true, validate: (v) => (["expense", "income", "reference"].includes(v.toLowerCase()) ? null : "head must be expense, income, or reference") },
     { key: "category", required: true },
     { key: "vendor", required: false },
     { key: "line_item", required: false },

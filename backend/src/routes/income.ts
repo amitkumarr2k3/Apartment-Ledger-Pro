@@ -1,7 +1,7 @@
 import { FastifyInstance } from "fastify";
 import { pool } from "../db";
 
-const EXCLUDED_INCOME_TOTAL_CATEGORIES = ["Tax", "Tax Collected (Liability)", "Maintenance Outstanding"];
+const EXCLUDED_INCOME_TOTAL_CATEGORIES = ["Tax", "Tax Collected (Liability)", "Maintenance Outstanding", "Maintenance Rate Reference" ];
 const EXCLUDED_INCOME_TREE_CATEGORIES: string[] = [];
 
 export async function routes(app: FastifyInstance) {
@@ -11,7 +11,7 @@ export async function routes(app: FastifyInstance) {
       `SELECT c.name AS category, v.name AS vendor, li.name AS line_item,
               t.period_month AS month, SUM(t.amount_paise)::bigint AS amount
        FROM transactions t
-       JOIN heads h ON h.id=t.head_id AND h.kind='income'
+       JOIN heads h ON h.id=t.head_id AND h.kind IN ('income', 'reference')
        JOIN categories c ON c.id=t.category_id
        LEFT JOIN vendors v ON v.id=t.vendor_id
        LEFT JOIN line_items li ON li.id=t.line_item_id

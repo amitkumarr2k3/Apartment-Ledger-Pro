@@ -52,7 +52,15 @@ function Inner() {
   const isTax = (s: string) => /tax|gst|cgst|sgst/i.test(s || "");
   const isMaintenance = (s: string) => /maintenance/i.test(s || "") && !/outstanding|arrears|default/i.test(s || "");
   const isLiability = (s: string) => /outstanding|arrears|default/i.test(s || "");
-
+  
+  const TOTAL_SQFT = 701591;
+  const isRateReference = (name: string) => /rate reference/i.test(name || "");
+  // pull the rate category out of the tree, sliced to the selected period
+  const rateCategory = incomeTree.find((c) => isRateReference(c.name));
+  const rateMonthly = rateCategory ? sliceMonthly(categoryMonthly(rateCategory)) : [];
+  // each stored value is (rate * 100); divide back, then multiply by fixed area, summed per selected period
+  const expectedCollection = rateMonthly.reduce((sum, storedVal) => sum + (storedVal / 100) * TOTAL_SQFT, 0);
+  
   /**
    * GST LIABILITY CALCULATION
    * Sum of all items in the income tree that match tax keywords.
@@ -77,7 +85,7 @@ function Inner() {
    * Sum of all income that is NOT maintenance, NOT liability/arrears, and NOT tax.
    */
   const communityIncome = safeIncomeTree.reduce((acc, c) => {
-    if (isMaintenance(c.name) || isLiability(c.name) || isTax(c.name)) return acc;
+    if (isRateReference(c.name) || isMaintenance(c.name) || isLiability(c.name) || isTax(c.name)) return acc;
     
     const catSum = (c.vendors || []).reduce((vAcc, v) => {
       if (isTax(v.name)) return vAcc;
@@ -158,7 +166,6 @@ function Inner() {
   const prevMonthLabel = previousMonthDate.toLocaleString("en-US", { month: "short", year: "2-digit" }).replace(" ", "-");
 
   // Mock values for the ones not in logic
-  const expectedCollection = 3000000;
   const outstandingDuesMock = 300000;
   const recoveryRate = 90;
   const corpusValue = "₹1,85,60,000";
@@ -168,6 +175,7 @@ function Inner() {
   const totalIncome = totalCollection + communityIncome;
   const netSurplus = totalIncome - totalExpense;
   const expenseIncomeRatio = totalIncome === 0 ? 0 : (totalExpense / totalIncome) * 100;
+
 
   return (
     <div className="space-y-6">
