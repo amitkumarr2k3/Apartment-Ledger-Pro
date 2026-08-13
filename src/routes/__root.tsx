@@ -16,28 +16,79 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Toaster } from "@/components/ui/sonner";
-import { getSession, canAccess } from "@/lib/session";
+import { getSession, canAccess, signOut } from "@/lib/session";
 import { AUTH_ENABLED } from "@/lib/feature-flags";
 
 // Public routes accessible without a session. Everything else requires OTP login.
 const PUBLIC_PATHS = new Set<string>(["/login"]);
+const IDLE_TIMEOUT_MS = 30 * 60 * 1000;
+// sessionStorage clears when the tab is closed, so a stale timestamp from a
+// previous browser session can never trigger an immediate idle-logout on fresh open.
+const LAST_ACTIVE_KEY = "apf.lastActiveAt";
 
 function RouteGuard() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
 
+  // ── Idle-timer effect: mounts ONCE, never restarts on navigation ─────────
+  // Keeping this separate from the auth-guard effect is critical: if both
+  // live in the same effect (deps=[pathname,...]) the idle interval is torn
+  // down and recreated on every route change, and the first check() call of
+  // the new effect would immediately read a stale lastActiveAt timestamp from
+  // a previous login session → instant forced logout.
   useEffect(() => {
-    // Feature flag: login disabled → skip every guard. If the user lands on
-    // /login (e.g. an old bookmark), bounce them into the app.
+    if (!AUTH_ENABLED) return;
+
+    const touch = () => {
+      if (getSession()) window.sessionStorage.setItem(LAST_ACTIVE_KEY, String(Date.now()));
+    };
+
+    const idleTick = () => {
+      const session = getSession();
+      if (!session) return;
+      const last = Number(window.sessionStorage.getItem(LAST_ACTIVE_KEY) ?? "0");
+      if (!last) { touch(); return; }                          // first tick: start clock
+      if (Date.now() - last > IDLE_TIMEOUT_MS) {
+        signOut();
+        // Read live pathname so the redirect param is always current.
+        const p = window.location.pathname;
+        navigate({
+          to: "/login",
+          search: PUBLIC_PATHS.has(p) ? {} as never : { redirect: p } as never,
+          replace: true,
+        });
+      }
+    };
+
+    const id = window.setInterval(idleTick, 30_000);
+    const opts = { passive: true } as const;
+    window.addEventListener("mousemove", touch, opts);
+    window.addEventListener("keydown", touch);
+    window.addEventListener("click", touch, opts);
+    window.addEventListener("scroll", touch, opts);
+    window.addEventListener("touchstart", touch, opts);
+    return () => {
+      window.clearInterval(id);
+      window.removeEventListener("mousemove", touch);
+      window.removeEventListener("keydown", touch);
+      window.removeEventListener("click", touch);
+      window.removeEventListener("scroll", touch);
+      window.removeEventListener("touchstart", touch);
+    };
+  // navigate is a stable reference from useNavigate – effectively runs once.
+  }, [navigate]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Auth-guard effect: runs on every pathname change ─────────────────────
+  useEffect(() => {
     if (!AUTH_ENABLED) {
       if (pathname === "/login") navigate({ to: "/", replace: true });
       return;
     }
+
     const check = () => {
       const session = getSession();
       if (session && pathname === "/") {
-        const target = session.role === "admin" ? "/admin/actions" : "/resident/overview";
-        navigate({ to: target, replace: true });
+        navigate({ to: session.role === "admin" ? "/admin/actions" : "/resident/overview", replace: true });
         return;
       }
       if (PUBLIC_PATHS.has(pathname)) return;
@@ -46,17 +97,13 @@ function RouteGuard() {
         return;
       }
       if (!canAccess(pathname, session.role)) {
-        // Resident tried to open an /admin/* route → send them home.
         navigate({ to: "/resident/overview", replace: true });
       }
     };
+
     check();
     window.addEventListener("apf-session-change", check);
-    window.addEventListener("storage", check);
-    return () => {
-      window.removeEventListener("apf-session-change", check);
-      window.removeEventListener("storage", check);
-    };
+    return () => window.removeEventListener("apf-session-change", check);
   }, [pathname, navigate]);
 
   return null;

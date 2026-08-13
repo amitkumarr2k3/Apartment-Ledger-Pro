@@ -84,10 +84,6 @@ function Inner() {
         </BreadcrumbList>
       </Breadcrumb>
 
-      <p className="text-xs text-muted-foreground -mt-3">
-        URL-synced · share this link to open exactly this view. Press <kbd className="rounded border border-border bg-muted px-1 font-mono">⌘K</kbd> to jump elsewhere.
-      </p>
-
       {!head && (
         <div className="grid gap-4 md:grid-cols-2">
           <HeadCard label="Expense" total={expenseTotal} categories={expenseTree.length} onClick={() => update({ head: "expense" })} tone="rose" />

@@ -244,6 +244,114 @@ sudo dpkg-reconfigure --priority=low unattended-upgrades
 
 ---
 
+## Part 10 — Enable HTTPS with Let's Encrypt (free TLS certificate)
+
+**Requirements before starting:**
+- You need a **domain name** (e.g. `apf.yourdomain.com`) with its **DNS A-record pointing to your VM's public IP**. Let's Encrypt verifies domain ownership; it does not work with bare IP addresses.
+- Port **443 must be open** in the Azure NSG (step 10a below).
+
+### 10a. Open port 443 in the Azure NSG
+
+1. Azure Portal → your VM (`apf-vm`) → left menu → **Networking** → **Network settings**.
+2. Under **Inbound port rules** → **+ Add inbound port rule**.
+3. Set: **Destination port ranges** = `443`, **Protocol** = `TCP`, **Action** = `Allow`, **Priority** = `310`, **Name** = `HTTPS`.
+4. Click **Add** and wait ~30 seconds for the rule to apply.
+
+### 10b. Install certbot on the VM
+
+```bash
+# SSH in if not already connected
+ssh -i "$HOME/.ssh/apf_vm" azureuser@<VM_PUBLIC_IP>
+
+# Install certbot (Ubuntu 22.04)
+sudo apt-get update
+sudo apt-get install -y certbot
+```
+
+### 10c. Obtain the TLS certificate (one-time)
+
+Stop the containers first so certbot can bind to port 80:
+```bash
+cd ~/app
+docker compose -f docker-compose.yml -f docker-compose.prod.yml down
+```
+
+Get the certificate (replace `apf.yourdomain.com` with your actual domain):
+```bash
+sudo certbot certonly --standalone -d apf.yourdomain.com
+```
+
+Certbot will:
+1. Temporarily start its own HTTP server on port 80
+2. Contact Let's Encrypt to verify domain ownership
+3. Write certs to `/etc/letsencrypt/live/apf.yourdomain.com/`
+
+> If this fails with "port 80 already in use", make sure you ran `docker compose down` first.
+
+### 10d. Set DOMAIN in your .env
+
+```bash
+nano ~/app/.env
+```
+
+Add or update these two lines:
+```
+DOMAIN=apf.yourdomain.com
+APP_URL=https://apf.yourdomain.com
+```
+
+### 10e. Restart the stack with the HTTPS overlay
+
+```bash
+cd ~/app
+docker compose \
+  -f docker-compose.yml \
+  -f docker-compose.prod.yml \
+  -f docker-compose.https.yml \
+  up -d --build
+```
+
+This rebuilds the web image and starts nginx with the HTTPS template (TLS on port 443 + HTTP-to-HTTPS redirect on port 80).
+
+### 10f. Verify
+
+```powershell
+# From your own machine (not the VM)
+curl https://apf.yourdomain.com/health
+```
+
+Open `https://apf.yourdomain.com` in a browser — you should see a padlock. All HTTP links will auto-redirect to HTTPS.
+
+### 10g. Automatic certificate renewal
+
+Let's Encrypt certificates expire after 90 days. Set up a cron job on the VM to renew automatically:
+
+```bash
+sudo crontab -e
+```
+
+Add this line (runs twice daily, renews only when <30 days left):
+```cron
+0 3,15 * * * certbot renew --pre-hook "cd /home/azureuser/app && docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.https.yml down" --post-hook "cd /home/azureuser/app && docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.https.yml up -d" --quiet
+```
+
+> The pre-hook stops the stack (frees port 80 for certbot's standalone renewal), and the post-hook restarts it with fresh certs.
+
+### 10h. Update future deploys
+
+When deploying code changes, use the same three-file command:
+```bash
+cd ~/app
+git pull
+docker compose \
+  -f docker-compose.yml \
+  -f docker-compose.prod.yml \
+  -f docker-compose.https.yml \
+  up -d --build
+```
+
+---
+
 ## Cost summary
 
 | Item | Cost |

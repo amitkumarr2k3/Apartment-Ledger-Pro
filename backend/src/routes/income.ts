@@ -2,7 +2,7 @@ import { FastifyInstance } from "fastify";
 import { pool } from "../db";
 
 const EXCLUDED_INCOME_TOTAL_CATEGORIES = ["Tax", "Tax Collected (Liability)", "Maintenance Outstanding"];
-const EXCLUDED_INCOME_TREE_CATEGORIES = ["Tax", "Tax Collected (Liability)"];
+const EXCLUDED_INCOME_TREE_CATEGORIES: string[] = [];
 
 export async function routes(app: FastifyInstance) {
   app.get("/tree", { preHandler: app.auth }, async (req) => {

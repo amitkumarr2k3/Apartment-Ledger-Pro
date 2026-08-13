@@ -27,6 +27,9 @@ ETL/config/mapping11.yaml
 .dev.vars
 ETL/output/transactions.xlsx
 .env
+ETL/processed/Expense-analysis*
+ETL/processed/Receipt-analysis*
+src/routes/resident.overview_*
 
 # Editor directories and files
 .vscode/*

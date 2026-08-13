@@ -145,8 +145,9 @@ export function signOut() {
   if (!isBrowser()) return;
   window.localStorage.removeItem(SESSION_KEY);
   window.localStorage.removeItem("apf.token");
-
+  window.localStorage.removeItem("apf.lastActiveAt");   // legacy cleanup
   window.sessionStorage.removeItem(OTP_KEY);
+  window.sessionStorage.removeItem("apf.lastActiveAt"); // clear idle clock for re-login
   window.dispatchEvent(new Event("apf-session-change"));
 }
 

@@ -76,6 +76,7 @@ function hasStoredAuth(): boolean {
 export function useMonthlyTotals() {
   return useQuery({
     queryKey: ["monthly-totals", authCacheKey()],
+    enabled: hasStoredAuth(),
     queryFn: async () => {
       const raw = await api.getMonthlyTotals();
       if (looksLikeBackendMonthly(raw as any[])) {
@@ -95,6 +96,7 @@ export function useMonthlyTotals() {
 export function useBalanceStrip() {
   return useQuery({
     queryKey: ["balance-strip", authCacheKey()],
+    enabled: hasStoredAuth(),
     queryFn: async () => {
       const r: any = await api.getBalanceStrip();
       if (r && "opening" in r && "closing" in r) {
@@ -117,6 +119,7 @@ export function useBalanceStrip() {
 export function useIncomeCategoryTotals() {
   return useQuery({
     queryKey: ["income-cat-totals", authCacheKey()],
+    enabled: hasStoredAuth(),
     queryFn: async () => {
       const r: any[] = await api.getIncomeCategoryTotals();
       if (hasPaiseTotal(r)) {
@@ -131,6 +134,7 @@ export function useIncomeCategoryTotals() {
 export function useExpenseCategoryTotals() {
   return useQuery({
     queryKey: ["expense-cat-totals", authCacheKey()],
+    enabled: hasStoredAuth(),
     queryFn: async () => {
       const r: any[] = await api.getExpenseCategoryTotals();
       if (hasPaiseTotal(r)) {
@@ -148,6 +152,7 @@ export function useExpenseCategoryTotals() {
 export function useIncomeTree() {
   return useQuery({
     queryKey: ["income-tree", authCacheKey()],
+    enabled: hasStoredAuth(),
     queryFn: async () => {
       try {
         const r = await fetch("/api/income/tree", authHeaders());
@@ -167,6 +172,7 @@ export function useIncomeTree() {
 export function useExpenseTree() {
   return useQuery({
     queryKey: ["expense-tree", authCacheKey()],
+    enabled: hasStoredAuth(),
     queryFn: async () => {
       try {
         const r = await fetch("/api/expenses/tree", authHeaders());
@@ -185,6 +191,7 @@ export function useExpenseTree() {
 export function useAdminTransactions() {
   return useQuery({
     queryKey: ["admin-transactions", authCacheKey()],
+    enabled: hasStoredAuth(),
     queryFn: async () => {
       try {
         const r = await fetch("/api/admin/transactions?pageSize=200", authHeaders());

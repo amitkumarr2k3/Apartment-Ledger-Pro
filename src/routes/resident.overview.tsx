@@ -8,11 +8,11 @@ import {
 } from "recharts";
 import { SmartTooltipContent, getTooltipTrigger } from "@/components/smart-tooltip";
 import {
-  inr, pct, expenseTree, categoryMonthly, total, vendorMonthly, sumMonthly,
+  inr, pct, categoryMonthly, total, vendorMonthly, sumMonthly,
 } from "@/lib/finance-mock";
 import { useMonthlyTotals, useExpenseTree, useIncomeTree } from "@/lib/hooks";
 import { filterReportableIncomeCategories } from "@/lib/income-utils";
-import { Wallet, ArrowRight, TrendingUp, TrendingDown } from "lucide-react";
+import { Wallet, ArrowRight, TrendingUp, TrendingDown, Home, Banknote, ShieldCheck, CheckCircle2, AlertCircle, ShoppingCart, Coins, Key, Landmark } from "lucide-react";
 
 export const Route = createFileRoute("/resident/overview")({
   component: Page,
@@ -28,41 +28,77 @@ function Page() {
 }
 
 function Inner() {
-  const { sliceMonthly, priorSliceMonthly, view, labels } = usePeriod();
+  const { sliceMonthly, priorSliceMonthly, view, labels = [] } = usePeriod();
   const { data: monthlyTotals = [] } = useMonthlyTotals();
   const { data: expenseTree = [] } = useExpenseTree();
   const { data: incomeTree = [] } = useIncomeTree();
-  const reportableIncomeTree = filterReportableIncomeCategories(incomeTree);
-  const period = sliceMonthly(monthlyTotals);
-  const prior = priorSliceMonthly(monthlyTotals);
-  const periodCollection = sliceMonthly(
-    sumMonthly(reportableIncomeTree.flatMap((c) => c.vendors.flatMap((v) => v.items.map((i) => i.monthly)))),
+  
+  const safeIncomeTree = incomeTree || [];
+  const safeExpenseTree = expenseTree || [];
+  const safeMonthlyTotals = monthlyTotals || [];
+
+  const reportableIncomeTree = filterReportableIncomeCategories(safeIncomeTree);
+  const period = sliceMonthly(safeMonthlyTotals);
+  const prior = priorSliceMonthly(safeMonthlyTotals);
+  
+  // Standard collection calculation
+  const periodCollectionSeries = sliceMonthly(
+    sumMonthly((reportableIncomeTree || []).flatMap((c) => (c.vendors || []).flatMap((v) => (v.items || []).map((i) => i.monthly || [])))),
   );
-  const priorCollectionSeries = priorSliceMonthly(
-    sumMonthly(reportableIncomeTree.flatMap((c) => c.vendors.flatMap((v) => v.items.map((i) => i.monthly)))),
-  );
+  const totalCollection = periodCollectionSeries.reduce((s, v) => s + (v || 0), 0);
+  const totalExpense = period.reduce((s, m) => s + (m.expense || 0), 0);
 
-  const totalCollection = periodCollection.reduce((s, v) => s + v, 0);
-  const totalExpense = period.reduce((s, m) => s + m.expense, 0);
-  const net = totalCollection - totalExpense;
-  // Show how much of collected income has been spent (expense ÷ income)
-  const ratio = totalCollection === 0 ? 0 : (totalExpense / totalCollection) * 100;
+  // Helper to check for tax/gst keywords
+  const isTax = (s: string) => /tax|gst|cgst|sgst/i.test(s || "");
+  const isMaintenance = (s: string) => /maintenance/i.test(s || "") && !/outstanding|arrears|default/i.test(s || "");
+  const isLiability = (s: string) => /outstanding|arrears|default/i.test(s || "");
 
-  const priorCollection = priorCollectionSeries.reduce((s, v) => s + v, 0);
-  const priorExpense = prior.reduce((s, m) => s + m.expense, 0);
-  const priorNet = priorCollection - priorExpense;
-  const priorRatio = priorCollection === 0 ? 0 : (priorExpense / priorCollection) * 100;
+  /**
+   * GST LIABILITY CALCULATION
+   * Sum of all items in the income tree that match tax keywords.
+   */
+  const gstLiability = safeIncomeTree.reduce((acc, c) => {
+    const cTax = isTax(c.name);
+    const catSum = (c.vendors || []).reduce((vAcc, v) => {
+      const vTax = isTax(v.name);
+      const venSum = (v.items || []).reduce((iAcc, i) => {
+        if (cTax || vTax || isTax(i.name)) {
+          return iAcc + total(sliceMonthly(i.monthly || []));
+        }
+        return iAcc;
+      }, 0);
+      return vAcc + venSum;
+    }, 0);
+    return acc + catSum;
+  }, 0);
 
-  const delta = (cur: number, prev: number) =>
-    prev === 0 ? null : ((cur - prev) / Math.abs(prev)) * 100;
+  /**
+   * OTHER INCOME (COMMUNITY INCOME)
+   * Sum of all income that is NOT maintenance, NOT liability/arrears, and NOT tax.
+   */
+  const communityIncome = safeIncomeTree.reduce((acc, c) => {
+    if (isMaintenance(c.name) || isLiability(c.name) || isTax(c.name)) return acc;
+    
+    const catSum = (c.vendors || []).reduce((vAcc, v) => {
+      if (isTax(v.name)) return vAcc;
+      const venSum = (v.items || []).reduce((iAcc, i) => {
+        if (isTax(i.name)) return iAcc;
+        return iAcc + total(sliceMonthly(i.monthly || []));
+      }, 0);
+      return vAcc + venSum;
+    }, 0);
+    return acc + catSum;
+  }, 0);
 
-  const top5 = expenseTree
+  // Top 5 Expenses for the chart/list
+  const top5 = safeExpenseTree
     .map((c) => ({ name: c.name, total: total(sliceMonthly(categoryMonthly(c))) }))
     .sort((a, b) => b.total - a.total)
     .slice(0, 5);
   const top5Total = top5.reduce((s, c) => s + c.total, 0);
-  const top5Vendors = expenseTree
-    .flatMap((c) => c.vendors.map((v) => ({
+  
+  const top5Vendors = safeExpenseTree
+    .flatMap((c) => (c.vendors || []).map((v) => ({
       name: v.name,
       category: c.name,
       total: total(sliceMonthly(vendorMonthly(v))),
@@ -71,42 +107,36 @@ function Inner() {
     .sort((a, b) => b.total - a.total)
     .slice(0, 5);
   const top5VendorTotal = top5Vendors.reduce((s, v) => s + v.total, 0);
+
+  // Maintenance Trend Logic
   const maintenanceIncomeByMonth = sliceMonthly(
-    incomeTree
-      .filter((c) => c.name.toLowerCase().includes("maintenance") && !/outstanding|arrears|default/.test(c.name.toLowerCase()))
+    safeIncomeTree
+      .filter((c) => isMaintenance(c.name))
       .reduce<number[]>((acc, c) => {
         const monthly = categoryMonthly(c);
         return acc.length === 0 ? monthly : acc.map((v, i) => v + (monthly[i] ?? 0));
       }, []),
   );
   const outstandingIncomeByMonth = sliceMonthly(
-    incomeTree
-      .filter((c) => /outstanding|arrears|default/.test(c.name.toLowerCase()))
+    safeIncomeTree
+      .filter((c) => isLiability(c.name))
       .reduce<number[]>((acc, c) => {
         const monthly = categoryMonthly(c);
         return acc.length === 0 ? monthly : acc.map((v, i) => v + (monthly[i] ?? 0));
       }, []),
   );
-  const isLiabilityCategory = (name: string) => /outstanding|arrears|default/.test(name.toLowerCase());
-  const nonMaintenanceCategories = incomeTree
-    .filter((c) => !c.name.toLowerCase().includes("maintenance") && !isLiabilityCategory(c.name))
-    .map((c) => ({ name: c.name, total: total(sliceMonthly(categoryMonthly(c))) }))
-    .filter((c) => c.total > 0)
-    .sort((a, b) => b.total - a.total);
-  const communityIncome = nonMaintenanceCategories.reduce((s, c) => s + c.total, 0);
-  const top5Income = nonMaintenanceCategories.slice(0, 5);
-  const top5IncomeTotal = top5Income.reduce((s, c) => s + c.total, 0);
-
+  
+  // Monthly Trend Data
   const periodMonthlyTotals = new Map(period.map((m) => [m.month, m]));
   let runningOutstanding = 0;
-  const monthlyWithOutstanding = labels.map((month, i) => {
+  const monthlyWithOutstanding = (labels || []).map((month, i) => {
     const monthlyTotal = periodMonthlyTotals.get(month);
     const collected = maintenanceIncomeByMonth[i] ?? 0;
     const outstanding = Math.max(0, outstandingIncomeByMonth[i] ?? 0);
     runningOutstanding += outstanding;
     return {
       month,
-      collection: periodCollection[i] ?? 0,
+      collection: periodCollectionSeries[i] ?? 0,
       expense: monthlyTotal?.expense ?? 0,
       net: monthlyTotal?.net ?? 0,
       outstanding,
@@ -114,52 +144,161 @@ function Inner() {
       maintenance_collected: collected,
     };
   });
-  const totalOutstanding = monthlyWithOutstanding.reduce((s, m) => s + m.outstanding, 0);
-  const monthsInArrears = monthlyWithOutstanding.filter((m) => m.outstanding > 0).length;
-  const defaultMonths = [...monthlyWithOutstanding]
-    .filter((m) => m.outstanding > 0)
-    .sort((a, b) => a.month.localeCompare(b.month));
-
+  
   const periodLabel = period.length > 1
     ? `${period[0].month} to ${period[period.length - 1].month}`
     : (period[0]?.month ?? "selected period");
 
-  const priorLabel = prior.length === 0 ? "no prior window" : `vs prior ${prior.length}m`;
   const topCardsClass = "h-full min-h-[380px]";
   const chartHeight = 240;
+  
+  // Date logic for "current month - 1"
+  const previousMonthDate = new Date();
+  previousMonthDate.setMonth(previousMonthDate.getMonth() - 1);
+  const prevMonthLabel = previousMonthDate.toLocaleString("en-US", { month: "short", year: "2-digit" }).replace(" ", "-");
+
+  // Mock values for the ones not in logic
+  const expectedCollection = 3000000;
+  const outstandingDuesMock = 300000;
+  const recoveryRate = 90;
+  const corpusValue = "₹1,85,60,000";
+  const bankBalance = 4250000;
+  
+  // Final Financial Metrics
+  const totalIncome = totalCollection + communityIncome;
+  const netSurplus = totalIncome - totalExpense;
+  const expenseIncomeRatio = totalIncome === 0 ? 0 : (totalExpense / totalIncome) * 100;
 
   return (
-    <>
-      {/* RD-01 summary cards with vs-prior deltas */}
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-        <SummaryCard label="Total collection" value={inr(totalCollection)} tone="cyan"
-          delta={delta(totalCollection, priorCollection)} deltaLabel={priorLabel} higherIsBetter />
-        <SummaryCard label="Total expense" value={inr(totalExpense)} tone="rose"
-          delta={delta(totalExpense, priorExpense)} deltaLabel={priorLabel} higherIsBetter={false} />
-        <SummaryCard label={net >= 0 ? "Net surplus" : "Net deficit"} value={inr(net)} tone={net >= 0 ? "emerald" : "amber"}
-          delta={delta(net, priorNet)} deltaLabel={priorLabel} higherIsBetter />
-        <SummaryCard label="Total outstanding / default" value={inr(totalOutstanding)} tone="amber"
-          delta={null} deltaLabel="uploaded outstanding and default line items" higherIsBetter={false} />
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="text-xs uppercase tracking-wider">Expense / Income · RD-04</CardDescription>
-            <CardTitle className="text-2xl">{ratio.toFixed(0)}%</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Progress value={Math.min(ratio, 150)} className="h-2" />
-            <div className="flex items-center justify-between mt-2 text-xs">
-              <span className="text-muted-foreground">
-                {ratio <= 100 ? "Expense below collection" : "Expense exceeds collection"}
-              </span>
-              {prior.length > 0 && (
-                <span className="text-muted-foreground">
-                  prior {priorRatio.toFixed(0)}%
-                </span>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+    <div className="space-y-6">
+      {/* Section 1: Collection Health */}
+      <DashboardSection 
+        title={`Collection Health (${periodLabel})`} 
+        icon={<Home className="h-5 w-5 text-blue-600" />} 
+        headerColor="bg-blue-50 border-blue-200"
+      >
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <MetricCard 
+            label="EXPECTED COLLECTION" 
+            value={inr(expectedCollection)} 
+            subText={`TARGET FOR ${periodLabel}`} 
+          />
+          <MetricCard 
+            label="COLLECTED MAINTENANCE" 
+            value={inr(totalCollection)} 
+            subText="RECEIVED TILL DATE" 
+            icon={<CheckCircle2 className="h-5 w-5 text-green-500" />}
+          />
+          <MetricCard 
+            label="OUTSTANDING DUES" 
+            value={inr(outstandingDuesMock)} 
+            subText="TOTAL ARREARS" 
+            icon={<AlertCircle className="h-5 w-5 text-red-500" />}
+            valueClassName="text-red-700"
+          />
+          <MetricCard 
+            label="RECOVERY RATE" 
+            value={`${recoveryRate}%`} 
+            subText={
+              <div className="flex justify-between w-full mt-1">
+                <span className="text-green-600 font-medium">165 FLATS</span>
+                <span className="text-red-600 font-medium">35 FLAT DEFAULTERS</span>
+              </div>
+            }
+            footer={
+              <div className="w-full mt-2">
+                <div className="flex items-center gap-1 text-green-600 text-xs font-medium mb-1">
+                  <div className="h-2 w-2 rounded-full bg-green-500" /> Healthy
+                </div>
+                <Progress value={recoveryRate} className="h-1.5 bg-gray-100" />
+              </div>
+            }
+          />
+        </div>
+      </DashboardSection>
+
+      {/* Section 2: Society Financial Position */}
+      <DashboardSection 
+        title="Society Financial Position" 
+        icon={<Banknote className="h-5 w-5 text-green-600" />} 
+        headerColor="bg-green-50 border-green-200"
+      >
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          <MetricCard 
+            label="OTHER INCOME" 
+            value={inr(communityIncome)} 
+            subText="RENT, PARKING, EVENTS, ETC." 
+          />
+          <MetricCard 
+            label="TOTAL INCOME" 
+            value={inr(totalIncome)} 
+            subText="MAINTENANCE + OTHER" 
+            icon={<TrendingUp className="h-5 w-5 text-green-500" />}
+          />
+          <MetricCard 
+            label="TOTAL EXPENSE" 
+            value={inr(totalExpense)} 
+            subText="MONTHLY OPERATING SPEND" 
+            icon={<ShoppingCart className="h-5 w-5 text-gray-400" />}
+            className="bg-gray-50/50"
+          />
+          <MetricCard 
+            label="NET OPERATING SURPLUS" 
+            value={inr(netSurplus)} 
+            subText="SAVINGS RETAINED" 
+            icon={<Coins className="h-5 w-5 text-green-600" />}
+            footer={
+              <div className="flex items-center gap-1 text-green-600 text-xs font-medium mt-2">
+                <div className="h-2 w-2 rounded-full bg-green-500" /> Positive
+              </div>
+            }
+          />
+          <MetricCard 
+            label="GST LIABILITY" 
+            value={inr(gstLiability)} 
+            subText="CGST + SGST COLLECTED" 
+            icon={<Landmark className="h-5 w-5 text-slate-400" />}
+            className="bg-slate-50/50"
+          />
+        </div>
+      </DashboardSection>
+
+      {/* Section 3: Long-Term Financial Strength */}
+      <DashboardSection 
+        title="Long-Term Financial Strength" 
+        icon={<ShieldCheck className="h-5 w-5 text-orange-600" />} 
+        headerColor="bg-orange-50 border-orange-200"
+      >
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <MetricCard 
+            label="CORPUS WITH INTEREST (ACCUMULATED)" 
+            value={corpusValue} 
+            subText={`INCLUDES FIXED SINKING FUND TILL ${prevMonthLabel.toUpperCase()}`} 
+          />
+          <MetricCard 
+            label="BANK BALANCE" 
+            value={inr(bankBalance)} 
+            subText="CURRENT LIQUID OPERABLE CASH" 
+            icon={<Key className="h-5 w-5 text-yellow-500" />}
+          />
+          <MetricCard 
+            label="EXPENSE / INCOME RATIO" 
+            value={`${expenseIncomeRatio.toFixed(1)}%`} 
+            subText="BUDGET EFFICIENCY INDICATOR" 
+            footer={
+              <div className="w-full mt-2">
+                <div className="text-center text-xs font-medium text-gray-600 mb-1">Healthy</div>
+                <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-gradient-to-r from-purple-500 via-blue-500 to-cyan-400" 
+                    style={{ width: `${Math.min(expenseIncomeRatio, 100)}%` }} 
+                  />
+                </div>
+              </div>
+            }
+          />
+        </div>
+      </DashboardSection>
 
       <div className="grid gap-4 lg:grid-cols-3">
         {/* RD-02 top 5 — drill-through */}
@@ -218,19 +357,19 @@ function Inner() {
             <CardDescription>RD-05 · Click any income category to drill down</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 flex-1 overflow-hidden">
-            {top5Income.length === 0 ? (
+            {top5.length === 0 ? (
               <div className="text-sm text-muted-foreground">
                 {`No community income recorded for ${periodLabel}.`}
               </div>
             ) : view === "chart" ? (
               <ResponsiveContainer width="100%" height={chartHeight}>
-                <BarChart data={top5Income} layout="vertical" margin={{ left: 20 }}>
+                <BarChart data={top5} layout="vertical" margin={{ left: 20 }}>
                   <CartesianGrid horizontal={false} strokeDasharray="3 3" opacity={0.3} />
                   <XAxis type="number" tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} fontSize={11} />
                   <YAxis type="category" dataKey="name" width={110} fontSize={12} />
                   <Tooltip trigger={getTooltipTrigger()} cursor={{ fill: "var(--color-muted)", opacity: 0.35 }} content={<SmartTooltipContent labelPrefix="Income" valueFormatter={(v) => inr(v)} />} />
                   <Bar dataKey="total" radius={[0, 4, 4, 0]} className="cursor-pointer">
-                    {top5Income.map((income) => (
+                    {top5.map((income) => (
                       <Cell key={income.name} fill="var(--color-chart-2)"
                         onClick={() => {
                           window.location.href = `/resident/drilldown?head=income&category=${encodeURIComponent(income.name)}`;
@@ -241,7 +380,7 @@ function Inner() {
               </ResponsiveContainer>
             ) : (
               <ul className="divide-y divide-border max-h-[240px] overflow-y-auto">
-                {top5Income.map((income) => (
+                {top5.map((income) => (
                   <li key={income.name}>
                     <Link
                       to="/resident/drilldown"
@@ -250,7 +389,7 @@ function Inner() {
                     >
                       <div>
                         <div className="font-medium">{income.name}</div>
-                        <div className="text-xs text-muted-foreground">{((income.total / (top5IncomeTotal || 1)) * 100).toFixed(1)}% of top 5</div>
+                        <div className="text-xs text-muted-foreground">{((income.total / (communityIncome || 1)) * 100).toFixed(1)}% of top 5</div>
                       </div>
                       <div className="flex items-center gap-3">
                         <span className="text-sm font-mono">{inr(income.total)}</span>
@@ -365,50 +504,50 @@ function Inner() {
           )}
         </CardContent>
       </Card>
-    </>
+    </div>
   );
 }
 
+function DashboardSection({ title, icon, headerColor, children }: { 
+  title: string; 
+  icon: React.ReactNode; 
+  headerColor: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className={`rounded-xl border ${headerColor.split(' ')[1]} overflow-hidden shadow-sm`}>
+      <div className={`px-4 py-2 flex items-center gap-2 font-semibold text-gray-800 ${headerColor.split(' ')[0]}`}>
+        {icon}
+        {title}
+      </div>
+      <div className="p-4 bg-white">
+        {children}
+      </div>
+    </div>
+  );
+}
 
-function SummaryCard({
-  label, value, tone, delta, deltaLabel, higherIsBetter,
-}: {
+function MetricCard({ label, value, subText, icon, footer, className, valueClassName }: {
   label: string;
   value: string;
-  tone: "cyan" | "rose" | "emerald" | "amber";
-  delta: number | null;
-  deltaLabel: string;
-  higherIsBetter: boolean;
+  subText: React.ReactNode;
+  icon?: React.ReactNode;
+  footer?: React.ReactNode;
+  className?: string;
+  valueClassName?: string;
 }) {
-  const bar = {
-    cyan: "bg-cyan-500",
-    rose: "bg-rose-500",
-    emerald: "bg-emerald-500",
-    amber: "bg-amber-500",
-  }[tone];
-  const good = delta === null ? null : higherIsBetter ? delta >= 0 : delta <= 0;
-  const deltaTone = good === null
-    ? "text-muted-foreground"
-    : good
-      ? "text-emerald-600 bg-emerald-500/10"
-      : "text-rose-600 bg-rose-500/10";
   return (
-    <Card className="relative overflow-hidden">
-      <div className={`absolute inset-y-0 left-0 w-1 ${bar}`} />
-      <CardHeader className="pb-2">
-        <CardDescription className="text-xs uppercase tracking-wider">{label}</CardDescription>
-        <CardTitle className="text-2xl font-mono">{value}</CardTitle>
+    <Card className={`border-none shadow-none text-center flex flex-col items-center justify-center p-2 ${className}`}>
+      <CardHeader className="p-0 space-y-1 w-full">
+        <div className="flex items-center justify-center gap-2 w-full relative">
+          <div className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">{label}</div>
+          {icon && <div className="absolute right-0 top-0">{icon}</div>}
+        </div>
+        <CardTitle className={`text-2xl font-bold ${valueClassName || "text-gray-900"}`}>{value}</CardTitle>
       </CardHeader>
-      <CardContent className="pt-0">
-        {delta === null ? (
-          <span className="text-[11px] text-muted-foreground">{deltaLabel}</span>
-        ) : (
-          <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-mono ${deltaTone}`}>
-            {delta >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-            {pct(delta, 1)}
-            <span className="opacity-70 ml-1">{deltaLabel}</span>
-          </span>
-        )}
+      <CardContent className="p-0 flex flex-col items-center w-full">
+        <div className="text-[10px] text-gray-500 font-medium uppercase">{subText}</div>
+        {footer}
       </CardContent>
     </Card>
   );

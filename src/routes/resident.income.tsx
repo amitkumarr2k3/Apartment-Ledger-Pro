@@ -117,7 +117,8 @@ function Inner() {
                     <CartesianGrid horizontal={false} strokeDasharray="3 3" opacity={0.3} />
                     <XAxis type="number" hide />
                     <YAxis type="category" dataKey="name" width={110} fontSize={11} />
-                    <Tooltip trigger={getTooltipTrigger()} cursor={{ fill: "var(--color-muted)", opacity: 0.35 }} content={<SmartTooltipContent labelPrefix="Income" valueFormatter={(v) => inr(v)} />} />
+                   {/* <Tooltip trigger={getTooltipTrigger()} cursor={{ fill: "var(--color-muted)", opacity: 0.35 }} content={<SmartTooltipContent labelPrefix="Income" valueFormatter={(v) => inr(v)} />} />*/}
+                    <Tooltip trigger={getTooltipTrigger()} cursor={{ fill: "var(--color-muted)", opacity: 0.35 }} content={<SmartTooltipContent labelPrefix="Income" valueFormatter={(v) => inr(Number(v))} />} />
                     <Bar dataKey="value" radius={[0, 4, 4, 0]}>
                       {otherIncomeRows.map((r, i) => <Cell key={r.name} fill={COLORS[i % COLORS.length]} />)}
                       <LabelList dataKey="pct" position="right" formatter={(v: number) => `${v}%`} style={{ fontSize: 11 }} />
@@ -180,7 +181,7 @@ function Inner() {
               <ComposedChart data={monthlyMaintenanceData}>
                 <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                 <XAxis dataKey="month" fontSize={11} />
-                <YAxis yAxisId="amount" tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} fontSize={11} />
+                <YAxis yAxisId="amount" tickFormatter={(v) => `$₹{(v / 1000).toFixed(0)}k`} fontSize={11} />
                 <YAxis yAxisId="pct" orientation="right" tickFormatter={(v) => `${v}%`} fontSize={11} domain={[0, 100]} />
                 <Tooltip trigger={getTooltipTrigger()} cursor={{ fill: "var(--color-muted)", opacity: 0.35 }} content={<SmartTooltipContent labelPrefix="Month" valueFormatter={(v) => inr(v)} />} />
                 <Legend />

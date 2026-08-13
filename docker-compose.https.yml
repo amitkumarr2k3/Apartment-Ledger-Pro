@@ -1,0 +1,45 @@
+# Production HTTPS overlay.
+#
+# Usage (combine with the base file and the port-80 prod override):
+#   docker compose \
+#     -f docker-compose.yml \
+#     -f docker-compose.prod.yml \
+#     -f docker-compose.https.yml \
+#     up -d --build
+#
+# Prerequisites (done once on the VM — see DEPLOY-VM.md Part 10):
+#   1. DNS A-record for DOMAIN → VM public IP must be live.
+#   2. Port 443 opened in the Azure NSG.
+#   3. certbot run once to obtain /etc/letsencrypt/live/${DOMAIN}/ on the host.
+#   4. DOMAIN=your.domain.com set in .env.
+#
+# What this file does differently from the base compose:
+#   • web:  mounts the HTTPS nginx template dir (overrides HTTP-only default),
+#           mounts the host's /etc/letsencrypt (read-only) so nginx can read certs,
+#           exposes port 443 in addition to 80.
+#   • api:  overrides APP_URL to the https:// variant (used in OTP email links).
+
+services:
+  web:
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      # Override the HTTP-only template with the HTTPS template directory.
+      - ./web/templates-https:/etc/nginx/templates:ro
+      # Mount Let's Encrypt certs from the host (read-only).
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      # Certbot webroot for .well-known/acme-challenge/ during renewals.
+      - certbot_webroot:/var/www/certbot:ro
+    environment:
+      DOMAIN: ${DOMAIN}
+      API_UPSTREAM: "http://api:4000"
+      SSR_UPSTREAM: "http://ssr:3000"
+
+  api:
+    environment:
+      # Override APP_URL so OTP / magic-link emails carry the https:// URL.
+      APP_URL: https://${DOMAIN}
+
+volumes:
+  certbot_webroot:
