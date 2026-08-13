@@ -12,7 +12,7 @@ import {
 } from "@/lib/finance-mock";
 import { useMonthlyTotals, useExpenseTree, useIncomeTree } from "@/lib/hooks";
 import { filterReportableIncomeCategories } from "@/lib/income-utils";
-import { Wallet, ArrowRight, TrendingUp, TrendingDown, Home, Banknote, ShieldCheck, CheckCircle2, AlertCircle, ShoppingCart, Coins, Key, Landmark } from "lucide-react";
+import { Wallet, ArrowRight, TrendingUp, TrendingDown, Home, Banknote, ShieldCheck, CheckCircle2, AlertTriangle, ShoppingCart, PiggyBank, Landmark, Vault, HandCoins, CreditCard, Scale, Gauge, Target } from "lucide-react";
 
 export const Route = createFileRoute("/resident/overview")({
   component: Page,
@@ -223,11 +223,20 @@ function Inner() {
   const recoveryRate = 90;
   const corpusValue = "₹1,85,60,000";
   const bankBalance = 4250000;
+  // Distinct from bankBalance on purpose -- Contingency Cash is a separate
+  // reserve set aside for emergencies, not the day-to-day operable balance.
+  const contingencyCash = 1500000;
   
   // Final Financial Metrics
   const totalIncome = collectedMaintenance + communityIncome;
   const netSurplus = totalIncome - totalExpense;
   const expenseIncomeRatio = totalIncome === 0 ? 0 : (totalExpense / totalIncome) * 100;
+  const ratioStatus =
+    expenseIncomeRatio > 100
+      ? { text: "Over Budget", color: "text-red-600" }
+      : expenseIncomeRatio > 85
+        ? { text: "Caution", color: "text-amber-600" }
+        : { text: "Healthy", color: "text-gray-600" };
 
 
   return (
@@ -242,24 +251,26 @@ function Inner() {
           <MetricCard 
             label="EXPECTED COLLECTION" 
             value={inr(expectedCollection)} 
-            subText={`TARGET FOR ${periodLabel}`} 
+            subText={`TARGET COLLECTION FOR ${periodLabel}`} 
+            icon={<Target className="h-5 w-5 text-blue-500" />}
           />
           <MetricCard 
             label="COLLECTED MAINTENANCE" 
             value={inr(collectedMaintenance)} 
-            subText="RECEIVED TILL DATE" 
+            subText={`MAINTENANCE RECEIVED FOR ${periodLabel}`} 
             icon={<CheckCircle2 className="h-5 w-5 text-green-500" />}
           />
           <MetricCard 
             label="OUTSTANDING DUES" 
             value={inr(outstandingDuesMock)} 
-            subText="TOTAL ARREARS" 
-            icon={<AlertCircle className="h-5 w-5 text-red-500" />}
+            subText="PENDING DUES ACROSS ALL FLATS" 
+            icon={<AlertTriangle className="h-5 w-5 text-red-500" />}
             valueClassName="text-red-700"
           />
           <MetricCard 
             label="RECOVERY RATE" 
             value={`${recoveryRate}%`} 
+            icon={<Gauge className="h-5 w-5 text-blue-500" />}
             subText={
               <div className="flex justify-between w-full mt-1">
                 <span className="text-green-600 font-medium">165 FLATS</span>
@@ -289,28 +300,33 @@ function Inner() {
             label="OTHER INCOME" 
             value={inr(communityIncome)} 
             subText="RENT, PARKING, EVENTS, ETC." 
+            icon={<Wallet className="h-5 w-5 text-teal-500" />}
           />
+			<MetricCard 
+			  label="TOTAL INCOME" 
+			  value={inr(totalIncome)} 
+			  subText="MAINTENANCE + OTHER INCOME · CLICK TO VIEW DETAILS" 
+			  icon={<TrendingUp className="h-5 w-5 text-green-500" />}
+			  to="/resident/drilldown"
+			  search={(((prev: any) => ({ ...prev, head: "income", category: undefined, vendor: undefined, line: undefined })) as any)}
+			/>
+			<MetricCard 
+			  label="TOTAL EXPENSE" 
+			  value={inr(totalExpense)} 
+			  subText={`OPERATING SPEND FOR ${periodLabel} · CLICK TO VIEW DETAILS`} 
+			  icon={<ShoppingCart className="h-5 w-5 text-gray-400" />}
+			  className="bg-gray-50/50"
+			  to="/resident/drilldown"
+			  search={(((prev: any) => ({ ...prev, head: "expense", category: undefined, vendor: undefined, line: undefined })) as any)}
+			/>
           <MetricCard 
-            label="TOTAL INCOME" 
-            value={inr(totalIncome)} 
-            subText="MAINTENANCE + OTHER" 
-            icon={<TrendingUp className="h-5 w-5 text-green-500" />}
-          />
-          <MetricCard 
-            label="TOTAL EXPENSE" 
-            value={inr(totalExpense)} 
-            subText="MONTHLY OPERATING SPEND" 
-            icon={<ShoppingCart className="h-5 w-5 text-gray-400" />}
-            className="bg-gray-50/50"
-          />
-          <MetricCard 
-            label="NET OPERATING SURPLUS" 
+            label={netSurplus >= 0 ? "NET OPERATING SURPLUS" : "NET OPERATING DEFICIT"} 
             value={inr(netSurplus)} 
-            subText="SAVINGS RETAINED" 
-            icon={<Coins className="h-5 w-5 text-green-600" />}
+            subText={netSurplus >= 0 ? "SAVINGS RETAINED" : "SHORTFALL TO COVER"} 
+            icon={<PiggyBank className={`h-5 w-5 ${netSurplus >= 0 ? "text-green-600" : "text-red-500"}`} />}
             footer={
-              <div className="flex items-center gap-1 text-green-600 text-xs font-medium mt-2">
-                <div className="h-2 w-2 rounded-full bg-green-500" /> Positive
+              <div className={`flex items-center gap-1 text-xs font-medium mt-2 ${netSurplus >= 0 ? "text-green-600" : "text-red-600"}`}>
+                <div className={`h-2 w-2 rounded-full ${netSurplus >= 0 ? "bg-green-500" : "bg-red-500"}`} /> {netSurplus >= 0 ? "Positive" : "Negative"}
               </div>
             }
           />
@@ -335,26 +351,28 @@ function Inner() {
             label="CORPUS WITH INTEREST (ACCUMULATED)" 
             value={corpusValue} 
             subText={`INCLUDES FIXED SINKING FUND TILL ${prevMonthLabel.toUpperCase()}`} 
+            icon={<Vault className="h-5 w-5 text-orange-500" />}
           />
           <MetricCard 
-            label="Contigency Cash" 
-            value={inr(bankBalance)} 
-            subText="CURRENT CONTIGENCY OPERABLE CASH" 
-            icon={<Key className="h-5 w-5 text-pink-500" />}
+            label="CONTINGENCY CASH" 
+            value={inr(contingencyCash)} 
+            subText="RESERVE SET ASIDE FOR EMERGENCIES" 
+            icon={<HandCoins className="h-5 w-5 text-pink-500" />}
           />
           <MetricCard 
             label="BANK BALANCE" 
             value={inr(bankBalance)} 
             subText="CURRENT LIQUID OPERABLE CASH" 
-            icon={<Key className="h-5 w-5 text-yellow-500" />}
+            icon={<CreditCard className="h-5 w-5 text-yellow-500" />}
           />
           <MetricCard 
             label="EXPENSE / INCOME RATIO" 
             value={`${expenseIncomeRatio.toFixed(1)}%`} 
             subText="BUDGET EFFICIENCY INDICATOR" 
+            icon={<Scale className="h-5 w-5 text-indigo-400" />}
             footer={
               <div className="w-full mt-2">
-                <div className="text-center text-xs font-medium text-gray-600 mb-1">Healthy</div>
+                <div className={`text-center text-xs font-medium mb-1 ${ratioStatus.color}`}>{ratioStatus.text}</div>
                 <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
                   <div 
                     className="h-full bg-gradient-to-r from-purple-500 via-blue-500 to-cyan-400" 
@@ -424,7 +442,7 @@ function Inner() {
         {/* RD-05 community income */}
         <Card className={topCardsClass}>
           <CardHeader>
-            <CardTitle className="text-base">Top 5 income sources(Excluding Maintainence)</CardTitle>
+            <CardTitle className="text-base">Top 5 income sources (excluding maintenance)</CardTitle>
             <CardDescription>RD-05 · Click any income category to drill down</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 flex-1 overflow-hidden">
@@ -528,7 +546,7 @@ function Inner() {
       {/* RD-03 trend */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Monthly trend · collection vs expense</CardTitle>
+          <CardTitle className="text-base">Monthly trend · actual vs expected collection, expense &amp; outstanding</CardTitle>
           <CardDescription>RD-03 · Includes cumulative outstanding signal</CardDescription>
         </CardHeader>
         <CardContent>
@@ -601,7 +619,7 @@ function DashboardSection({ title, icon, headerColor, children }: {
   );
 }
 
-function MetricCard({ label, value, subText, icon, footer, className, valueClassName }: {
+function MetricCard({ label, value, subText, icon, footer, className, valueClassName, to, search }: {
   label: string;
   value: string;
   subText: React.ReactNode;
@@ -609,9 +627,17 @@ function MetricCard({ label, value, subText, icon, footer, className, valueClass
   footer?: React.ReactNode;
   className?: string;
   valueClassName?: string;
+  // When provided, the whole card becomes a clickable drill-down link
+  // (used by Total Income / Total Expense -> Head Drill-down).
+  to?: string;
+  search?: any;
 }) {
-  return (
-    <Card className={`border-none shadow-none text-center flex flex-col items-center justify-center p-2 ${className}`}>
+  const card = (
+    <Card
+      className={`border-none shadow-none text-center flex flex-col items-center justify-center p-2 ${className || ""} ${
+        to ? "cursor-pointer hover:bg-accent/50 hover:shadow-sm transition-colors rounded-lg" : ""
+      }`}
+    >
       <CardHeader className="p-0 space-y-1 w-full">
         <div className="flex items-center justify-center gap-2 w-full relative">
           <div className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">{label}</div>
@@ -625,4 +651,13 @@ function MetricCard({ label, value, subText, icon, footer, className, valueClass
       </CardContent>
     </Card>
   );
+
+  if (to) {
+    return (
+      <Link to={to} search={search} className="block">
+        {card}
+      </Link>
+    );
+  }
+  return card;
 }
