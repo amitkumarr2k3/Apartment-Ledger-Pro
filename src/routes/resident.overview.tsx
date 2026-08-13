@@ -41,11 +41,6 @@ function Inner() {
   const period = sliceMonthly(safeMonthlyTotals);
   const prior = priorSliceMonthly(safeMonthlyTotals);
   
-  // Standard collection calculation
-  const periodCollectionSeries = sliceMonthly(
-    sumMonthly((reportableIncomeTree || []).flatMap((c) => (c.vendors || []).flatMap((v) => (v.items || []).map((i) => i.monthly || [])))),
-  );
-  const totalCollection = periodCollectionSeries.reduce((s, v) => s + (v || 0), 0);
   const totalExpense = period.reduce((s, m) => s + (m.expense || 0), 0);
 
   // Helper to check for tax/gst keywords
@@ -146,14 +141,25 @@ function Inner() {
   const top5VendorTotal = top5Vendors.reduce((s, v) => s + v.total, 0);
 
   // Maintenance Trend Logic
-  const maintenanceIncomeByMonth = sliceMonthly(
-    safeIncomeTree
-      .filter((c) => isMaintenanceChargeExact(c.name))
-      .reduce<number[]>((acc, c) => {
-        const monthly = categoryMonthly(c);
-        return acc.length === 0 ? monthly : acc.map((v, i) => v + (monthly[i] ?? 0));
-      }, []),
-  );
+  // Deep-scan category -> vendor -> line_item for an EXACT match on
+  // "Maintenance Charge" (same rule as collectedMaintenance above). The
+  // category itself is named "Maintenance Collection" and the vendor is
+  // "Apartment Owners" -- only the line_item is literally "Maintenance
+  // Charge" -- so this must check all three levels, not just c.name.
+  const maintenanceChargeRawMonthly = safeIncomeTree.reduce<number[]>((acc, c) => {
+    const catHit = isMaintenanceChargeExact(c.name);
+    (c.vendors || []).forEach((v) => {
+      const vHit = isMaintenanceChargeExact(v.name);
+      (v.items || []).forEach((i) => {
+        if (catHit || vHit || isMaintenanceChargeExact(i.name)) {
+          const monthly = i.monthly || [];
+          acc = acc.length === 0 ? [...monthly] : acc.map((val, idx) => val + (monthly[idx] ?? 0));
+        }
+      });
+    });
+    return acc;
+  }, []);
+  const maintenanceIncomeByMonth = sliceMonthly(maintenanceChargeRawMonthly);
   const outstandingIncomeByMonth = sliceMonthly(
     safeIncomeTree
       .filter((c) => isLiability(c.name))
@@ -164,16 +170,23 @@ function Inner() {
   );
   
   // Monthly Trend Data
+  // "Actual Collection" on this chart must mirror the Collected Maintenance
+  // card exactly -- i.e. ONLY the "Maintenance Charge" line item, not the
+  // broader "reportable income" total. "Expected Collection" is the same
+  // rate x total-sqft formula used by the Expected Collection card above,
+  // computed per month so it can be plotted as its own trend line.
   const periodMonthlyTotals = new Map(period.map((m) => [m.month, m]));
   let runningOutstanding = 0;
   const monthlyWithOutstanding = (labels || []).map((month, i) => {
     const monthlyTotal = periodMonthlyTotals.get(month);
     const collected = maintenanceIncomeByMonth[i] ?? 0;
     const outstanding = Math.max(0, outstandingIncomeByMonth[i] ?? 0);
+    const expectedThisMonth = ((rateMonthly[i] ?? 0) / 100) * TOTAL_SQFT;
     runningOutstanding += outstanding;
     return {
       month,
-      collection: periodCollectionSeries[i] ?? 0,
+      actual_collection: collected,
+      expected_collection: expectedThisMonth,
       expense: monthlyTotal?.expense ?? 0,
       net: monthlyTotal?.net ?? 0,
       outstanding,
@@ -506,7 +519,8 @@ function Inner() {
                 <YAxis tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} fontSize={11} />
                 <Tooltip trigger={getTooltipTrigger()} cursor={{ fill: "var(--color-muted)", opacity: 0.35 }} content={<SmartTooltipContent labelPrefix="Month" valueFormatter={(v) => inr(v)} />} />
                 <Legend />
-                <Line type="monotone" dataKey="collection" stroke="var(--color-chart-2)" strokeWidth={2} name="Collection" />
+                <Line type="monotone" dataKey="actual_collection" stroke="var(--color-chart-2)" strokeWidth={2} name="Actual Collection" />
+                <Line type="monotone" dataKey="expected_collection" stroke="var(--color-chart-4, #a855f7)" strokeWidth={2} strokeDasharray="4 2" name="Expected Collection" />
                 <Line type="monotone" dataKey="expense" stroke="var(--color-chart-1)" strokeWidth={2} name="Expense" />
                 <Line type="monotone" dataKey="cumulative_outstanding" stroke="var(--color-chart-3)" strokeWidth={2} name="Cumulative outstanding" />
               </LineChart>
@@ -518,7 +532,8 @@ function Inner() {
                   <thead className="bg-muted/40">
                     <tr>
                       <th className="text-left p-2">Month</th>
-                      <th className="text-right p-2">Collection</th>
+                      <th className="text-right p-2">Actual Collection</th>
+                      <th className="text-right p-2">Expected Collection</th>
                       <th className="text-right p-2">Expense</th>
                       <th className="text-right p-2">Outstanding</th>
                       <th className="text-right p-2">Cumulative</th>
@@ -528,7 +543,8 @@ function Inner() {
                     {monthlyWithOutstanding.map((m) => (
                       <tr key={m.month} className="border-t border-border">
                         <td className="p-2">{m.month}</td>
-                        <td className="p-2 text-right font-mono">{inr(m.collection)}</td>
+                        <td className="p-2 text-right font-mono">{inr(m.actual_collection)}</td>
+                        <td className="p-2 text-right font-mono">{inr(m.expected_collection)}</td>
                         <td className="p-2 text-right font-mono">{inr(m.expense)}</td>
                         <td className="p-2 text-right font-mono">{inr(m.outstanding)}</td>
                         <td className="p-2 text-right font-mono">{inr(m.cumulative_outstanding)}</td>
