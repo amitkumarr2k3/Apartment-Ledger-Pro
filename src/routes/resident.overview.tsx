@@ -52,14 +52,43 @@ function Inner() {
   const isTax = (s: string) => /tax|gst|cgst|sgst/i.test(s || "");
   const isMaintenance = (s: string) => /maintenance/i.test(s || "") && !/outstanding|arrears|default/i.test(s || "");
   const isLiability = (s: string) => /outstanding|arrears|default/i.test(s || "");
-  
+  // Strict, exact-name match -- "Collected Maintenance" must ONLY ever be the
+  // "Maintenance Charge" line item. It must never pick up Association Fund,
+  // AV Room, Late Payment Fine, Lift Advertisement, Move In/Out Charges,
+  // CGST/SGST, or any other ledger that happens to share the word
+  // "maintenance" or gets swept in by a broader income filter.
+  const isMaintenanceChargeExact = (s: string) => (s || "").trim().toLowerCase() === "maintenance charge";
+
   const TOTAL_SQFT = 701591;
   const isRateReference = (name: string) => /rate reference/i.test(name || "");
   // pull the rate category out of the tree, sliced to the selected period
-  const rateCategory = incomeTree.find((c) => isRateReference(c.name));
+  const rateCategory = safeIncomeTree.find((c) => isRateReference(c.name));
   const rateMonthly = rateCategory ? sliceMonthly(categoryMonthly(rateCategory)) : [];
   // each stored value is (rate * 100); divide back, then multiply by fixed area, summed per selected period
   const expectedCollection = rateMonthly.reduce((sum, storedVal) => sum + (storedVal / 100) * TOTAL_SQFT, 0);
+
+  /**
+   * COLLECTED MAINTENANCE
+   * Deep-scans category -> vendor -> line_item for an EXACT match on
+   * "Maintenance Charge" only. Deliberately does NOT reuse the loose
+   * "reportable income" total, which used to include every other income
+   * line (Association Fund, Late Payment Fine, CGST/SGST, etc.) and
+   * therefore over-counted this card.
+   */
+  const collectedMaintenance = safeIncomeTree.reduce((acc, c) => {
+    const catHit = isMaintenanceChargeExact(c.name);
+    const catSum = (c.vendors || []).reduce((vAcc, v) => {
+      const vHit = isMaintenanceChargeExact(v.name);
+      const venSum = (v.items || []).reduce((iAcc, i) => {
+        if (catHit || vHit || isMaintenanceChargeExact(i.name)) {
+          return iAcc + total(sliceMonthly(i.monthly || []));
+        }
+        return iAcc;
+      }, 0);
+      return vAcc + venSum;
+    }, 0);
+    return acc + catSum;
+  }, 0);
   
   /**
    * GST LIABILITY CALCULATION
@@ -119,7 +148,7 @@ function Inner() {
   // Maintenance Trend Logic
   const maintenanceIncomeByMonth = sliceMonthly(
     safeIncomeTree
-      .filter((c) => isMaintenance(c.name))
+      .filter((c) => isMaintenanceChargeExact(c.name))
       .reduce<number[]>((acc, c) => {
         const monthly = categoryMonthly(c);
         return acc.length === 0 ? monthly : acc.map((v, i) => v + (monthly[i] ?? 0));
@@ -172,7 +201,7 @@ function Inner() {
   const bankBalance = 4250000;
   
   // Final Financial Metrics
-  const totalIncome = totalCollection + communityIncome;
+  const totalIncome = collectedMaintenance + communityIncome;
   const netSurplus = totalIncome - totalExpense;
   const expenseIncomeRatio = totalIncome === 0 ? 0 : (totalExpense / totalIncome) * 100;
 
@@ -193,7 +222,7 @@ function Inner() {
           />
           <MetricCard 
             label="COLLECTED MAINTENANCE" 
-            value={inr(totalCollection)} 
+            value={inr(collectedMaintenance)} 
             subText="RECEIVED TILL DATE" 
             icon={<CheckCircle2 className="h-5 w-5 text-green-500" />}
           />
