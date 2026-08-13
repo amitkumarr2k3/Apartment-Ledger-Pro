@@ -122,6 +122,17 @@ function Inner() {
     return acc + catSum;
   }, 0);
 
+  // Top 5 income sources (excluding maintenance, outstanding/liability, tax,
+  // and the internal rate-reference category) -- mirrors communityIncome's
+  // exclusion rules exactly so the two numbers always agree with each other.
+  const top5Income = safeIncomeTree
+    .filter((c) => !(isRateReference(c.name) || isMaintenance(c.name) || isLiability(c.name) || isTax(c.name)))
+    .map((c) => ({ name: c.name, total: total(sliceMonthly(categoryMonthly(c))) }))
+    .filter((c) => c.total > 0)
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 5);
+  const top5IncomeTotal = top5Income.reduce((s, c) => s + c.total, 0);
+
   // Top 5 Expenses for the chart/list
   const top5 = safeExpenseTree
     .map((c) => ({ name: c.name, total: total(sliceMonthly(categoryMonthly(c))) }))
@@ -319,11 +330,17 @@ function Inner() {
         icon={<ShieldCheck className="h-5 w-5 text-orange-600" />} 
         headerColor="bg-orange-50 border-orange-200"
       >
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <MetricCard 
             label="CORPUS WITH INTEREST (ACCUMULATED)" 
             value={corpusValue} 
             subText={`INCLUDES FIXED SINKING FUND TILL ${prevMonthLabel.toUpperCase()}`} 
+          />
+          <MetricCard 
+            label="Contigency Cash" 
+            value={inr(bankBalance)} 
+            subText="CURRENT CONTIGENCY OPERABLE CASH" 
+            icon={<Key className="h-5 w-5 text-pink-500" />}
           />
           <MetricCard 
             label="BANK BALANCE" 
@@ -358,7 +375,11 @@ function Inner() {
             <CardDescription>RD-02 · Click any expense category to drill down</CardDescription>
           </CardHeader>
           <CardContent className="flex-1 overflow-hidden">
-            {view === "chart" ? (
+            {top5.length === 0 ? (
+              <div className="text-sm text-muted-foreground">
+                {`No expense recorded for ${periodLabel}.`}
+              </div>
+            ) : view === "chart" ? (
               <ResponsiveContainer width="100%" height={chartHeight}>
                 <BarChart data={top5} layout="vertical" margin={{ left: 20 }}>
                   <CartesianGrid horizontal={false} strokeDasharray="3 3" opacity={0.3} />
@@ -407,19 +428,19 @@ function Inner() {
             <CardDescription>RD-05 · Click any income category to drill down</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 flex-1 overflow-hidden">
-            {top5.length === 0 ? (
+            {top5Income.length === 0 ? (
               <div className="text-sm text-muted-foreground">
                 {`No community income recorded for ${periodLabel}.`}
               </div>
             ) : view === "chart" ? (
               <ResponsiveContainer width="100%" height={chartHeight}>
-                <BarChart data={top5} layout="vertical" margin={{ left: 20 }}>
+                <BarChart data={top5Income} layout="vertical" margin={{ left: 20 }}>
                   <CartesianGrid horizontal={false} strokeDasharray="3 3" opacity={0.3} />
                   <XAxis type="number" tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} fontSize={11} />
                   <YAxis type="category" dataKey="name" width={110} fontSize={12} />
                   <Tooltip trigger={getTooltipTrigger()} cursor={{ fill: "var(--color-muted)", opacity: 0.35 }} content={<SmartTooltipContent labelPrefix="Income" valueFormatter={(v) => inr(v)} />} />
                   <Bar dataKey="total" radius={[0, 4, 4, 0]} className="cursor-pointer">
-                    {top5.map((income) => (
+                    {top5Income.map((income) => (
                       <Cell key={income.name} fill="var(--color-chart-2)"
                         onClick={() => {
                           window.location.href = `/resident/drilldown?head=income&category=${encodeURIComponent(income.name)}`;
@@ -430,7 +451,7 @@ function Inner() {
               </ResponsiveContainer>
             ) : (
               <ul className="divide-y divide-border max-h-[240px] overflow-y-auto">
-                {top5.map((income) => (
+                {top5Income.map((income) => (
                   <li key={income.name}>
                     <Link
                       to="/resident/drilldown"
@@ -439,7 +460,7 @@ function Inner() {
                     >
                       <div>
                         <div className="font-medium">{income.name}</div>
-                        <div className="text-xs text-muted-foreground">{((income.total / (communityIncome || 1)) * 100).toFixed(1)}% of top 5</div>
+                        <div className="text-xs text-muted-foreground">{((income.total / (top5IncomeTotal || 1)) * 100).toFixed(1)}% of top 5</div>
                       </div>
                       <div className="flex items-center gap-3">
                         <span className="text-sm font-mono">{inr(income.total)}</span>
