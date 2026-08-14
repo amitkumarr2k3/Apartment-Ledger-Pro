@@ -98,7 +98,9 @@ function Inner() {
             <CardDescription>RD-10 · Select a category to see vendor breakdown</CardDescription>
           </CardHeader>
           <CardContent className="divide-y divide-border">
-            {tree.map((c) => {
+            {[...tree]
+              .sort((a, b) => total(sliceMonthly(categoryMonthly(b))) - total(sliceMonthly(categoryMonthly(a))))
+              .map((c) => {
               const t = total(sliceMonthly(categoryMonthly(c)));
               return (
                 <button key={c.name} onClick={() => update({ category: c.name })} className="w-full flex items-center justify-between py-3 text-left hover:bg-accent/40 -mx-4 px-4 rounded">
@@ -124,7 +126,9 @@ function Inner() {
             <CardDescription>RD-11 · Click a vendor to see line items</CardDescription>
           </CardHeader>
           <CardContent className="divide-y divide-border">
-            {category.vendors.map((v) => {
+            {[...category.vendors]
+              .sort((a, b) => total(sliceMonthly(vendorMonthly(b))) - total(sliceMonthly(vendorMonthly(a))))
+              .map((v) => {
               const t = total(sliceMonthly(vendorMonthly(v)));
               return (
                 <button key={v.name} onClick={() => update({ vendor: v.name })} className="w-full flex items-center justify-between py-3 text-left hover:bg-accent/40 -mx-4 px-4 rounded">
@@ -171,7 +175,9 @@ function Inner() {
               <CardDescription>RD-12 · Absent months show as ₹0</CardDescription>
             </CardHeader>
             <CardContent className="divide-y divide-border">
-              {vendor.items.map((it) => {
+              {[...vendor.items]
+                .sort((a, b) => total(sliceMonthly(b.monthly)) - total(sliceMonthly(a.monthly)))
+                .map((it) => {
                 const sliced = sliceMonthly(it.monthly);
                 const t = total(sliced);
                 const activeMonths = sliced.filter((n) => n > 0).length;

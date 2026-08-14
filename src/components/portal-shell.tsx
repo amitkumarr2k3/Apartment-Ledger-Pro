@@ -11,7 +11,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import {
   CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator,
 } from "@/components/ui/command";
-import { Home, BarChart3, Table2, Menu, ChevronLeft, Printer, Download, LogOut, UserCircle2 } from "lucide-react";
+import { Home, BarChart3, Table2, Menu, ChevronLeft, LogOut, UserCircle2 } from "lucide-react";
 
 // ─── Period context ──────────────────────────────────────────────────────
 export type PeriodValue = "month-prev" | "range-3m" | "range-6m" | "range-12m" | "fy" | "fy-prev";
@@ -243,21 +243,6 @@ function SidebarNav({
   );
 }
 
-
-function downloadCSV(period: PeriodCtx, title: string) {
-  const rows = period.sliceMonthly(monthlyTotals);
-  const header = ["Month", "Collection (INR)", "Expense (INR)", "Net (INR)"];
-  const body = rows.map((r) => [r.month, r.collection, r.expense, r.net]);
-  const csv = [header, ...body].map((r) => r.join(",")).join("\n");
-  const blob = new Blob([csv], { type: "text/csv" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-  a.href = url;
-  a.download = `${slug}-${period.value}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
-}
 
 // ⌘K palette — jump to any screen, head, category, or vendor
 function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
@@ -527,22 +512,6 @@ export function PortalShell({
                   </ToggleGroupItem>
                 </ToggleGroup>
               )}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="outline" size="icon" className="hidden sm:inline-flex" aria-label="Export CSV" onClick={() => downloadCSV(periodCtx, title)}>
-                    <Download className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">Export monthly totals as CSV</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="outline" size="icon" className="hidden sm:inline-flex" aria-label="Print" onClick={() => window.print()}>
-                    <Printer className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">Print / save as PDF</TooltipContent>
-              </Tooltip>
             </div>
           </div>
           <div className="px-4 sm:hidden pb-3 space-y-2">
@@ -606,14 +575,6 @@ export function PortalShell({
                 ))}
               </SelectContent>
             </Select>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" className="flex-1" onClick={() => downloadCSV(periodCtx, title)}>
-                <Download className="h-3.5 w-3.5 mr-1" /> CSV
-              </Button>
-              <Button variant="outline" size="sm" className="flex-1" onClick={() => window.print()}>
-                <Printer className="h-3.5 w-3.5 mr-1" /> Print
-              </Button>
-            </div>
           </div>
           <nav className="hidden sm:flex px-4 sm:px-8 items-center gap-1 overflow-x-auto scrollbar-none" aria-label={`${persona} sections`}>
             {personaSections.map((section, si) => (

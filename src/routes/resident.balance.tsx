@@ -213,13 +213,7 @@ function Inner() {
           )}
         </CardContent>
       </Card>
-
-      {/* RD-41 note */}
-      <p className="text-xs text-muted-foreground">
-        RD-41 · Single-month view uses prior month's closing as opening. Switch the range picker to a single month to see this behaviour.
-      </p>
     </>
-
   );
 }
 
