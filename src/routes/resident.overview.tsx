@@ -11,7 +11,7 @@ import {
   inr, pct, categoryMonthly, total, vendorMonthly, sumMonthly,
 } from "@/lib/finance-mock";
 import { useMonthlyTotals, useExpenseTree, useIncomeTree } from "@/lib/hooks";
-import { Wallet, ArrowRight, TrendingUp, TrendingDown, Home, Banknote, ShieldCheck, CheckCircle2, AlertTriangle, ShoppingCart, PiggyBank, Landmark, Vault, HandCoins, CreditCard, Scale, Gauge, Target } from "lucide-react";
+import { Wallet, ArrowRight, TrendingUp, TrendingDown, Home, Banknote, ShieldCheck, CheckCircle2, AlertTriangle, ShoppingCart, PiggyBank, Vault, HandCoins, CreditCard, Scale, Gauge, Target } from "lucide-react";
 
 export const Route = createFileRoute("/resident/overview")({
   component: Page,
@@ -108,25 +108,6 @@ function Inner() {
   }, 0);
   
   /**
-   * GST LIABILITY CALCULATION
-   * Sum of all items in the income tree that match tax keywords.
-   */
-  const gstLiability = safeIncomeTree.reduce((acc, c) => {
-    const cTax = isTax(c.name);
-    const catSum = (c.vendors || []).reduce((vAcc, v) => {
-      const vTax = isTax(v.name);
-      const venSum = (v.items || []).reduce((iAcc, i) => {
-        if (cTax || vTax || isTax(i.name)) {
-          return iAcc + total(sliceMonthly(i.monthly || []));
-        }
-        return iAcc;
-      }, 0);
-      return vAcc + venSum;
-    }, 0);
-    return acc + catSum;
-  }, 0);
-
-  /**
    * OTHER INCOME (COMMUNITY INCOME)
    * Sum of all income that is NOT maintenance, NOT liability/arrears, and NOT tax.
    */
@@ -186,9 +167,30 @@ function Inner() {
   previousMonthDate.setMonth(previousMonthDate.getMonth() - 1);
   const prevMonthLabel = previousMonthDate.toLocaleString("en-US", { month: "short", year: "2-digit" }).replace(" ", "-");
 
-  // Mock values for the ones not in logic
-  const outstandingDuesMock = 300000;
-  const recoveryRate = 90;
+  /**
+   * OUTSTANDING DUES (period-filtered)
+   * Sum of all "Maintenance Outstanding"-style categories for the selected
+   * period. Feeds Recovery Rate below so the two figures can never disagree.
+   */
+  const outstandingDuesActual = safeIncomeTree
+    .filter((c) => isLiability(c.name))
+    .reduce((sum, c) => sum + total(sliceMonthly(categoryMonthly(c))), 0);
+
+  /**
+   * RECOVERY RATE
+   * % of total maintenance due (collected + still outstanding) actually
+   * collected for the selected period. Replaces the previous hardcoded 90%
+   * now that real collection + outstanding data exists.
+   */
+  const recoveryRate = (collectedMaintenance + outstandingDuesActual) > 0
+    ? (collectedMaintenance / (collectedMaintenance + outstandingDuesActual)) * 100
+    : 0;
+  const recoveryStatus =
+    recoveryRate >= 90
+      ? { text: "Healthy", color: "text-green-600", dot: "bg-green-500" }
+      : recoveryRate >= 75
+        ? { text: "Watch", color: "text-amber-600", dot: "bg-amber-500" }
+        : { text: "At Risk", color: "text-red-600", dot: "bg-red-500" };
   const corpusValue = "₹1,85,60,000";
   // BANK BALANCE = cumulative (Collection - Expense) across EVERY month ever
   // recorded, deliberately NOT sliced by the dashboard's period filter --
@@ -196,7 +198,7 @@ function Inner() {
   // Reference-only rows (rate cards) and "Maintenance Outstanding" (money
   // never actually collected/deposited) are excluded from the collection side.
   const allTimeCollection = safeIncomeTree
-    .filter((c) => !isAnyRateReference(c.name) && !isLiability(c.name))
+    .filter((c) => !isAnyRateReference(c.name) && !isLiability(c.name) && !isTax(c.name))
     .reduce((sum, c) => sum + total(categoryMonthly(c)), 0);
   const allTimeExpense = safeExpenseTree.reduce((sum, c) => sum + total(categoryMonthly(c)), 0);
   const bankBalance = allTimeCollection - allTimeExpense;
@@ -241,29 +243,16 @@ function Inner() {
           />
           <MetricCard 
             label="OUTSTANDING DUES" 
-            value={inr(outstandingDuesMock)} 
-            subText="PENDING DUES ACROSS ALL FLATS" 
+            value={inr(outstandingDuesActual)} 
+            subText={`PENDING DUES FOR ${periodLabel}`} 
             icon={<AlertTriangle className="h-5 w-5 text-red-500" />}
             valueClassName="text-red-700"
           />
           <MetricCard 
-            label="RECOVERY RATE" 
-            value={`${recoveryRate}%`} 
-            icon={<Gauge className="h-5 w-5 text-blue-500" />}
-            subText={
-              <div className="flex justify-between w-full mt-1">
-                <span className="text-green-600 font-medium">165 FLATS</span>
-                <span className="text-red-600 font-medium">35 FLAT DEFAULTERS</span>
-              </div>
-            }
-            footer={
-              <div className="w-full mt-2">
-                <div className="flex items-center gap-1 text-green-600 text-xs font-medium mb-1">
-                  <div className="h-2 w-2 rounded-full bg-green-500" /> Healthy
-                </div>
-                <Progress value={recoveryRate} className="h-1.5 bg-gray-100" />
-              </div>
-            }
+            label="OTHER INCOME" 
+            value={inr(communityIncome)} 
+            subText="RENT, PARKING, EVENTS, ETC." 
+            icon={<Wallet className="h-5 w-5 text-teal-500" />}
           />
         </div>
       </DashboardSection>
@@ -274,13 +263,7 @@ function Inner() {
         icon={<Banknote className="h-5 w-5 text-green-600" />} 
         headerColor="bg-green-50 border-green-200"
       >
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-          <MetricCard 
-            label="OTHER INCOME" 
-            value={inr(communityIncome)} 
-            subText="RENT, PARKING, EVENTS, ETC." 
-            icon={<Wallet className="h-5 w-5 text-teal-500" />}
-          />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
 			<MetricCard 
 			  label="TOTAL INCOME" 
 			  value={inr(totalIncome)} 
@@ -309,6 +292,20 @@ function Inner() {
               </div>
             }
           />
+          <MetricCard 
+            label="RECOVERY RATE" 
+            value={`${recoveryRate.toFixed(1)}%`} 
+            icon={<Gauge className="h-5 w-5 text-blue-500" />}
+            subText={`MAINTENANCE COLLECTED VS DUE FOR ${periodLabel}`}
+            footer={
+              <div className="w-full mt-2">
+                <div className={`flex items-center gap-1 text-xs font-medium mb-1 ${recoveryStatus.color}`}>
+                  <div className={`h-2 w-2 rounded-full ${recoveryStatus.dot}`} /> {recoveryStatus.text}
+                </div>
+                <Progress value={Math.min(recoveryRate, 100)} className="h-1.5 bg-gray-100" />
+              </div>
+            }
+          />
         </div>
       </DashboardSection>
 
@@ -324,6 +321,7 @@ function Inner() {
             value={corpusValue} 
             subText={`INCLUDES FIXED SINKING FUND TILL ${prevMonthLabel.toUpperCase()}`} 
             icon={<Vault className="h-5 w-5 text-orange-500" />}
+            fixed
           />
           <MetricCard 
             label="CONTINGENCY CASH" 
@@ -332,6 +330,7 @@ function Inner() {
             icon={<HandCoins className="h-5 w-5 text-pink-500" />}
             to="/resident/balance"
             hash="contingency-fund-chart"
+            fixed
             footer={
               <div className="mt-2 text-[9px] font-semibold text-pink-600 bg-pink-50 rounded px-2 py-1 leading-tight">
                 ⊆ Included within Bank Balance -- not additional funds
@@ -343,6 +342,7 @@ function Inner() {
             value={inr(bankBalance)} 
             subText="CUMULATIVE COLLECTION − EXPENSE · NOT FILTER-DEPENDENT" 
             icon={<CreditCard className="h-5 w-5 text-yellow-500" />}
+            fixed
             footer={
               <div className="w-full mt-2">
                 <div className="h-1.5 w-full rounded-full overflow-hidden flex bg-gray-100">
@@ -564,7 +564,7 @@ function DashboardSection({ title, icon, headerColor, children }: {
   );
 }
 
-function MetricCard({ label, value, subText, icon, footer, className, valueClassName, to, search, hash }: {
+function MetricCard({ label, value, subText, icon, footer, className, valueClassName, to, search, hash, fixed }: {
   label: string;
   value: string;
   subText: React.ReactNode;
@@ -578,13 +578,25 @@ function MetricCard({ label, value, subText, icon, footer, className, valueClass
   to?: string;
   search?: any;
   hash?: string;
+  // When true, visually marks this card as an ALL-TIME figure that does
+  // NOT respond to the dashboard's period filter (e.g. Bank Balance,
+  // Contingency Cash, Corpus) so it's obviously different at a glance from
+  // cards that do change with the selected duration.
+  fixed?: boolean;
 }) {
   const card = (
     <Card
-      className={`border-none shadow-none text-center flex flex-col items-center justify-center p-2 ${className || ""} ${
-        to ? "cursor-pointer hover:bg-accent/50 hover:shadow-sm transition-colors rounded-lg" : ""
+      className={`relative text-center flex flex-col items-center justify-center p-2 ${className || ""} ${
+        fixed ? "border border-dashed border-slate-300 bg-slate-50/60" : "border-none shadow-none"
+      } ${
+        to ? "cursor-pointer hover:bg-accent/50 hover:shadow-md transition-colors rounded-lg ring-1 ring-blue-100" : ""
       }`}
     >
+      {fixed && (
+        <div className="absolute top-1.5 left-1.5 text-[8px] font-bold uppercase tracking-wide text-slate-600 bg-slate-200 rounded px-1.5 py-0.5">
+          All-time
+        </div>
+      )}
       <CardHeader className="p-0 space-y-1 w-full">
         <div className="flex items-center justify-center gap-2 w-full relative">
           <div className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">{label}</div>
@@ -596,6 +608,11 @@ function MetricCard({ label, value, subText, icon, footer, className, valueClass
         <div className="text-[10px] text-gray-500 font-medium uppercase">{subText}</div>
         {footer}
       </CardContent>
+      {to && (
+        <div className="absolute bottom-1.5 right-1.5 h-5 w-5 rounded-full bg-blue-100 flex items-center justify-center">
+          <ArrowRight className="h-3 w-3 text-blue-600" />
+        </div>
+      )}
     </Card>
   );
 
