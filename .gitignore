@@ -30,6 +30,7 @@ ETL/output/transactions.xlsx
 ETL/processed/Expense-analysis*
 ETL/processed/Receipt-analysis*
 src/routes/resident.overview_*
+src/routes/Back/*
 
 # Editor directories and files
 .vscode/*

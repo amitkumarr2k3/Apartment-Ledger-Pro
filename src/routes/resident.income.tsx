@@ -65,15 +65,23 @@ function Inner() {
         .flatMap((c) => c.vendors.flatMap((v) => v.items.map((i) => i.monthly))),
     ),
   );
+  // Expected Collection target line -- same per-sqft rate x fixed area
+  // formula used by Overview\u2019s / Cashflow Health\u2019s Expected Collection.
+  const isMaintenanceRateReference = (name: string) => /maintenance rate reference/i.test(name || "");
+  const TOTAL_SQFT = 701591;
+  const rateCategory = incomeTree.find((c) => isMaintenanceRateReference(c.name));
+  const rateMonthly = rateCategory ? sliceMonthly(categoryMonthly(rateCategory)) : [];
   const monthlyMaintenanceData = labels.map((m, i) => {
     const collected = maintenanceMonthly[i] ?? 0;
     const outstanding = Math.max(0, outstandingMonthly[i] ?? 0);
     const totalMaintenance = collected + outstanding;
+    const expectedCollection = ((rateMonthly[i] ?? 0) / 100) * TOTAL_SQFT;
     return {
       month: m,
       collected,
       outstanding,
       totalMaintenance,
+      expectedCollection,
       recoveryPct: totalMaintenance > 0 ? +((collected / totalMaintenance) * 100).toFixed(1) : 0,
     };
   });
@@ -187,6 +195,7 @@ function Inner() {
                 <Legend />
                 <Bar yAxisId="amount" dataKey="collected" name="Maintenance collected" fill="var(--color-chart-2)" radius={[4, 4, 0, 0]} />
                 <Bar yAxisId="amount" dataKey="outstanding" name="Unpaid maintenance" fill="var(--color-chart-1)" radius={[4, 4, 0, 0]} />
+                <Line yAxisId="amount" type="monotone" dataKey="expectedCollection" name="Expected Collection" stroke="var(--color-chart-4, #a855f7)" strokeWidth={2} strokeDasharray="4 2" dot={false} />
                 <Line yAxisId="pct" type="monotone" dataKey="recoveryPct" name="Recovery %" stroke="var(--color-chart-3)" strokeWidth={2} dot={false} />
               </ComposedChart>
             </ResponsiveContainer>
@@ -198,6 +207,7 @@ function Inner() {
                     <tr>
                       <th className="text-left p-2">Month</th>
                       <th className="text-right p-2">Collected</th>
+                      <th className="text-right p-2">Expected</th>
                       <th className="text-right p-2">Outstanding</th>
                       <th className="text-right p-2">Recovery %</th>
                     </tr>
@@ -207,6 +217,7 @@ function Inner() {
                       <tr key={m.month} className="border-t border-border">
                         <td className="p-2">{m.month}</td>
                         <td className="p-2 text-right font-mono">{inr(m.collected)}</td>
+                        <td className="p-2 text-right font-mono">{inr(m.expectedCollection)}</td>
                         <td className="p-2 text-right font-mono">{inr(m.outstanding)}</td>
                         <td className="p-2 text-right font-mono">{m.recoveryPct.toFixed(1)}%</td>
                       </tr>

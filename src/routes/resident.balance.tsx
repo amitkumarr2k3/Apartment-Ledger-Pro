@@ -4,9 +4,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { inr } from "@/lib/finance-mock";
-import { useBalanceStrip, useMonthlyTotals } from "@/lib/hooks";
+import { Bar, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend } from "recharts";
+import { SmartTooltipContent, getTooltipTrigger } from "@/components/smart-tooltip";
+import { inr, categoryMonthly } from "@/lib/finance-mock";
+import { useBalanceStrip, useMonthlyTotals, useIncomeTree } from "@/lib/hooks";
 import { Info } from "lucide-react";
+
+const TOTAL_SQFT = 701591;
 
 export const Route = createFileRoute("/resident/balance")({
   component: Page,
@@ -25,6 +29,8 @@ function Inner() {
   const { sliceMonthly } = usePeriod();
   const { data: monthlyTotals = [] } = useMonthlyTotals();
   const { data: balanceStrip = { opening: 0, income: 0, expense: 0, net: 0, closing: 0 } } = useBalanceStrip();
+  const { data: incomeTree = [] } = useIncomeTree();
+  const safeIncomeTree = incomeTree || [];
   const period = sliceMonthly(monthlyTotals);
   // Opening at start of range = start balance + everything before this window
   const priorNet = monthlyTotals.slice(0, monthlyTotals.length - period.length)
@@ -42,6 +48,35 @@ function Inner() {
   const totalExpense = period.reduce((s, m) => s + m.expense, 0);
   const net = totalIncome - totalExpense;
   const closingBal = period.length ? rangeOpening + net : balanceStrip.closing;
+
+  // NEW INSIGHT: months of expense covered by the closing balance -- a
+  // simple "cash runway" indicator for a balance-focused page.
+  const avgMonthlyExpense = period.length ? totalExpense / period.length : 0;
+  const monthsCovered = avgMonthlyExpense > 0 ? closingBal / avgMonthlyExpense : null;
+
+  // NEW: Contingency Fund -- same business rule as Overview/Cashflow Health.
+  // Cumulative headline figure is deliberately NOT sliced by the period
+  // filter (always reflects the full history to date); the chart below it
+  // DOES respect the filter, same split as on the Overview dashboard.
+  const isContingencyRateReference = (name: string) => /contingency rate reference/i.test(name || "");
+  const contingencyCategory = safeIncomeTree.find((c) => isContingencyRateReference(c.name));
+  const contingencyFullMonthly = contingencyCategory ? categoryMonthly(contingencyCategory) : [];
+  const contingencyCash = contingencyFullMonthly.reduce(
+    (sum, storedVal) => sum + ((storedVal || 0) / 100) * TOTAL_SQFT,
+    0,
+  );
+  const contingencyMonthlySliced = contingencyCategory ? sliceMonthly(categoryMonthly(contingencyCategory)) : [];
+  let runningContingency = 0;
+  const contingencyRows = rows.map((r, i) => {
+    const contingencyThisMonth = ((contingencyMonthlySliced[i] ?? 0) / 100) * TOTAL_SQFT;
+    runningContingency += contingencyThisMonth;
+    return { month: r.month, contingency_fund: contingencyThisMonth, cumulative_contingency: runningContingency };
+  });
+
+  // Contingency Cash is a RING-FENCED PORTION of Closing Balance, not
+  // additional money on top of it -- drives the composition bar below.
+  const unrestrictedClosing = Math.max(0, closingBal - contingencyCash);
+  const contingencyShareOfClosing = closingBal > 0 ? Math.min(100, (contingencyCash / closingBal) * 100) : 0;
 
   return (
     <>
@@ -61,6 +96,36 @@ function Inner() {
             <StripCell label="Total expense" value={inr(totalExpense)} tone="rose" />
             <StripCell label="Net movement" value={inr(net)} tone={net >= 0 ? "emerald" : "rose"} />
             <StripCell label="Closing balance" value={inr(closingBal)} tone="cyan" />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+            <div className="rounded-md border border-border p-4">
+              <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Months of expense covered</div>
+              <div className="text-xl font-mono mt-1">{monthsCovered === null ? "N/A" : `${monthsCovered.toFixed(1)} months`}</div>
+              <div className="text-[10px] text-muted-foreground mt-1">Closing balance {'\u00f7'} average monthly expense for the selected range</div>
+            </div>
+            <div className="rounded-md border border-border p-4">
+              <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Contingency reserve within closing balance</div>
+              <div className="h-1.5 w-full rounded-full overflow-hidden flex bg-gray-100 mt-2">
+                <div
+                  className="h-full bg-pink-400"
+                  style={{ width: `${contingencyShareOfClosing}%` }}
+                  title={`Contingency reserve (ring-fenced): ${inr(contingencyCash)}`}
+                />
+                <div
+                  className="h-full bg-cyan-400"
+                  style={{ width: `${100 - contingencyShareOfClosing}%` }}
+                  title={`Unrestricted / freely usable: ${inr(unrestrictedClosing)}`}
+                />
+              </div>
+              <div className="flex items-center justify-between w-full mt-1 text-[9px] text-gray-500 leading-tight">
+                <span>● <span className="text-pink-500 font-medium">Contingency</span> {inr(contingencyCash)}</span>
+                <span><span className="text-cyan-600 font-medium">Unrestricted</span> {inr(unrestrictedClosing)} ●</span>
+              </div>
+              <div className="mt-2 text-[9px] font-semibold text-pink-600 bg-pink-50 rounded px-2 py-1 leading-tight">
+                ⊆ Contingency Cash is part of Closing Balance -- not additional funds
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -119,6 +184,33 @@ function Inner() {
               ))}
             </TableBody>
           </Table>
+        </CardContent>
+      </Card>
+
+      {/* Monthly contingency fund collection -- moved here from Overview,
+          since this is fundamentally a rolling-reserve/balance story, same
+          shape of insight as the continuity table above. */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Monthly contingency fund collection</CardTitle>
+          <CardDescription>Contingency portion of the maintenance charge, collected per month for the selected range. {'\u2286'} Part of Closing Balance above -- not additional funds.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {contingencyCategory == null ? (
+            <p className="text-sm text-muted-foreground">No contingency rate has been uploaded yet for this range.</p>
+          ) : (
+            <ResponsiveContainer width="100%" height={260}>
+              <ComposedChart data={contingencyRows} margin={{ left: 8, right: 8 }}>
+                <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                <XAxis dataKey="month" fontSize={11} />
+                <YAxis tickFormatter={(v) => `\u20B9${(v / 1000).toFixed(0)}k`} fontSize={11} />
+                <Tooltip trigger={getTooltipTrigger()} cursor={{ fill: "var(--color-muted)", opacity: 0.35 }} content={<SmartTooltipContent labelPrefix="Month" valueFormatter={(v) => inr(v)} />} />
+                <Legend />
+                <Bar dataKey="contingency_fund" fill="var(--color-chart-2)" radius={[4, 4, 0, 0]} name="Contingency Collected" />
+                <Line type="monotone" dataKey="cumulative_contingency" stroke="var(--color-chart-4, #a855f7)" strokeWidth={2} name="Cumulative Reserve" />
+              </ComposedChart>
+            </ResponsiveContainer>
+          )}
         </CardContent>
       </Card>
 

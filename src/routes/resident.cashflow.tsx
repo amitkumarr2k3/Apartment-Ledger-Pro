@@ -2,50 +2,146 @@ import { createFileRoute } from "@tanstack/react-router";
 import { PortalShell, usePeriod } from "@/components/portal-shell";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Tooltip, Bar, CartesianGrid, ComposedChart, Line, ResponsiveContainer, XAxis, YAxis, Legend } from "recharts";
+import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { SmartTooltipContent, getTooltipTrigger } from "@/components/smart-tooltip";
-import { inr } from "@/lib/finance-mock";
-import { useMonthlyTotals } from "@/lib/hooks";
-import { Info, TrendingDown, TrendingUp } from "lucide-react";
+import { inr, categoryMonthly } from "@/lib/finance-mock";
+import { useMonthlyTotals, useIncomeTree } from "@/lib/hooks";
+import { Info, TrendingDown, TrendingUp, Award, AlertOctagon } from "lucide-react";
 
 export const Route = createFileRoute("/resident/cashflow")({
   component: Page,
-  head: () => ({ meta: [{ title: "Resident · Cashflow Health" }] }),
+  head: () => ({ meta: [{ title: "Resident \u00B7 Cashflow Health" }] }),
 });
 
 function Page() {
   return (
-    <PortalShell title="Community cashflow health" reqIds="RD-20 · RD-21 · RD-22 · RD-23" persona="resident">
+    <PortalShell title="Community cashflow health" reqIds="RD-20 \u00B7 RD-21 \u00B7 RD-22 \u00B7 RD-23" persona="resident">
       <Inner />
     </PortalShell>
   );
 }
 
+const TOTAL_SQFT = 701591;
+
 function Inner() {
-  const { sliceMonthly, view } = usePeriod();
+  const { sliceMonthly, view, labels = [] } = usePeriod();
   const { data: monthlyTotals = [] } = useMonthlyTotals();
+  const { data: incomeTree = [] } = useIncomeTree();
+  const safeIncomeTree = incomeTree || [];
   const period = sliceMonthly(monthlyTotals);
 
-  const totalCol = period.reduce((s, m) => s + m.collection, 0);
-  const totalExp = period.reduce((s, m) => s + m.expense, 0);
+  // ---- Same business rules as Overview -- kept in sync so every dashboard
+  // agrees on what counts as real income, on purpose. ----
+  const isTax = (s: string) => /tax|gst|cgst|sgst/i.test(s || "");
+  const isMaintenanceLoose = (s: string) => /maintenance/i.test(s || "") && !/outstanding|arrears|default/i.test(s || "");
+  const isLiability = (s: string) => /outstanding|arrears|default/i.test(s || "");
+  const isMaintenanceChargeExact = (s: string) => (s || "").trim().toLowerCase() === "maintenance charge";
+  const isMaintenanceRateReference = (s: string) => /maintenance rate reference/i.test(s || "");
+  const isContingencyRateReference = (s: string) => /contingency rate reference/i.test(s || "");
+  const isAnyRateReference = (s: string) => isMaintenanceRateReference(s) || isContingencyRateReference(s);
+
+  // Actual Collection = ONLY the "Maintenance Charge" line item (mirrors
+  // Overview\u2019s Collected Maintenance card exactly).
+  const maintenanceChargeRawMonthly = safeIncomeTree.reduce<number[]>((acc, c) => {
+    const catHit = isMaintenanceChargeExact(c.name);
+    (c.vendors || []).forEach((v) => {
+      const vHit = isMaintenanceChargeExact(v.name);
+      (v.items || []).forEach((i) => {
+        if (catHit || vHit || isMaintenanceChargeExact(i.name)) {
+          const monthly = i.monthly || [];
+          acc = acc.length === 0 ? [...monthly] : acc.map((val, idx) => val + (monthly[idx] ?? 0));
+        }
+      });
+    });
+    return acc;
+  }, []);
+  const actualCollectionByMonth = sliceMonthly(maintenanceChargeRawMonthly);
+
+  // Other reportable income: excludes maintenance, outstanding/arrears, tax,
+  // and the internal rate-reference categories -- NOT the raw
+  // mv_monthly_totals collection figure, which still silently includes
+  // Tax/GST and Maintenance Outstanding at the database level.
+  const otherIncomeByMonth = sliceMonthly(
+    safeIncomeTree
+      .filter((c) => !(isMaintenanceLoose(c.name) || isLiability(c.name) || isTax(c.name) || isAnyRateReference(c.name)))
+      .reduce<number[]>((acc, c) => {
+        const monthly = categoryMonthly(c);
+        return acc.length === 0 ? monthly : acc.map((v, i) => v + (monthly[i] ?? 0));
+      }, []),
+  );
+
+  const outstandingByMonth = sliceMonthly(
+    safeIncomeTree
+      .filter((c) => isLiability(c.name))
+      .reduce<number[]>((acc, c) => {
+        const monthly = categoryMonthly(c);
+        return acc.length === 0 ? monthly : acc.map((v, i) => v + (monthly[i] ?? 0));
+      }, []),
+  );
+
+  // Expected Collection = per-sqft rate x fixed area (same Rate Reference
+  // data source as Overview\u2019s Expected Collection card).
+  const rateCategory = safeIncomeTree.find((c) => isMaintenanceRateReference(c.name));
+  const rateMonthly = rateCategory ? sliceMonthly(categoryMonthly(rateCategory)) : [];
+
+  const periodMonthlyTotals = new Map(period.map((m) => [m.month, m]));
+  let runningOutstanding = 0;
+  const monthlyTrend = (labels || []).map((month, i) => {
+    const monthlyTotal = periodMonthlyTotals.get(month);
+    const actualCollection = actualCollectionByMonth[i] ?? 0;
+    const otherIncome = otherIncomeByMonth[i] ?? 0;
+    const totalIncomeThisMonth = actualCollection + otherIncome;
+    const outstanding = Math.max(0, outstandingByMonth[i] ?? 0);
+    const expectedCollectionThisMonth = ((rateMonthly[i] ?? 0) / 100) * TOTAL_SQFT;
+    runningOutstanding += outstanding;
+    return {
+      month,
+      actual_collection: actualCollection,
+      expected_collection: expectedCollectionThisMonth,
+      other_income: otherIncome,
+      total_income: totalIncomeThisMonth,
+      expense: monthlyTotal?.expense ?? 0,
+      outstanding,
+      cumulative_outstanding: runningOutstanding,
+      net: totalIncomeThisMonth - (monthlyTotal?.expense ?? 0),
+    };
+  });
+
+  // ---- Clean, consistent totals (replaces the old raw mv_monthly_totals
+  // "collection" figure, which used to silently include Tax/GST and
+  // Maintenance Outstanding). ----
+  const totalIncomeClean = monthlyTrend.reduce((s, m) => s + m.total_income, 0);
+  const totalExpenseClean = monthlyTrend.reduce((s, m) => s + m.expense, 0);
+  const totalExpectedClean = monthlyTrend.reduce((s, m) => s + m.expected_collection, 0);
+  const totalActualClean = monthlyTrend.reduce((s, m) => s + m.actual_collection, 0);
+
   // % of collected income that has been spent
-  const ratio = totalCol === 0 ? 0 : (totalExp / totalCol) * 100;
-  const surplus = period.filter((m) => m.net >= 0).length;
-  const deficit = period.length - surplus;
+  const ratio = totalIncomeClean === 0 ? 0 : (totalExpenseClean / totalIncomeClean) * 100;
+  const surplus = monthlyTrend.filter((m) => m.net >= 0).length;
+  const deficit = monthlyTrend.length - surplus;
+
+  // NEW INSIGHT: Expected vs Actual maintenance collection variance
+  const collectionVariancePct = totalExpectedClean === 0
+    ? 0
+    : ((totalActualClean - totalExpectedClean) / totalExpectedClean) * 100;
+
+  // NEW INSIGHT: best / worst month by net (total income - expense)
+  const bestMonth = monthlyTrend.length ? monthlyTrend.reduce((a, b) => (b.net > a.net ? b : a)) : null;
+  const worstMonth = monthlyTrend.length ? monthlyTrend.reduce((a, b) => (b.net < a.net ? b : a)) : null;
 
   return (
     <>
 
       <Alert>
         <Info className="h-4 w-4" />
-        <AlertDescription>RD-23 · Aggregate community-level view only. No individual flat-wise tracking.</AlertDescription>
+        <AlertDescription>RD-23 \u00B7 Aggregate community-level view only. No individual flat-wise tracking.</AlertDescription>
       </Alert>
 
       <div className="grid gap-4 md:grid-cols-3">
         {/* RD-20 */}
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription className="text-xs uppercase tracking-wider">Expense / Income · RD-20</CardDescription>
+            <CardDescription className="text-xs uppercase tracking-wider">Expense / Income \u00B7 RD-20</CardDescription>
             <CardTitle className="text-4xl font-mono">{ratio.toFixed(0)}%</CardTitle>
           </CardHeader>
           <CardContent>
@@ -58,16 +154,16 @@ function Inner() {
         {/* RD-22 */}
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription className="text-xs uppercase tracking-wider">Surplus months · RD-22</CardDescription>
+            <CardDescription className="text-xs uppercase tracking-wider">Surplus months \u00B7 RD-22</CardDescription>
             <CardTitle className="text-4xl font-mono text-emerald-600">{surplus}</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-xs text-muted-foreground">out of {period.length} months in selected range</p>
+            <p className="text-xs text-muted-foreground">out of {monthlyTrend.length} months in selected range</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription className="text-xs uppercase tracking-wider">Deficit months · RD-22</CardDescription>
+            <CardDescription className="text-xs uppercase tracking-wider">Deficit months \u00B7 RD-22</CardDescription>
             <CardTitle className="text-4xl font-mono text-rose-600">{deficit}</CardTitle>
           </CardHeader>
           <CardContent>
@@ -76,25 +172,65 @@ function Inner() {
         </Card>
       </div>
 
-      {/* RD-21 */}
+      {/* NEW INSIGHTS: Expected-vs-Actual variance + best/worst month callouts */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription className="text-xs uppercase tracking-wider">Collection performance vs target</CardDescription>
+            <CardTitle className={`text-3xl font-mono ${collectionVariancePct >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
+              {collectionVariancePct >= 0 ? "+" : ""}{collectionVariancePct.toFixed(1)}%
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-xs text-muted-foreground">
+              Actual maintenance collected ({inr(totalActualClean)}) vs the expected target ({inr(totalExpectedClean)}) based on the per-sqft rate.
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription className="text-xs uppercase tracking-wider">Best &amp; worst month (net)</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {bestMonth && (
+              <div className="flex items-center justify-between text-sm">
+                <span className="flex items-center gap-1 text-emerald-600"><Award className="h-4 w-4" /> {bestMonth.month}</span>
+                <span className="font-mono">{inr(bestMonth.net)}</span>
+              </div>
+            )}
+            {worstMonth && (
+              <div className="flex items-center justify-between text-sm">
+                <span className="flex items-center gap-1 text-rose-600"><AlertOctagon className="h-4 w-4" /> {worstMonth.month}</span>
+                <span className="font-mono">{inr(worstMonth.net)}</span>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* RD-21 -- moved from Overview: strictly richer than the old bar chart
+          it replaces (adds Expected Collection target + cumulative outstanding
+          risk signal, and fixes the Tax/GST contamination that previously
+          existed in the raw "collection" figure this page used to show). */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Collection vs Expense · month-wise</CardTitle>
-          <CardDescription>RD-21 · Community-level totals</CardDescription>
+          <CardTitle className="text-base">Monthly trend \u00B7 actual vs expected collection, expense &amp; outstanding</CardTitle>
+          <CardDescription>RD-21 \u00B7 Moved from Overview \u00B7 Includes cumulative outstanding signal</CardDescription>
         </CardHeader>
         <CardContent>
           {view === "chart" ? (
             <ResponsiveContainer width="100%" height={320}>
-              <ComposedChart data={period}>
+              <LineChart data={monthlyTrend} margin={{ left: 8, right: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                 <XAxis dataKey="month" fontSize={11} />
-                <YAxis tickFormatter={(v) => `₹${(v/1000).toFixed(0)}k`} fontSize={11} />
+                <YAxis tickFormatter={(v) => `\u20B9${(v / 1000).toFixed(0)}k`} fontSize={11} />
                 <Tooltip trigger={getTooltipTrigger()} cursor={{ fill: "var(--color-muted)", opacity: 0.35 }} content={<SmartTooltipContent labelPrefix="Month" valueFormatter={(v) => inr(v)} />} />
                 <Legend />
-                <Bar dataKey="collection" fill="var(--color-chart-2)" name="Collection" radius={[4,4,0,0]} />
-                <Bar dataKey="expense" fill="var(--color-chart-1)" name="Expense" radius={[4,4,0,0]} />
-                <Line type="monotone" dataKey="net" stroke="var(--color-chart-4)" strokeWidth={2} name="Net" />
-              </ComposedChart>
+                <Line type="monotone" dataKey="actual_collection" stroke="var(--color-chart-2)" strokeWidth={2} name="Actual Collection" />
+                <Line type="monotone" dataKey="expected_collection" stroke="var(--color-chart-4, #a855f7)" strokeWidth={2} strokeDasharray="4 2" name="Expected Collection" />
+                <Line type="monotone" dataKey="expense" stroke="var(--color-chart-1)" strokeWidth={2} name="Expense" />
+                <Line type="monotone" dataKey="cumulative_outstanding" stroke="var(--color-chart-3)" strokeWidth={2} name="Cumulative outstanding" />
+              </LineChart>
             </ResponsiveContainer>
           ) : (
             <div className="rounded-md border border-border overflow-hidden">
@@ -102,18 +238,22 @@ function Inner() {
                 <thead className="bg-muted/40">
                   <tr>
                     <th className="text-left p-2">Month</th>
-                    <th className="text-right p-2">Collection</th>
+                    <th className="text-right p-2">Actual Collection</th>
+                    <th className="text-right p-2">Expected Collection</th>
                     <th className="text-right p-2">Expense</th>
-                    <th className="text-right p-2">Net</th>
+                    <th className="text-right p-2">Outstanding</th>
+                    <th className="text-right p-2">Cumulative</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {period.map((m) => (
+                  {monthlyTrend.map((m) => (
                     <tr key={m.month} className="border-t border-border">
                       <td className="p-2">{m.month}</td>
-                      <td className="p-2 text-right font-mono">{inr(m.collection)}</td>
+                      <td className="p-2 text-right font-mono">{inr(m.actual_collection)}</td>
+                      <td className="p-2 text-right font-mono">{inr(m.expected_collection)}</td>
                       <td className="p-2 text-right font-mono">{inr(m.expense)}</td>
-                      <td className="p-2 text-right font-mono">{inr(m.net)}</td>
+                      <td className="p-2 text-right font-mono">{inr(m.outstanding)}</td>
+                      <td className="p-2 text-right font-mono">{inr(m.cumulative_outstanding)}</td>
                     </tr>
                   ))}
                 </tbody>

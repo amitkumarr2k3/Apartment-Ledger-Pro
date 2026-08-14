@@ -4,14 +4,13 @@ import { PortalShell, usePeriod } from "@/components/portal-shell";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import {
-  Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend, Cell,
+  Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell,
 } from "recharts";
 import { SmartTooltipContent, getTooltipTrigger } from "@/components/smart-tooltip";
 import {
   inr, pct, categoryMonthly, total, vendorMonthly, sumMonthly,
 } from "@/lib/finance-mock";
 import { useMonthlyTotals, useExpenseTree, useIncomeTree } from "@/lib/hooks";
-import { filterReportableIncomeCategories } from "@/lib/income-utils";
 import { Wallet, ArrowRight, TrendingUp, TrendingDown, Home, Banknote, ShieldCheck, CheckCircle2, AlertTriangle, ShoppingCart, PiggyBank, Landmark, Vault, HandCoins, CreditCard, Scale, Gauge, Target } from "lucide-react";
 
 export const Route = createFileRoute("/resident/overview")({
@@ -28,7 +27,7 @@ function Page() {
 }
 
 function Inner() {
-  const { sliceMonthly, priorSliceMonthly, view, labels = [] } = usePeriod();
+  const { sliceMonthly, view } = usePeriod();
   const { data: monthlyTotals = [] } = useMonthlyTotals();
   const { data: expenseTree = [] } = useExpenseTree();
   const { data: incomeTree = [] } = useIncomeTree();
@@ -37,9 +36,7 @@ function Inner() {
   const safeExpenseTree = expenseTree || [];
   const safeMonthlyTotals = monthlyTotals || [];
 
-  const reportableIncomeTree = filterReportableIncomeCategories(safeIncomeTree);
   const period = sliceMonthly(safeMonthlyTotals);
-  const prior = priorSliceMonthly(safeMonthlyTotals);
   
   const totalExpense = period.reduce((s, m) => s + (m.expense || 0), 0);
 
@@ -55,12 +52,37 @@ function Inner() {
   const isMaintenanceChargeExact = (s: string) => (s || "").trim().toLowerCase() === "maintenance charge";
 
   const TOTAL_SQFT = 701591;
-  const isRateReference = (name: string) => /rate reference/i.test(name || "");
+  // Specific matchers (must not collide with each other -- both category
+  // names happen to contain the substring "rate reference").
+  const isMaintenanceRateReference = (name: string) => /maintenance rate reference/i.test(name || "");
+  const isContingencyRateReference = (name: string) => /contingency rate reference/i.test(name || "");
+  const isAnyRateReference = (name: string) => isMaintenanceRateReference(name) || isContingencyRateReference(name);
   // pull the rate category out of the tree, sliced to the selected period
-  const rateCategory = safeIncomeTree.find((c) => isRateReference(c.name));
+  const rateCategory = safeIncomeTree.find((c) => isMaintenanceRateReference(c.name));
   const rateMonthly = rateCategory ? sliceMonthly(categoryMonthly(rateCategory)) : [];
   // each stored value is (rate * 100); divide back, then multiply by fixed area, summed per selected period
   const expectedCollection = rateMonthly.reduce((sum, storedVal) => sum + (storedVal / 100) * TOTAL_SQFT, 0);
+
+  /**
+   * CONTINGENCY FUND
+   * The contingency portion is a slice of the same per-sqft maintenance
+   * charge (e.g. Rs 0.25 of the Rs 4/sqft), defined month-by-month purely
+   * via CSV upload (head=reference, category="Contingency Rate Reference") --
+   * no code change needed to update the portion for a new month.
+   */
+  const contingencyCategory = safeIncomeTree.find((c) => isContingencyRateReference(c.name));
+  // Full, UNSLICED 12-month series -- the headline "Contingency Cash" figure
+  // intentionally ignores whatever period filter is selected on the
+  // dashboard and always reflects the latest maintenance-collection cycle
+  // month for which a rate has been defined.
+  const contingencyFullMonthly = contingencyCategory ? categoryMonthly(contingencyCategory) : [];
+  // Cumulative across EVERY month recorded so far, deliberately NOT sliced by
+  // the dashboard's period filter -- this is the running contingency reserve
+  // built up since inception, not a single month's contribution.
+  const contingencyCash = contingencyFullMonthly.reduce(
+    (sum, storedVal) => sum + ((storedVal || 0) / 100) * TOTAL_SQFT,
+    0,
+  );
 
   /**
    * COLLECTED MAINTENANCE
@@ -109,7 +131,7 @@ function Inner() {
    * Sum of all income that is NOT maintenance, NOT liability/arrears, and NOT tax.
    */
   const communityIncome = safeIncomeTree.reduce((acc, c) => {
-    if (isRateReference(c.name) || isMaintenance(c.name) || isLiability(c.name) || isTax(c.name)) return acc;
+    if (isAnyRateReference(c.name) || isMaintenance(c.name) || isLiability(c.name) || isTax(c.name)) return acc;
     
     const catSum = (c.vendors || []).reduce((vAcc, v) => {
       if (isTax(v.name)) return vAcc;
@@ -126,7 +148,7 @@ function Inner() {
   // and the internal rate-reference category) -- mirrors communityIncome's
   // exclusion rules exactly so the two numbers always agree with each other.
   const top5Income = safeIncomeTree
-    .filter((c) => !(isRateReference(c.name) || isMaintenance(c.name) || isLiability(c.name) || isTax(c.name)))
+    .filter((c) => !(isAnyRateReference(c.name) || isMaintenance(c.name) || isLiability(c.name) || isTax(c.name)))
     .map((c) => ({ name: c.name, total: total(sliceMonthly(categoryMonthly(c))) }))
     .filter((c) => c.total > 0)
     .sort((a, b) => b.total - a.total)
@@ -151,60 +173,6 @@ function Inner() {
     .slice(0, 5);
   const top5VendorTotal = top5Vendors.reduce((s, v) => s + v.total, 0);
 
-  // Maintenance Trend Logic
-  // Deep-scan category -> vendor -> line_item for an EXACT match on
-  // "Maintenance Charge" (same rule as collectedMaintenance above). The
-  // category itself is named "Maintenance Collection" and the vendor is
-  // "Apartment Owners" -- only the line_item is literally "Maintenance
-  // Charge" -- so this must check all three levels, not just c.name.
-  const maintenanceChargeRawMonthly = safeIncomeTree.reduce<number[]>((acc, c) => {
-    const catHit = isMaintenanceChargeExact(c.name);
-    (c.vendors || []).forEach((v) => {
-      const vHit = isMaintenanceChargeExact(v.name);
-      (v.items || []).forEach((i) => {
-        if (catHit || vHit || isMaintenanceChargeExact(i.name)) {
-          const monthly = i.monthly || [];
-          acc = acc.length === 0 ? [...monthly] : acc.map((val, idx) => val + (monthly[idx] ?? 0));
-        }
-      });
-    });
-    return acc;
-  }, []);
-  const maintenanceIncomeByMonth = sliceMonthly(maintenanceChargeRawMonthly);
-  const outstandingIncomeByMonth = sliceMonthly(
-    safeIncomeTree
-      .filter((c) => isLiability(c.name))
-      .reduce<number[]>((acc, c) => {
-        const monthly = categoryMonthly(c);
-        return acc.length === 0 ? monthly : acc.map((v, i) => v + (monthly[i] ?? 0));
-      }, []),
-  );
-  
-  // Monthly Trend Data
-  // "Actual Collection" on this chart must mirror the Collected Maintenance
-  // card exactly -- i.e. ONLY the "Maintenance Charge" line item, not the
-  // broader "reportable income" total. "Expected Collection" is the same
-  // rate x total-sqft formula used by the Expected Collection card above,
-  // computed per month so it can be plotted as its own trend line.
-  const periodMonthlyTotals = new Map(period.map((m) => [m.month, m]));
-  let runningOutstanding = 0;
-  const monthlyWithOutstanding = (labels || []).map((month, i) => {
-    const monthlyTotal = periodMonthlyTotals.get(month);
-    const collected = maintenanceIncomeByMonth[i] ?? 0;
-    const outstanding = Math.max(0, outstandingIncomeByMonth[i] ?? 0);
-    const expectedThisMonth = ((rateMonthly[i] ?? 0) / 100) * TOTAL_SQFT;
-    runningOutstanding += outstanding;
-    return {
-      month,
-      actual_collection: collected,
-      expected_collection: expectedThisMonth,
-      expense: monthlyTotal?.expense ?? 0,
-      net: monthlyTotal?.net ?? 0,
-      outstanding,
-      cumulative_outstanding: runningOutstanding,
-      maintenance_collected: collected,
-    };
-  });
   
   const periodLabel = period.length > 1
     ? `${period[0].month} to ${period[period.length - 1].month}`
@@ -222,10 +190,21 @@ function Inner() {
   const outstandingDuesMock = 300000;
   const recoveryRate = 90;
   const corpusValue = "₹1,85,60,000";
-  const bankBalance = 4250000;
-  // Distinct from bankBalance on purpose -- Contingency Cash is a separate
-  // reserve set aside for emergencies, not the day-to-day operable balance.
-  const contingencyCash = 1500000;
+  // BANK BALANCE = cumulative (Collection - Expense) across EVERY month ever
+  // recorded, deliberately NOT sliced by the dashboard's period filter --
+  // this represents the actual liquid cash on hand today, not a period flow.
+  // Reference-only rows (rate cards) and "Maintenance Outstanding" (money
+  // never actually collected/deposited) are excluded from the collection side.
+  const allTimeCollection = safeIncomeTree
+    .filter((c) => !isAnyRateReference(c.name) && !isLiability(c.name))
+    .reduce((sum, c) => sum + total(categoryMonthly(c)), 0);
+  const allTimeExpense = safeExpenseTree.reduce((sum, c) => sum + total(categoryMonthly(c)), 0);
+  const bankBalance = allTimeCollection - allTimeExpense;
+  // Contingency Cash is a RING-FENCED PORTION of Bank Balance, not additional
+  // money on top of it. These two values drive the composition bar on the
+  // Bank Balance card so that relationship is visually unmistakable.
+  const unrestrictedCash = Math.max(0, bankBalance - contingencyCash);
+  const contingencyShareOfBank = bankBalance > 0 ? Math.min(100, (contingencyCash / bankBalance) * 100) : 0;
   
   // Final Financial Metrics
   const totalIncome = collectedMaintenance + communityIncome;
@@ -356,14 +335,39 @@ function Inner() {
           <MetricCard 
             label="CONTINGENCY CASH" 
             value={inr(contingencyCash)} 
-            subText="RESERVE SET ASIDE FOR EMERGENCIES" 
+            subText="CUMULATIVE RESERVE · NOT FILTER-DEPENDENT" 
             icon={<HandCoins className="h-5 w-5 text-pink-500" />}
+            footer={
+              <div className="mt-2 text-[9px] font-semibold text-pink-600 bg-pink-50 rounded px-2 py-1 leading-tight">
+                ⊆ Included within Bank Balance -- not additional funds
+              </div>
+            }
           />
           <MetricCard 
             label="BANK BALANCE" 
             value={inr(bankBalance)} 
-            subText="CURRENT LIQUID OPERABLE CASH" 
+            subText="CUMULATIVE COLLECTION − EXPENSE · NOT FILTER-DEPENDENT" 
             icon={<CreditCard className="h-5 w-5 text-yellow-500" />}
+            footer={
+              <div className="w-full mt-2">
+                <div className="h-1.5 w-full rounded-full overflow-hidden flex bg-gray-100">
+                  <div
+                    className="h-full bg-pink-400"
+                    style={{ width: `${contingencyShareOfBank}%` }}
+                    title={`Contingency reserve (ring-fenced): ${inr(contingencyCash)}`}
+                  />
+                  <div
+                    className="h-full bg-yellow-400"
+                    style={{ width: `${100 - contingencyShareOfBank}%` }}
+                    title={`Unrestricted / freely usable: ${inr(unrestrictedCash)}`}
+                  />
+                </div>
+                <div className="flex items-center justify-between w-full mt-1 text-[9px] text-gray-500 leading-tight">
+                  <span>● <span className="text-pink-500 font-medium">Contingency</span> {inr(contingencyCash)}</span>
+                  <span><span className="text-yellow-600 font-medium">Unrestricted</span> {inr(unrestrictedCash)} ●</span>
+                </div>
+              </div>
+            }
           />
           <MetricCard 
             label="EXPENSE / INCOME RATIO" 
@@ -542,60 +546,6 @@ function Inner() {
           </CardContent>
         </Card>
       </div>
-
-      {/* RD-03 trend */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Monthly trend · actual vs expected collection, expense &amp; outstanding</CardTitle>
-          <CardDescription>RD-03 · Includes cumulative outstanding signal</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {view === "chart" ? (
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={monthlyWithOutstanding} margin={{ left: 8, right: 8 }}>
-                <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                <XAxis dataKey="month" fontSize={11} />
-                <YAxis tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} fontSize={11} />
-                <Tooltip trigger={getTooltipTrigger()} cursor={{ fill: "var(--color-muted)", opacity: 0.35 }} content={<SmartTooltipContent labelPrefix="Month" valueFormatter={(v) => inr(v)} />} />
-                <Legend />
-                <Line type="monotone" dataKey="actual_collection" stroke="var(--color-chart-2)" strokeWidth={2} name="Actual Collection" />
-                <Line type="monotone" dataKey="expected_collection" stroke="var(--color-chart-4, #a855f7)" strokeWidth={2} strokeDasharray="4 2" name="Expected Collection" />
-                <Line type="monotone" dataKey="expense" stroke="var(--color-chart-1)" strokeWidth={2} name="Expense" />
-                <Line type="monotone" dataKey="cumulative_outstanding" stroke="var(--color-chart-3)" strokeWidth={2} name="Cumulative outstanding" />
-              </LineChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="space-y-3">
-              <div className="rounded-md border border-border overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/40">
-                    <tr>
-                      <th className="text-left p-2">Month</th>
-                      <th className="text-right p-2">Actual Collection</th>
-                      <th className="text-right p-2">Expected Collection</th>
-                      <th className="text-right p-2">Expense</th>
-                      <th className="text-right p-2">Outstanding</th>
-                      <th className="text-right p-2">Cumulative</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {monthlyWithOutstanding.map((m) => (
-                      <tr key={m.month} className="border-t border-border">
-                        <td className="p-2">{m.month}</td>
-                        <td className="p-2 text-right font-mono">{inr(m.actual_collection)}</td>
-                        <td className="p-2 text-right font-mono">{inr(m.expected_collection)}</td>
-                        <td className="p-2 text-right font-mono">{inr(m.expense)}</td>
-                        <td className="p-2 text-right font-mono">{inr(m.outstanding)}</td>
-                        <td className="p-2 text-right font-mono">{inr(m.cumulative_outstanding)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
     </div>
   );
 }
