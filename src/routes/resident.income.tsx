@@ -94,7 +94,7 @@ function Inner() {
 
   return (
     <>
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid gap-4 lg:grid-cols-3 items-start">
         {/* RD-30 */}
         <Card className="lg:col-span-2">
           <CardHeader>
@@ -189,7 +189,7 @@ function Inner() {
               <ComposedChart data={monthlyMaintenanceData}>
                 <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                 <XAxis dataKey="month" fontSize={11} />
-                <YAxis yAxisId="amount" tickFormatter={(v) => `$₹{(v / 1000).toFixed(0)}k`} fontSize={11} />
+                <YAxis yAxisId="amount" tickFormatter={(v) => "₹" + (v / 1000).toFixed(0) + "k"} fontSize={11} />
                 <YAxis yAxisId="pct" orientation="right" tickFormatter={(v) => `${v}%`} fontSize={11} domain={[0, 100]} />
                 <Tooltip trigger={getTooltipTrigger()} cursor={{ fill: "var(--color-muted)", opacity: 0.35 }} content={<SmartTooltipContent labelPrefix="Month" valueFormatter={(v) => inr(v)} />} />
                 <Legend />

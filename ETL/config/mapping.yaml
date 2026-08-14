@@ -135,6 +135,11 @@ income_categories:
   Parking Revenue:
     - Guest Parking Rent
 
+  Commercial Income:
+    - Creche
+    - Creaatio
+    - Laundry Pro
+
 
 vendor_groups:
 
@@ -353,6 +358,23 @@ vendors:
   Guest Parking Rent:
     vendor: Parking Services
     vendor_kind: income_stream
+
+  # Commercial tenants operating within the apartment premises (creche,
+  # boutique/store, laundry service). Each is its own external vendor --
+  # unlike the shared "Amenities"/"income_stream" buckets above, these are
+  # genuine companies paying rent, so vendor_kind is "company" and vendor
+  # is the tenant's own name (not a generic bucket).
+  Creche:
+    vendor: Creche
+    vendor_kind: company
+
+  Creaatio:
+    vendor: Creaatio
+    vendor_kind: company
+
+  Laundry Pro:
+    vendor: Laundry Pro
+    vendor_kind: company
 
 
 vendor_candidates:

@@ -309,13 +309,6 @@ function Inner() {
               </div>
             }
           />
-          <MetricCard 
-            label="GST LIABILITY" 
-            value={inr(gstLiability)} 
-            subText="CGST + SGST COLLECTED" 
-            icon={<Landmark className="h-5 w-5 text-slate-400" />}
-            className="bg-slate-50/50"
-          />
         </div>
       </DashboardSection>
 
@@ -335,8 +328,10 @@ function Inner() {
           <MetricCard 
             label="CONTINGENCY CASH" 
             value={inr(contingencyCash)} 
-            subText="CUMULATIVE RESERVE · NOT FILTER-DEPENDENT" 
+            subText="CUMULATIVE RESERVE · CLICK FOR MONTHLY TREND" 
             icon={<HandCoins className="h-5 w-5 text-pink-500" />}
+            to="/resident/balance"
+            hash="contingency-fund-chart"
             footer={
               <div className="mt-2 text-[9px] font-semibold text-pink-600 bg-pink-50 rounded px-2 py-1 leading-tight">
                 ⊆ Included within Bank Balance -- not additional funds
@@ -569,7 +564,7 @@ function DashboardSection({ title, icon, headerColor, children }: {
   );
 }
 
-function MetricCard({ label, value, subText, icon, footer, className, valueClassName, to, search }: {
+function MetricCard({ label, value, subText, icon, footer, className, valueClassName, to, search, hash }: {
   label: string;
   value: string;
   subText: React.ReactNode;
@@ -578,9 +573,11 @@ function MetricCard({ label, value, subText, icon, footer, className, valueClass
   className?: string;
   valueClassName?: string;
   // When provided, the whole card becomes a clickable drill-down link
-  // (used by Total Income / Total Expense -> Head Drill-down).
+  // (used by Total Income / Total Expense -> Head Drill-down, and
+  // Contingency Cash -> Opening & Closing's contingency chart).
   to?: string;
   search?: any;
+  hash?: string;
 }) {
   const card = (
     <Card
@@ -604,7 +601,7 @@ function MetricCard({ label, value, subText, icon, footer, className, valueClass
 
   if (to) {
     return (
-      <Link to={to} search={search} className="block">
+      <Link to={to} search={search} hash={hash} className="block">
         {card}
       </Link>
     );

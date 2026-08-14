@@ -190,7 +190,7 @@ function Inner() {
       {/* Monthly contingency fund collection -- moved here from Overview,
           since this is fundamentally a rolling-reserve/balance story, same
           shape of insight as the continuity table above. */}
-      <Card>
+      <Card id="contingency-fund-chart">
         <CardHeader>
           <CardTitle className="text-base">Monthly contingency fund collection</CardTitle>
           <CardDescription>Contingency portion of the maintenance charge, collected per month for the selected range. {'\u2286'} Part of Closing Balance above -- not additional funds.</CardDescription>

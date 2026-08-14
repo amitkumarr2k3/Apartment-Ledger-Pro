@@ -13,8 +13,16 @@ export const isMaintenanceOutstandingCategory = (name: string) =>
 export const isRateReferenceCategory = (name: string) =>
   /rate reference/i.test(name || "");
 
+// Statutory tax collections (CGST/SGST, "Tax Collected (Liability)") are
+// money the society holds on behalf of the government -- they are a
+// liability, not income the society can use, and must never appear in an
+// "Income Categories" / "Income sources" list. The GST Liability card on
+// Overview is the correct place to surface this figure.
+export const isTaxCategory = (name: string) =>
+  /tax|gst|cgst|sgst/i.test(name || "");
+
 export const isReportableIncomeCategory = (name: string) =>
-  !isMaintenanceOutstandingCategory(name) && !isRateReferenceCategory(name);
+  !isMaintenanceOutstandingCategory(name) && !isRateReferenceCategory(name) && !isTaxCategory(name);
 
 export const filterReportableIncomeCategories = <T extends { name: string }>(items: T[]) =>
   items.filter((item) => isReportableIncomeCategory(item.name));

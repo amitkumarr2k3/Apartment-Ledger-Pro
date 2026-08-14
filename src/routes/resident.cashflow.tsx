@@ -10,12 +10,12 @@ import { Info, TrendingDown, TrendingUp, Award, AlertOctagon } from "lucide-reac
 
 export const Route = createFileRoute("/resident/cashflow")({
   component: Page,
-  head: () => ({ meta: [{ title: "Resident \u00B7 Cashflow Health" }] }),
+  head: () => ({ meta: [{ title: "Resident · Cashflow Health" }] }),
 });
 
 function Page() {
   return (
-    <PortalShell title="Community cashflow health" reqIds="RD-20 \u00B7 RD-21 \u00B7 RD-22 \u00B7 RD-23" persona="resident">
+    <PortalShell title="Community cashflow health" reqIds="RD-20 · RD-21 · RD-22 · RD-23" persona="resident">
       <Inner />
     </PortalShell>
   );
@@ -134,14 +134,14 @@ function Inner() {
 
       <Alert>
         <Info className="h-4 w-4" />
-        <AlertDescription>RD-23 \u00B7 Aggregate community-level view only. No individual flat-wise tracking.</AlertDescription>
+        <AlertDescription>RD-23 · Aggregate community-level view only. No individual flat-wise tracking.</AlertDescription>
       </Alert>
 
       <div className="grid gap-4 md:grid-cols-3">
         {/* RD-20 */}
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription className="text-xs uppercase tracking-wider">Expense / Income \u00B7 RD-20</CardDescription>
+            <CardDescription className="text-xs uppercase tracking-wider">Expense / Income · RD-20</CardDescription>
             <CardTitle className="text-4xl font-mono">{ratio.toFixed(0)}%</CardTitle>
           </CardHeader>
           <CardContent>
@@ -154,7 +154,7 @@ function Inner() {
         {/* RD-22 */}
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription className="text-xs uppercase tracking-wider">Surplus months \u00B7 RD-22</CardDescription>
+            <CardDescription className="text-xs uppercase tracking-wider">Surplus months · RD-22</CardDescription>
             <CardTitle className="text-4xl font-mono text-emerald-600">{surplus}</CardTitle>
           </CardHeader>
           <CardContent>
@@ -163,7 +163,7 @@ function Inner() {
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription className="text-xs uppercase tracking-wider">Deficit months \u00B7 RD-22</CardDescription>
+            <CardDescription className="text-xs uppercase tracking-wider">Deficit months · RD-22</CardDescription>
             <CardTitle className="text-4xl font-mono text-rose-600">{deficit}</CardTitle>
           </CardHeader>
           <CardContent>
@@ -214,8 +214,8 @@ function Inner() {
           existed in the raw "collection" figure this page used to show). */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Monthly trend \u00B7 actual vs expected collection, expense &amp; outstanding</CardTitle>
-          <CardDescription>RD-21 \u00B7 Moved from Overview \u00B7 Includes cumulative outstanding signal</CardDescription>
+          <CardTitle className="text-base">Monthly trend · actual vs expected collection, expense &amp; outstanding</CardTitle>
+          <CardDescription>RD-21 · Moved from Overview · Includes cumulative outstanding signal</CardDescription>
         </CardHeader>
         <CardContent>
           {view === "chart" ? (
