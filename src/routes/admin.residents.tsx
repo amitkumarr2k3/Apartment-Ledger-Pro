@@ -27,13 +27,21 @@ function authHeader(): HeadersInit {
   return t ? { Authorization: `Bearer ${t}` } : {};
 }
 
-function dbRowToResident(r: any): ResidentRow {
+// FIX (2026-08-15): the old mapper collapsed "superadmin" -> "admin" for
+// display. That meant opening a superadmin's row and clicking "Save changes"
+// -- even without touching the Role field -- would PATCH role: "admin" and
+// silently, permanently demote them. We now keep the real role value and
+// widen the type (ResidentRow from finance-mock.ts only declares
+// "resident" | "admin", so we intersect rather than edit that shared file).
+type AdminResidentRow = Omit<ResidentRow, "role"> & { role: "resident" | "admin" | "superadmin" };
+
+function dbRowToResident(r: any): AdminResidentRow {
   return {
     id: r.email,
     email: r.email,
     name: r.name ?? "",
     flat: r.flat_code ?? "",
-    role: r.role === "superadmin" ? "admin" : r.role,
+    role: r.role, // keep the real value -- resident / admin / superadmin
     status: r.revoked_at ? "revoked" : "active",
     invitedAt: r.invited_at ? String(r.invited_at).slice(0, 10) : "",
   };
@@ -66,8 +74,8 @@ async function patchResident(email: string, patch: Record<string, unknown>) {
 }
 
 // ── Draft shape ──────────────────────────────────────────────────────────────
-const emptyDraft = { email: "", name: "", flat: "", role: "resident" as "resident" | "admin" };
-type Draft = { email: string; name: string; flat: string; role: "resident" | "admin" };
+const emptyDraft = { email: "", name: "", flat: "", role: "resident" as "resident" | "admin" | "superadmin" };
+type Draft = { email: string; name: string; flat: string; role: "resident" | "admin" | "superadmin" };
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 function Page() {
@@ -81,9 +89,9 @@ function Page() {
 
 // ── Mock view (unauthenticated) ───────────────────────────────────────────────
 function MockView() {
-  const [rows, setRows] = useState<ResidentRow[]>(seedResidents);
+  const [rows, setRows] = useState<AdminResidentRow[]>(seedResidents as AdminResidentRow[]);
 
-  function onSave(editing: ResidentRow | null, draft: Draft) {
+  function onSave(editing: AdminResidentRow | null, draft: Draft) {
     if (editing) {
       setRows((rs) => rs.map((r) => r.id === editing.id ? { ...r, ...draft } : r));
       toast.success(`Updated ${editing.email}`);
@@ -93,9 +101,9 @@ function MockView() {
       toast.success(`Whitelisted ${draft.email}`);
     }
   }
-  function onToggleRevoke(r: ResidentRow) {
+  function onToggleRevoke(r: AdminResidentRow) {
     const next = r.status === "revoked" ? "active" : "revoked";
-    setRows((rs) => rs.map((x) => x.id === r.id ? { ...x, status: next as ResidentRow["status"] } : x));
+    setRows((rs) => rs.map((x) => x.id === r.id ? { ...x, status: next as AdminResidentRow["status"] } : x));
     toast.success(`${r.email} ${next === "revoked" ? "revoked" : "reactivated"}`);
   }
 
@@ -133,7 +141,7 @@ function LiveView() {
   if (isLoading) return <p className="text-sm text-muted-foreground py-8 text-center">Loading residents…</p>;
   if (isError) return <NoDbData note="Could not load residents. Check your connection or try refreshing." />;
 
-  function onSave(editing: ResidentRow | null, draft: Draft) {
+  function onSave(editing: AdminResidentRow | null, draft: Draft) {
     if (editing) {
       patchMut.mutate(
         { email: editing.email, patch: { name: draft.name, flat_code: draft.flat, role: draft.role } },
@@ -143,14 +151,14 @@ function LiveView() {
       createMut.mutate({ email: draft.email, name: draft.name, flat_code: draft.flat, role: draft.role });
     }
   }
-  function onToggleRevoke(r: ResidentRow) {
+  function onToggleRevoke(r: AdminResidentRow) {
     const willRevoke = r.status !== "revoked";
     patchMut.mutate(
       { email: r.email, patch: { revoke: willRevoke } },
       { onSuccess: () => toast.success(`${r.email} ${willRevoke ? "revoked" : "reactivated"}`) },
     );
   }
-  function onResend(r: ResidentRow) {
+  function onResend(r: AdminResidentRow) {
     toast.info(`Ask ${r.email} to use the OTP sign-in flow — a 6-digit code will be sent on their next attempt.`);
   }
 
@@ -164,16 +172,16 @@ function ResidentTable({
   onToggleRevoke,
   onResend,
 }: {
-  rows: ResidentRow[];
-  onSave: (editing: ResidentRow | null, draft: Draft) => void;
-  onToggleRevoke: (r: ResidentRow) => void;
-  onResend: (r: ResidentRow) => void;
+  rows: AdminResidentRow[];
+  onSave: (editing: AdminResidentRow | null, draft: Draft) => void;
+  onToggleRevoke: (r: AdminResidentRow) => void;
+  onResend: (r: AdminResidentRow) => void;
 }) {
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [roleFilter, setRoleFilter] = useState("all");
   const [open, setOpen] = useState(false);
-  const [editing, setEditing] = useState<ResidentRow | null>(null);
+  const [editing, setEditing] = useState<AdminResidentRow | null>(null);
   const [draft, setDraft] = useState<Draft>(emptyDraft);
 
   const filtered = useMemo(() => rows.filter((r) => {
@@ -187,13 +195,18 @@ function ResidentTable({
     total: rows.length,
     active: rows.filter((r) => r.status === "active").length,
     invited: rows.filter((r) => r.status === "invited").length,
-    admin: rows.filter((r) => r.role === "admin").length,
+    // "Admins" stat intentionally includes superadmins too -- both are
+    // administrative accounts; the exact role is still shown per-row.
+    admin: rows.filter((r) => r.role === "admin" || r.role === "superadmin").length,
   }), [rows]);
 
   function startCreate() { setEditing(null); setDraft(emptyDraft); setOpen(true); }
-  function startEdit(r: ResidentRow) {
+  function startEdit(r: AdminResidentRow) {
     setEditing(r);
-    setDraft({ email: r.email, name: r.name, flat: r.flat, role: r.role === "admin" ? "admin" : "resident" });
+    // FIX (2026-08-15): previously forced anything non-"admin" down to
+    // "resident", which also silently downgraded superadmins. Now preserves
+    // the real role so saving without touching this field is a true no-op.
+    setDraft({ email: r.email, name: r.name, flat: r.flat, role: r.role });
     setOpen(true);
   }
   function save() {
@@ -245,6 +258,7 @@ function ResidentTable({
                 <SelectItem value="all">All roles</SelectItem>
                 <SelectItem value="resident">Resident</SelectItem>
                 <SelectItem value="admin">Admin</SelectItem>
+                <SelectItem value="superadmin">Superadmin</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -269,7 +283,10 @@ function ResidentTable({
                     <TableCell>{r.name}</TableCell>
                     <TableCell className="text-xs">{r.flat || "—"}</TableCell>
                     <TableCell>
-                      <Badge variant="outline" className={r.role === "admin" ? "border-violet-500/40 text-violet-600" : ""}>{r.role}</Badge>
+                      <Badge variant="outline" className={
+                        r.role === "superadmin" ? "border-fuchsia-500/40 text-fuchsia-600" :
+                        r.role === "admin" ? "border-violet-500/40 text-violet-600" : ""
+                      }>{r.role}</Badge>
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline" className={
@@ -325,11 +342,12 @@ function ResidentTable({
                 <Input value={draft.flat} onChange={(e) => setDraft({ ...draft, flat: e.target.value })} placeholder="A-101" />
               </Field>
               <Field label="Role">
-                <Select value={draft.role} onValueChange={(v: "resident" | "admin") => setDraft({ ...draft, role: v })}>
+                <Select value={draft.role} onValueChange={(v: "resident" | "admin" | "superadmin") => setDraft({ ...draft, role: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="resident">Resident</SelectItem>
                     <SelectItem value="admin">Admin</SelectItem>
+                    <SelectItem value="superadmin">Superadmin</SelectItem>
                   </SelectContent>
                 </Select>
               </Field>
