@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { PortalShell, usePeriod } from "@/components/portal-shell";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -42,6 +43,20 @@ function Page() {
 function Inner() {
   const { activeLabels, label } = usePeriod();
   const { data: fetched = [] } = useAdminTransactions();
+  const qc = useQueryClient();
+  // Same invalidation set used by admin.imports.tsx after a successful commit,
+  // so every dashboard/chart that reads these query keys refreshes too.
+  async function refreshEverything() {
+    await Promise.all([
+      qc.invalidateQueries({ queryKey: ["admin-transactions"] }),
+      qc.invalidateQueries({ queryKey: ["monthly-totals"] }),
+      qc.invalidateQueries({ queryKey: ["balance-strip"] }),
+      qc.invalidateQueries({ queryKey: ["income-cat-totals"] }),
+      qc.invalidateQueries({ queryKey: ["expense-cat-totals"] }),
+      qc.invalidateQueries({ queryKey: ["expense-tree"] }),
+      qc.invalidateQueries({ queryKey: ["income-tree"] }),
+    ]);
+  }
   const [localOverride, setLocalOverride] = useState<TxnRow[] | null>(null);
   const rows = localOverride ?? fetched;
   const setRows = (updater: (prev: TxnRow[]) => TxnRow[]) => setLocalOverride(updater(rows));
@@ -82,21 +97,56 @@ function Inner() {
     setDraft({ date: r.date, month: r.month, head: r.head, category: r.category, vendor: r.vendor, lineItem: r.lineItem, amount: r.amount, direction: r.direction, notes: r.notes ?? "" });
     setOpen(true);
   }
-  function save() {
-    if (editing) {
-      setRows((rs) => rs.map((r) => r.id === editing.id ? { ...r, ...draft } : r));
-      toast.success(`Updated ${editing.id}`);
-    } else {
-      const id = `T${Math.floor(Math.random() * 9000) + 1000}`;
-      setRows((rs) => [{ id, source: "manual", ...draft }, ...rs]);
-      toast.success(`Created ${id}`);
+  // TODO: confirm these REST routes/payload shapes against the actual backend
+  // (server-side admin transactions write endpoints were not available to verify
+  // against). This follows the same auth-header + JSON convention used by the
+  // read endpoint in hooks.ts (useAdminTransactions) and by admin.imports.tsx.
+  async function save() {
+    const body = {
+      txn_date: draft.date,
+      head_kind: draft.head,
+      category_name: draft.category,
+      vendor_name: draft.vendor ?? null,
+      line_item_name: draft.lineItem,
+      amount_paise: Math.round(draft.amount * 100),
+      direction: draft.direction,
+      notes: draft.notes ?? "",
+      period_month: draft.month,
+    };
+    try {
+      const url = editing ? `/api/admin/transactions/${editing.id}` : "/api/admin/transactions";
+      const method = editing ? "PATCH" : "POST";
+      const r = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json", ...(authHeadersObj()) },
+        body: JSON.stringify(body),
+      });
+      if (!r.ok) throw new Error(String(r.status));
+      toast.success(editing ? `Updated ${editing.id}` : "Created transaction");
+      await refreshEverything();
+      setOpen(false);
+    } catch (e) {
+      toast.error("Save failed \u2014 change was not persisted to the server.");
     }
-    setOpen(false);
   }
-  function remove(r: TxnRow) {
+  async function remove(r: TxnRow) {
     if (!confirm(`Delete ${r.id} (${r.lineItem})?`)) return;
-    setRows((rs) => rs.filter((x) => x.id !== r.id));
-    toast.success(`Deleted ${r.id}`);
+    try {
+      const resp = await fetch(`/api/admin/transactions/${r.id}`, {
+        method: "DELETE",
+        headers: { ...(authHeadersObj()) },
+      });
+      if (!resp.ok) throw new Error(String(resp.status));
+      toast.success(`Deleted ${r.id}`);
+      await refreshEverything();
+    } catch (e) {
+      toast.error("Delete failed \u2014 record was not removed on the server.");
+    }
+  }
+  function authHeadersObj(): Record<string, string> {
+    if (typeof window === "undefined") return {};
+    const t = window.localStorage.getItem("apf.token");
+    return t ? { Authorization: `Bearer ${t}` } : {};
   }
 
   const treeForHead = draft.head === "expense" ? expenseTree : incomeTree;

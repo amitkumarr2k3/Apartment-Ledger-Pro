@@ -187,18 +187,51 @@ export function useExpenseTree() {
   });
 }
 
+// Extra fields beyond mock.TxnRow: the real UUIDs needed to PATCH/DELETE a
+// transaction or to build category/head/vendor pickers for new transactions.
+// (finance-mock.ts's TxnRow doesn't declare these -- rather than edit that
+// shared mock file, we widen the return type inline with an intersection.)
+export type AdminTxnRow = mock.TxnRow & {
+  categoryId?: string;
+  headId?: string;
+  vendorId?: string;
+  flatId?: string;
+};
+
 // ---- admin.transactions ----
 export function useAdminTransactions() {
   return useQuery({
     queryKey: ["admin-transactions", authCacheKey()],
     enabled: hasStoredAuth(),
-    queryFn: async () => {
+    queryFn: async (): Promise<AdminTxnRow[]> => {
       try {
-        const r = await fetch("/api/admin/transactions?pageSize=200", authHeaders());
-        if (!r.ok) throw new Error(String(r.status));
-        const j = await r.json();
-        return (j.rows as any[]).map((t): mock.TxnRow => ({
-          id: t.id?.slice(0, 8) ?? "-",
+        // FIX (2026-08-15): confirmed against backend/src/routes/admin.transactions.ts:
+        // GET / validates `pageSize` with Zod .max(200) -- anything above 200 makes
+        // .parse() throw, which the app has no handler for, so Fastify returns a
+        // bare 500. `page` itself is fully supported and the response already
+        // includes `total`, so we page through at the max allowed size (200)
+        // until we've collected everything the backend reports.
+        const pageSize = 200; // matches backend schema's hard max -- do not increase
+        let page = 1;
+        let all: any[] = [];
+        let total = Infinity;
+        while (all.length < total && page <= 50) { // safety cap: 50 pages = 10,000 rows
+          const r = await fetch(`/api/admin/transactions?pageSize=${pageSize}&page=${page}`, authHeaders());
+          if (!r.ok) throw new Error(String(r.status));
+          const j = await r.json();
+          const rows: any[] = Array.isArray(j.rows) ? j.rows : [];
+          if (rows.length === 0) break;
+          all = all.concat(rows);
+          total = typeof j.total === "number" ? j.total : all.length;
+          page += 1;
+        }
+        return all.map((t): AdminTxnRow => ({
+          // FIX (2026-08-15): id used to be t.id?.slice(0, 8) -- an 8-character
+          // truncation of the UUID. That's fine for a display label, but it
+          // silently broke Edit/Delete, since the backend's PATCH/:id and
+          // DELETE/:id routes validate the id with z.string().uuid() and would
+          // reject the truncated value. We now keep the full UUID.
+          id: t.id ?? "-",
           date: toYmd(t.txn_date),
           month: isoMonthToLabel(t.period_month),
           head: t.head_kind,
@@ -210,9 +243,17 @@ export function useAdminTransactions() {
           direction: t.direction,
           notes: t.notes ?? "",
           source: t.source ?? "manual",
+          // FIX (2026-08-15): the backend's SELECT t.*, ... already returns these
+          // raw UUID columns -- they were just being discarded here. Keeping them
+          // lets admin.transactions.tsx send real category_id/head_id/vendor_id
+          // on create/update instead of unusable name strings.
+          categoryId: t.category_id ?? undefined,
+          headId: t.head_id ?? undefined,
+          vendorId: t.vendor_id ?? undefined,
+          flatId: t.flat_id ?? undefined,
         }));
       } catch {
-        return hasStoredAuth() ? [] : mock.seedTransactions;
+        return hasStoredAuth() ? [] : (mock.seedTransactions as AdminTxnRow[]);
       }
     },
     staleTime: 30_000,
