@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
 import { PortalShell, usePeriod } from "@/components/portal-shell";
+import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,8 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { inr, months12, expenseTree, incomeTree, type TxnRow } from "@/lib/finance-mock";
-import { useAdminTransactions } from "@/lib/hooks";
-import { Pencil, Plus, Trash2, Search } from "lucide-react";
+import { useAdminTransactions, type AdminTxnRow } from "@/lib/hooks";
+import { Pencil, Plus, Trash2, Search, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin/transactions")({
@@ -20,12 +20,20 @@ export const Route = createFileRoute("/admin/transactions")({
   head: () => ({ meta: [{ title: "Admin · Transactions" }] }),
 });
 
-const emptyDraft: Omit<TxnRow, "id" | "source"> = {
+type Draft = Omit<TxnRow, "id" | "source"> & {
+  categoryId?: string;
+  headId?: string;
+  vendorId?: string;
+};
+
+const emptyDraft: Draft = {
   date: new Date().toISOString().slice(0, 10),
   month: months12[months12.length - 1],
   head: "expense",
-  category: expenseTree[0].name,
-  vendor: expenseTree[0].vendors[0]?.name,
+  category: "",
+  categoryId: undefined,
+  vendor: undefined,
+  vendorId: undefined,
   lineItem: "New line item",
   amount: 0,
   direction: "D",
@@ -43,9 +51,10 @@ function Page() {
 function Inner() {
   const { activeLabels, label } = usePeriod();
   const { data: fetched = [] } = useAdminTransactions();
+  const rows: AdminTxnRow[] = fetched;
   const qc = useQueryClient();
-  // Same invalidation set used by admin.imports.tsx after a successful commit,
-  // so every dashboard/chart that reads these query keys refreshes too.
+  // Same invalidation set admin.imports.tsx already uses after a successful
+  // commit, so every dashboard/chart reading these query keys refreshes too.
   async function refreshEverything() {
     await Promise.all([
       qc.invalidateQueries({ queryKey: ["admin-transactions"] }),
@@ -57,15 +66,41 @@ function Inner() {
       qc.invalidateQueries({ queryKey: ["income-tree"] }),
     ]);
   }
-  const [localOverride, setLocalOverride] = useState<TxnRow[] | null>(null);
-  const rows = localOverride ?? fetched;
-  const setRows = (updater: (prev: TxnRow[]) => TxnRow[]) => setLocalOverride(updater(rows));
+
+  // Derive {id, name} pickers from real transactions already fetched -- no
+  // dedicated categories/heads/vendors lookup endpoint exists on the backend
+  // yet, so this covers every category/head/vendor used at least once.
+  // Adding a BRAND-NEW category/vendor never seen before still needs a proper
+  // admin management screen (follow-up item, not covered here).
+  const headOptions = useMemo(() => {
+    const map = new Map<string, { id: string; name: "expense" | "income" }>();
+    for (const r of rows) if (r.headId) map.set(r.headId, { id: r.headId, name: r.head });
+    return Array.from(map.values());
+  }, [rows]);
+  const categoryOptions = useMemo(() => {
+    const map = new Map<string, { id: string; name: string; headId?: string }>();
+    for (const r of rows) if (r.categoryId) map.set(r.categoryId, { id: r.categoryId, name: r.category, headId: r.headId });
+    return Array.from(map.values());
+  }, [rows]);
+  const vendorOptions = useMemo(() => {
+    const map = new Map<string, { id: string; name: string; categoryId?: string }>();
+    for (const r of rows) if (r.vendorId && r.vendor) map.set(r.vendorId, { id: r.vendorId, name: r.vendor, categoryId: r.categoryId });
+    return Array.from(map.values());
+  }, [rows]);
+
   const [q, setQ] = useState("");
   const [month, setMonth] = useState<string>("period");
   const [head, setHead] = useState<string>("all");
+  const [pageSize, setPageSize] = useState<number>(50);
+  const [page, setPage] = useState<number>(1);
+  // Reset to page 1 whenever a filter or the page size changes, so you never
+  // land on an out-of-range page after narrowing results.
+  useEffect(() => {
+    setPage(1);
+  }, [q, month, head, pageSize]);
   const [open, setOpen] = useState(false);
-  const [editing, setEditing] = useState<TxnRow | null>(null);
-  const [draft, setDraft] = useState<Omit<TxnRow, "id" | "source">>(emptyDraft);
+  const [editing, setEditing] = useState<AdminTxnRow | null>(null);
+  const [draft, setDraft] = useState<Draft>(emptyDraft);
 
   const monthOptions = useMemo(
     () => Array.from(new Set([...activeLabels, ...rows.map((r) => r.month)])).filter(Boolean),
@@ -91,57 +126,22 @@ function Inner() {
     return { inc, exp, net: inc - exp, count: filtered.length };
   }, [filtered]);
 
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const clampedPage = Math.min(page, totalPages);
+  const pageRows = useMemo(
+    () => filtered.slice((clampedPage - 1) * pageSize, clampedPage * pageSize),
+    [filtered, clampedPage, pageSize],
+  );
+
   function startCreate() { setEditing(null); setDraft(emptyDraft); setOpen(true); }
-  function startEdit(r: TxnRow) {
+  function startEdit(r: AdminTxnRow) {
     setEditing(r);
-    setDraft({ date: r.date, month: r.month, head: r.head, category: r.category, vendor: r.vendor, lineItem: r.lineItem, amount: r.amount, direction: r.direction, notes: r.notes ?? "" });
+    setDraft({
+      date: r.date, month: r.month, head: r.head, category: r.category, categoryId: r.categoryId,
+      vendor: r.vendor, vendorId: r.vendorId, lineItem: r.lineItem, amount: r.amount,
+      direction: r.direction, notes: r.notes ?? "",
+    });
     setOpen(true);
-  }
-  // TODO: confirm these REST routes/payload shapes against the actual backend
-  // (server-side admin transactions write endpoints were not available to verify
-  // against). This follows the same auth-header + JSON convention used by the
-  // read endpoint in hooks.ts (useAdminTransactions) and by admin.imports.tsx.
-  async function save() {
-    const body = {
-      txn_date: draft.date,
-      head_kind: draft.head,
-      category_name: draft.category,
-      vendor_name: draft.vendor ?? null,
-      line_item_name: draft.lineItem,
-      amount_paise: Math.round(draft.amount * 100),
-      direction: draft.direction,
-      notes: draft.notes ?? "",
-      period_month: draft.month,
-    };
-    try {
-      const url = editing ? `/api/admin/transactions/${editing.id}` : "/api/admin/transactions";
-      const method = editing ? "PATCH" : "POST";
-      const r = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json", ...(authHeadersObj()) },
-        body: JSON.stringify(body),
-      });
-      if (!r.ok) throw new Error(String(r.status));
-      toast.success(editing ? `Updated ${editing.id}` : "Created transaction");
-      await refreshEverything();
-      setOpen(false);
-    } catch (e) {
-      toast.error("Save failed \u2014 change was not persisted to the server.");
-    }
-  }
-  async function remove(r: TxnRow) {
-    if (!confirm(`Delete ${r.id} (${r.lineItem})?`)) return;
-    try {
-      const resp = await fetch(`/api/admin/transactions/${r.id}`, {
-        method: "DELETE",
-        headers: { ...(authHeadersObj()) },
-      });
-      if (!resp.ok) throw new Error(String(resp.status));
-      toast.success(`Deleted ${r.id}`);
-      await refreshEverything();
-    } catch (e) {
-      toast.error("Delete failed \u2014 record was not removed on the server.");
-    }
   }
   function authHeadersObj(): Record<string, string> {
     if (typeof window === "undefined") return {};
@@ -149,8 +149,53 @@ function Inner() {
     return t ? { Authorization: `Bearer ${t}` } : {};
   }
 
-  const treeForHead = draft.head === "expense" ? expenseTree : incomeTree;
-  const catObj = treeForHead.find((c) => c.name === draft.category) ?? treeForHead[0];
+  async function save() {
+    if (!draft.categoryId || !draft.headId) {
+      toast.error("Pick a category and head (both are required by the backend).");
+      return;
+    }
+    const body = {
+      txn_date: draft.date,
+      category_id: draft.categoryId,
+      head_id: draft.headId,
+      vendor_id: draft.vendorId ?? null,
+      line_item_name: draft.lineItem,
+      amount_paise: Math.round(draft.amount * 100),
+      direction: draft.direction,
+      notes: draft.notes ?? "",
+    };
+    try {
+      const url = editing ? `/api/admin/transactions/${editing.id}` : "/api/admin/transactions";
+      const method = editing ? "PATCH" : "POST";
+      const r = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json", ...authHeadersObj() },
+        body: JSON.stringify(body),
+      });
+      if (!r.ok) throw new Error(String(r.status));
+      toast.success(editing ? `Updated ${editing.id}` : "Created transaction");
+      await refreshEverything();
+      setOpen(false);
+    } catch {
+      toast.error("Save failed — the change was not persisted to the server.");
+    }
+  }
+
+  async function remove(r: AdminTxnRow) {
+    if (!confirm(`Delete ${r.id} (${r.lineItem})?`)) return;
+    try {
+      const resp = await fetch(`/api/admin/transactions/${r.id}`, {
+        method: "DELETE",
+        headers: authHeadersObj(),
+      });
+      if (!resp.ok) throw new Error(String(resp.status));
+      toast.success(`Deleted ${r.id}`);
+      await refreshEverything();
+    } catch {
+      toast.error("Delete failed — the record was not removed on the server.");
+    }
+  }
+
 
   return (
     <>
@@ -208,7 +253,7 @@ function Inner() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.slice(0, 200).map((r) => (
+                {pageRows.map((r) => (
                   <TableRow key={r.id}>
                     <TableCell className="font-mono text-xs">{r.id}</TableCell>
                     <TableCell className="text-xs">{r.date}</TableCell>
@@ -234,7 +279,30 @@ function Inner() {
               </TableBody>
             </Table>
           </div>
-          {filtered.length > 200 && <p className="text-xs text-muted-foreground">Showing first 200 of {filtered.length}. Narrow filters to see more.</p>}
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-xs text-muted-foreground">
+              Showing {filtered.length === 0 ? 0 : (clampedPage - 1) * pageSize + 1}–{Math.min(clampedPage * pageSize, filtered.length)} of {filtered.length}
+            </p>
+            <div className="flex items-center gap-2">
+              <Select value={String(pageSize)} onValueChange={(v) => setPageSize(Number(v))}>
+                <SelectTrigger className="h-8 w-[110px]"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="10">10 / page</SelectItem>
+                  <SelectItem value="50">50 / page</SelectItem>
+                  <SelectItem value="100">100 / page</SelectItem>
+                </SelectContent>
+              </Select>
+              <div className="flex items-center gap-1">
+                <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={clampedPage <= 1} aria-label="Previous page">
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="text-xs text-muted-foreground w-[80px] text-center">Page {clampedPage} of {totalPages}</span>
+                <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={clampedPage >= totalPages} aria-label="Next page">
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -247,21 +315,49 @@ function Inner() {
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Date"><Input type="date" value={draft.date} onChange={(e) => setDraft({ ...draft, date: e.target.value })} /></Field>
             <Field label="Head">
-              <Select value={draft.head} onValueChange={(v: "expense" | "income") => setDraft({ ...draft, head: v, direction: v === "income" ? "C" : "D", category: (v === "expense" ? expenseTree : incomeTree)[0].name })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent><SelectItem value="expense">Expense</SelectItem><SelectItem value="income">Income</SelectItem></SelectContent>
+              <Select
+                value={draft.headId ?? ""}
+                onValueChange={(id) => {
+                  const opt = headOptions.find((h) => h.id === id);
+                  if (!opt) return;
+                  setDraft({ ...draft, headId: opt.id, head: opt.name, direction: opt.name === "income" ? "C" : "D", categoryId: undefined, category: "" });
+                }}
+              >
+                <SelectTrigger><SelectValue placeholder="Select…" /></SelectTrigger>
+                <SelectContent>{headOptions.map((h) => <SelectItem key={h.id} value={h.id}>{h.name}</SelectItem>)}</SelectContent>
               </Select>
             </Field>
             <Field label="Category">
-              <Select value={draft.category} onValueChange={(v) => setDraft({ ...draft, category: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{treeForHead.map((c) => <SelectItem key={c.name} value={c.name}>{c.name}</SelectItem>)}</SelectContent>
+              <Select
+                value={draft.categoryId ?? ""}
+                onValueChange={(id) => {
+                  const opt = categoryOptions.find((c) => c.id === id);
+                  if (!opt) return;
+                  setDraft({ ...draft, categoryId: opt.id, category: opt.name });
+                }}
+              >
+                <SelectTrigger><SelectValue placeholder="Select…" /></SelectTrigger>
+                <SelectContent>
+                  {categoryOptions.filter((c) => !draft.headId || c.headId === draft.headId).map((c) => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
             </Field>
             <Field label="Vendor">
-              <Select value={draft.vendor ?? ""} onValueChange={(v) => setDraft({ ...draft, vendor: v })}>
-                <SelectTrigger><SelectValue placeholder="Select…" /></SelectTrigger>
-                <SelectContent>{catObj.vendors.map((v) => <SelectItem key={v.name} value={v.name}>{v.name}</SelectItem>)}</SelectContent>
+              <Select
+                value={draft.vendorId ?? ""}
+                onValueChange={(id) => {
+                  const opt = vendorOptions.find((v) => v.id === id);
+                  setDraft({ ...draft, vendorId: opt?.id, vendor: opt?.name });
+                }}
+              >
+                <SelectTrigger><SelectValue placeholder="Select… (optional)" /></SelectTrigger>
+                <SelectContent>
+                  {vendorOptions.filter((v) => !draft.categoryId || v.categoryId === draft.categoryId).map((v) => (
+                    <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
             </Field>
             <Field label="Line item" className="sm:col-span-2"><Input value={draft.lineItem} onChange={(e) => setDraft({ ...draft, lineItem: e.target.value })} /></Field>
