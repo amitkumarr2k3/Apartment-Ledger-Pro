@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { requestOtp as requestOtpApi, verifyOtp as verifyOtpApi } from "@/lib/api";
 import { signInWithPassword, applySessionFromAuthResponse, isAdminOrAbove } from "@/lib/session";
-import { KeyRound, Mail, ShieldCheck, RefreshCw, Lock, Loader2, Building2, Sparkles } from "lucide-react";
+import { KeyRound, Mail, MailQuestion, ShieldCheck, RefreshCw, Lock, Loader2, Building2, Sparkles } from "lucide-react";
 
 
 const searchSchema = z.object({
@@ -204,6 +204,11 @@ function LoginPage() {
                     <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Sending code...</>
                   ) : "Send OTP"}
                 </Button>
+                {/* FIX (2026-08-15): kept short here on purpose -- the fuller
+                    troubleshooting message (spam + registration contact)
+                    lives only on the post-send screen below, where someone
+                    actually waiting for a code that hasn't arrived can act
+                    on it. Showing the same message twice was redundant. */}
                 <p className="text-xs text-muted-foreground">
                   If OTP is not in Inbox, check Spam/Junk folder.
                 </p>
@@ -245,6 +250,25 @@ function LoginPage() {
                 >
                   Use a different email
                 </button>
+                {/* FIX (2026-08-15): upgraded from plain muted-foreground
+                    text to a proper callout -- easy-to-miss fine print meant
+                    residents kept retrying/resending instead of noticing the
+                    guidance. Same content as before, shown identically to
+                    every visitor reaching this stage regardless of whether
+                    their email turns out to be registered -- never confirms
+                    or denies status, matching /request-otp's uniform
+                    response, so this stays safe from an email-enumeration
+                    standpoint. */}
+                <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 mt-1">
+                  <MailQuestion className="h-4 w-4 shrink-0 mt-0.5 text-amber-600" />
+                  <p className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed">
+                    Still nothing after a few minutes? Check Spam/Junk, then email{" "}
+                    <a href="mailto:rwa@cgboulevard.com" className="font-semibold underline underline-offset-2">
+                      rwa@cgboulevard.com
+                    </a>{" "}
+                    to confirm your email is registered.
+                  </p>
+                </div>
               </>
             )}
           </CardContent>
