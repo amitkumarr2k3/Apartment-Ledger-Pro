@@ -3,8 +3,103 @@
 // API hooks normalise backend rows into the shapes the prototype screens use.
 // In authenticated mode they must not mask DB cleanup/API errors with mock data.
 import { useQuery } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
+import { getSession } from "@/lib/session";
 import * as mock from "@/lib/finance-mock";
 import * as api from "@/lib/api";
+
+// ---- admin.settings dashboard visibility (real backend, not mock) ----
+// FIX (2026-08-15): admin/settings previously used seedDashboardControls
+// (hardcoded mock data) and "Save changes" never called any API at all --
+// toggles only mutated local component state. This wires the REAL
+// GET/PATCH /api/admin/settings/dashboards endpoints (confirmed already
+// implemented and working in admin.settings.ts on the backend).
+export type DashboardSettingRow = {
+  dashboard_key: string;
+  enabled: boolean;
+  hidden_widgets: string[];
+};
+
+export function useDashboardSettings() {
+  return useQuery({
+    queryKey: ["dashboard-settings", authCacheKey()],
+    enabled: hasStoredAuth(),
+    queryFn: async (): Promise<DashboardSettingRow[]> => {
+      try {
+        const r = await fetch("/api/admin/settings/dashboards", authHeaders());
+        if (!r.ok) return [];
+        const rows = await r.json();
+        return Array.isArray(rows) ? rows : [];
+      } catch {
+        return [];
+      }
+    },
+    staleTime: 30_000,
+  });
+}
+
+export async function saveDashboardSettings(rows: DashboardSettingRow[]): Promise<boolean> {
+  try {
+    // FIX (2026-08-15): authHeaders() returns a full RequestInit shape --
+    // { headers: { Authorization: ... } } -- meant to be passed directly as
+    // fetch's second argument (as every GET call in this file does:
+    // fetch(url, authHeaders())). Spreading it AS a headers object (the
+    // mistake here) nested it one level too deep -- { "Content-Type": ...,
+    // headers: { Authorization: ... } } -- so the real Authorization header
+    // was never actually sent, and every save silently hit the backend
+    // unauthenticated (401), even though the GET calls elsewhere worked
+    // fine. Extract .headers explicitly to get the flat shape this spread
+    // actually needs.
+    const auth = authHeaders();
+    const r = await fetch("/api/admin/settings/dashboards", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...(auth.headers ?? {}) },
+      body: JSON.stringify(rows),
+    });
+    return r.ok;
+  } catch {
+    return false;
+  }
+}
+
+// Convenience hook for resident pages: given this page's dashboard_key and
+// a specific widget id, returns whether that widget should render. If no
+// settings row exists yet for this dashboard (nothing ever saved), defaults
+// to fully visible -- so this never hides anything until an admin
+// explicitly turns something off.
+export function useWidgetVisibility(dashboardKey: string) {
+  // FIX (2026-08-15): SSR pages render before any client-side data fetch can
+  // run (fetches are gated on window/localStorage, which don't exist on the
+  // server), so the server-rendered HTML always shows "everything visible."
+  // If the client's first paint used the REAL fetched settings immediately,
+  // it could render differently than what the server sent down -- a
+  // hydration mismatch (this is very likely what caused the crash you saw,
+  // matching the "React error #418" in the console). The fix: report
+  // "everything visible" until this component has actually mounted on the
+  // client, matching the server's output exactly, THEN switch to the real
+  // settings on the next render. This trades one harmless render flash for
+  // never crashing on a mismatch.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+  const { data: settings = [] } = useDashboardSettings();
+
+  // FIX (2026-08-15): Dashboard Controls restrictions apply ONLY to actual
+  // residents. Admins/superadmins always see the full dashboard regardless
+  // of what's hidden for residents -- by design decision, since limiting an
+  // admin's own visibility into their own community's data serves no real
+  // purpose, and "Preview as resident" is meant for checking layout/UX, not
+  // for literally hiding data from an admin viewing their own session.
+  // getSession() safely returns null during SSR/before mount (matching the
+  // `mounted` guard above), so this doesn't reintroduce a hydration risk.
+  const session = mounted ? getSession() : null;
+  const isAdminOrAbove = session?.role === "admin" || session?.role === "superadmin";
+
+  const row = settings.find((s) => s.dashboard_key === dashboardKey);
+  const dashboardEnabled = !mounted || isAdminOrAbove ? true : (row?.enabled ?? true);
+  const hiddenWidgets = !mounted || isAdminOrAbove ? [] : (row?.hidden_widgets ?? []);
+  const isWidgetVisible = (widgetId: string) => dashboardEnabled && !hiddenWidgets.includes(widgetId);
+  return { dashboardEnabled, hiddenWidgets, isWidgetVisible };
+}
 
 // ---- vendor ranking ----
 export function useVendorRanking() {

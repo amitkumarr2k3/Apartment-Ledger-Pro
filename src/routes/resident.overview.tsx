@@ -10,7 +10,7 @@ import { SmartTooltipContent, getTooltipTrigger } from "@/components/smart-toolt
 import {
   inr, pct, categoryMonthly, total, vendorMonthly, sumMonthly,
 } from "@/lib/finance-mock";
-import { useMonthlyTotals, useExpenseTree, useIncomeTree } from "@/lib/hooks";
+import { useMonthlyTotals, useExpenseTree, useIncomeTree, useWidgetVisibility } from "@/lib/hooks";
 import { Wallet, ArrowRight, TrendingUp, TrendingDown, Home, Banknote, ShieldCheck, CheckCircle2, AlertTriangle, ShoppingCart, PiggyBank, Vault, HandCoins, CreditCard, Scale, Gauge, Target } from "lucide-react";
 
 export const Route = createFileRoute("/resident/overview")({
@@ -28,6 +28,10 @@ function Page() {
 
 function Inner() {
   const { sliceMonthly, view } = usePeriod();
+  // FIX (2026-08-15): real widget-level visibility, replacing the old
+  // Dashboard Controls page that had no effect on what residents actually
+  // see. Each real card below now checks its real widget id.
+  const { isWidgetVisible } = useWidgetVisibility("resident.overview");
   const { data: monthlyTotals = [] } = useMonthlyTotals();
   const { data: expenseTree = [] } = useExpenseTree();
   const { data: incomeTree = [] } = useIncomeTree();
@@ -223,6 +227,7 @@ function Inner() {
   return (
     <div className="space-y-6">
       {/* Section 1: Collection Health */}
+      {isWidgetVisible("overview.collectionHealth") && (
       <DashboardSection 
         title={`Collection Health (${periodLabel})`} 
         icon={<Home className="h-5 w-5 text-blue-600" />} 
@@ -256,8 +261,10 @@ function Inner() {
           />
         </div>
       </DashboardSection>
+      )}
 
       {/* Section 2: Society Financial Position */}
+      {isWidgetVisible("overview.financialPosition") && (
       <DashboardSection 
         title="Society Financial Position" 
         icon={<Banknote className="h-5 w-5 text-green-600" />} 
@@ -308,8 +315,10 @@ function Inner() {
           />
         </div>
       </DashboardSection>
+      )}
 
       {/* Section 3: Long-Term Financial Strength */}
+      {isWidgetVisible("overview.financialStrength") && (
       <DashboardSection 
         title="Long-Term Financial Strength" 
         icon={<ShieldCheck className="h-5 w-5 text-orange-600" />} 
@@ -383,9 +392,11 @@ function Inner() {
           />
         </div>
       </DashboardSection>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-3">
         {/* RD-02 top 5 — drill-through */}
+        {isWidgetVisible("overview.top5Expenses") && (
         <Card className={topCardsClass}>
           <CardHeader>
             <CardTitle className="text-base">Top 5 expense categories</CardTitle>
@@ -437,8 +448,10 @@ function Inner() {
             )}
           </CardContent>
         </Card>
+        )}
 
         {/* RD-05 community income */}
+        {isWidgetVisible("overview.top5Income") && (
         <Card className={topCardsClass}>
           <CardHeader>
             <CardTitle className="text-base">Top 5 income sources (excluding maintenance)</CardTitle>
@@ -490,7 +503,9 @@ function Inner() {
             )}
           </CardContent>
         </Card>
+        )}
 
+        {isWidgetVisible("overview.top5Vendors") && (
         <Card className={topCardsClass}>
           <CardHeader>
             <CardTitle className="text-base">Top 5 vendors by expense</CardTitle>
@@ -540,6 +555,7 @@ function Inner() {
             )}
           </CardContent>
         </Card>
+        )}
       </div>
     </div>
   );

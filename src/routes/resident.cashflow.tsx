@@ -5,7 +5,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { SmartTooltipContent, getTooltipTrigger } from "@/components/smart-tooltip";
 import { inr, categoryMonthly } from "@/lib/finance-mock";
-import { useMonthlyTotals, useIncomeTree } from "@/lib/hooks";
+import { useMonthlyTotals, useIncomeTree, useWidgetVisibility } from "@/lib/hooks";
 import { Info, TrendingDown, TrendingUp, Award, AlertOctagon } from "lucide-react";
 
 export const Route = createFileRoute("/resident/cashflow")({
@@ -25,6 +25,7 @@ const TOTAL_SQFT = 701591;
 
 function Inner() {
   const { sliceMonthly, view, labels = [] } = usePeriod();
+  const { isWidgetVisible } = useWidgetVisibility("resident.cashflow");
   const { data: monthlyTotals = [] } = useMonthlyTotals();
   const { data: incomeTree = [] } = useIncomeTree();
   const safeIncomeTree = incomeTree || [];
@@ -137,6 +138,7 @@ function Inner() {
         <AlertDescription>RD-23 · Aggregate community-level view only. No individual flat-wise tracking.</AlertDescription>
       </Alert>
 
+      {isWidgetVisible("cashflow.summaryCards") && (
       <div className="grid gap-4 md:grid-cols-3">
         {/* RD-20 */}
         <Card>
@@ -171,8 +173,10 @@ function Inner() {
           </CardContent>
         </Card>
       </div>
+      )}
 
       {/* NEW INSIGHTS: Expected-vs-Actual variance + best/worst month callouts */}
+      {isWidgetVisible("cashflow.performanceVsTarget") && (
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader className="pb-2">
@@ -207,11 +211,13 @@ function Inner() {
           </CardContent>
         </Card>
       </div>
+      )}
 
       {/* RD-21 -- moved from Overview: strictly richer than the old bar chart
           it replaces (adds Expected Collection target + cumulative outstanding
           risk signal, and fixes the Tax/GST contamination that previously
           existed in the raw "collection" figure this page used to show). */}
+      {isWidgetVisible("cashflow.monthlyTrendChart") && (
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Monthly trend · actual vs expected collection, expense &amp; outstanding</CardTitle>
@@ -262,6 +268,7 @@ function Inner() {
           )}
         </CardContent>
       </Card>
+      )}
     </>
 
   );

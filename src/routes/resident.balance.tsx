@@ -7,7 +7,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Bar, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend } from "recharts";
 import { SmartTooltipContent, getTooltipTrigger } from "@/components/smart-tooltip";
 import { inr, categoryMonthly } from "@/lib/finance-mock";
-import { useBalanceStrip, useMonthlyTotals, useIncomeTree } from "@/lib/hooks";
+import { useBalanceStrip, useMonthlyTotals, useIncomeTree, useWidgetVisibility } from "@/lib/hooks";
 import { Info } from "lucide-react";
 
 const TOTAL_SQFT = 701591;
@@ -27,6 +27,7 @@ function Page() {
 
 function Inner() {
   const { sliceMonthly } = usePeriod();
+  const { isWidgetVisible } = useWidgetVisibility("resident.balance");
   const { data: monthlyTotals = [] } = useMonthlyTotals();
   const { data: balanceStrip = { opening: 0, income: 0, expense: 0, net: 0, closing: 0 } } = useBalanceStrip();
   const { data: incomeTree = [] } = useIncomeTree();
@@ -82,6 +83,7 @@ function Inner() {
     <>
 
       {/* RD-40 balance strip */}
+      {isWidgetVisible("balance.strip") && (
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Balance strip · RD-40, RD-42</CardTitle>
@@ -129,6 +131,7 @@ function Inner() {
           </div>
         </CardContent>
       </Card>
+      )}
 
       {hasOpeningGap && (
         <Alert>
@@ -150,6 +153,7 @@ function Inner() {
 
 
       {/* RD-43 mini table */}
+      {isWidgetVisible("balance.continuity") && (
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Month-by-month continuity · RD-43</CardTitle>
@@ -186,10 +190,12 @@ function Inner() {
           </Table>
         </CardContent>
       </Card>
+      )}
 
       {/* Monthly contingency fund collection -- moved here from Overview,
           since this is fundamentally a rolling-reserve/balance story, same
           shape of insight as the continuity table above. */}
+      {isWidgetVisible("balance.contingencyChart") && (
       <Card id="contingency-fund-chart">
         <CardHeader>
           <CardTitle className="text-base">Monthly contingency fund collection</CardTitle>
@@ -213,6 +219,7 @@ function Inner() {
           )}
         </CardContent>
       </Card>
+      )}
     </>
   );
 }

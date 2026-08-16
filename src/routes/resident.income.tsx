@@ -5,7 +5,7 @@ import { Link } from "@tanstack/react-router";
 import { Bar, BarChart, CartesianGrid, Cell, ComposedChart, LabelList, Line, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend } from "recharts";
 import { SmartTooltipContent, getTooltipTrigger } from "@/components/smart-tooltip";
 import { inr, categoryMonthly, total, sumMonthly } from "@/lib/finance-mock";
-import { useIncomeTree, useMonthlyTotals } from "@/lib/hooks";
+import { useIncomeTree, useMonthlyTotals, useWidgetVisibility } from "@/lib/hooks";
 import { filterReportableIncomeCategories, isMaintenanceOutstandingCategory } from "@/lib/income-utils";
 
 export const Route = createFileRoute("/resident/income")({
@@ -24,6 +24,7 @@ function Page() {
 }
 
 function Inner() {
+  const { isWidgetVisible } = useWidgetVisibility("resident.income");
   const { data: incomeTree = [] } = useIncomeTree();
   const { data: monthlyTotals = [] } = useMonthlyTotals();
   const { sliceMonthly, labels, view } = usePeriod();
@@ -96,6 +97,7 @@ function Inner() {
     <>
       <div className="grid gap-4 lg:grid-cols-3 items-start">
         {/* RD-30 */}
+        {isWidgetVisible("income.sourcesBreakdown") && (
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle className="text-base">Income sources · RD-30</CardTitle>
@@ -137,8 +139,10 @@ function Inner() {
             )}
           </CardContent>
         </Card>
+        )}
 
         {/* RD-31 */}
+        {isWidgetVisible("income.expenseRatio") && (
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Expense / Income · RD-31</CardTitle>
@@ -156,9 +160,11 @@ function Inner() {
             </div>
           </CardContent>
         </Card>
+        )}
       </div>
 
       {/* RD-32 */}
+      {isWidgetVisible("income.maintenanceVsOutstanding") && (
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Maintenance collection vs outstanding · RD-32</CardTitle>
@@ -243,6 +249,7 @@ function Inner() {
           )}
         </CardContent>
       </Card>
+      )}
     </>
   );
 }
