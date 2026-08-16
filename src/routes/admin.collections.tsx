@@ -4,9 +4,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Tooltip, Bar, BarChart, CartesianGrid, ComposedChart, Line, ResponsiveContainer, XAxis, YAxis, Legend, Area, AreaChart } from "recharts";
 import { SmartTooltipContent, getTooltipTrigger } from "@/components/smart-tooltip";
-import { inr, pct } from "@/lib/finance-mock";
+import { inr, pct, months12 } from "@/lib/finance-mock";
 import { AlertTriangle } from "lucide-react";
-import { useMonthlyTotals } from "@/lib/hooks";
+import { useMonthlyTotals, useIncomeTree } from "@/lib/hooks";
+import { sumMaintenanceChargeMonthly } from "@/lib/income-utils";
 import { NoDbData } from "@/components/mock-gate";
 
 export const Route = createFileRoute("/admin/collections")({
@@ -25,11 +26,29 @@ function Page() {
 function Inner() {
   const { sliceMonthly, view } = usePeriod();
   const { data: apiMonthly } = useMonthlyTotals();
+  const { data: incomeTree = [] } = useIncomeTree();
   const source = apiMonthly ?? [];
   if (source.length === 0) {
     return <NoDbData note="Collection charts appear once monthly income transactions are recorded." />;
   }
-  const data = sliceMonthly(source).map((m, i, arr) => {
+
+  // FIX (2026-08-15): the backend's monthlyTotals.collection is a raw sum of
+  // EVERY income transaction -- GST/tax, rate-reference rows, Association
+  // Fund, Late Payment Fine, outstanding/liability, etc. This chart's
+  // "Expected Collection" concept is a per-sqft MAINTENANCE rate target, so
+  // "Collection" here is meant to mean Collected Maintenance specifically --
+  // exactly what Overview's Collected Maintenance card shows. Recompute it
+  // the same way Overview does (sumMaintenanceChargeMonthly), so the two
+  // dashboards report the same number instead of the backend's unfiltered
+  // total (previously ~30.49L here vs ~25.77L on Overview for Jul '26).
+  const maintenanceMonthly = sumMaintenanceChargeMonthly(incomeTree, months12.length);
+  const maintenanceByMonth = new Map(months12.map((m, i) => [m, maintenanceMonthly[i]]));
+  const adjustedSource = source.map((m) => {
+    const collection = maintenanceByMonth.get(m.month) ?? m.collection;
+    return { ...m, collection, net: collection - m.expense };
+  });
+
+  const data = sliceMonthly(adjustedSource).map((m, i, arr) => {
     const prev = arr[i - 1]?.collection;
     const change = prev ? ((m.collection - prev) / prev) * 100 : 0;
     return { ...m, change };

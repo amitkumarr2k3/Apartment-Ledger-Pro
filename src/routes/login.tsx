@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { requestOtp as requestOtpApi, verifyOtp as verifyOtpApi } from "@/lib/api";
-import { signInWithPassword } from "@/lib/session";
+import { signInWithPassword, applySessionFromAuthResponse, isAdminOrAbove } from "@/lib/session";
 import { KeyRound, Mail, ShieldCheck, RefreshCw, Lock, Loader2, Building2, Sparkles } from "lucide-react";
 
 
@@ -60,10 +60,12 @@ function LoginPage() {
       return;
     }
     toast.success(`Signed in as ${res.session!.name}`);
-    // Admins/superadmins always land on the admin area, even if they were
-    // bounced from a resident URL — otherwise the redirect param wins and
-    // makes it look like they signed in as a resident.
-    const dest = res.session!.role === "admin"
+    // FIX (2026-08-15): this used to check `role === "admin"` only, which
+    // silently excluded "superadmin" once that became its own distinct
+    // value -- a superadmin logging in via password fell through to the
+    // resident destination instead. Use isAdminOrAbove() so both roles land
+    // in the admin area, even if they were bounced from a resident URL.
+    const dest = isAdminOrAbove(res.session!.role)
       ? "/admin/actions"
       : ((redirect as string) || "/resident/overview");
     navigate({ to: dest });
@@ -91,24 +93,14 @@ function LoginPage() {
     setBusy(true);
     try {
       const j = await verifyOtpApi(email, otp);
-      const roles: string[] = Array.isArray(j.user?.roles) ? j.user.roles : [];
-      const role: "admin" | "resident" = (roles.includes("admin") || roles.includes("superadmin"))
-        ? "admin"
-        : "resident";
-      const session = {
-        email: j.user?.email ?? email.toLowerCase(),
-        name: j.user?.name || j.user?.email || email,
-        flatCode: j.user?.flatCode ?? j.user?.flat_code ?? null,
-        role,
-        issuedAt: Date.now(),
-      };
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem("apf.session", JSON.stringify(session));
-        window.dispatchEvent(new Event("apf-session-change"));
-      }
+      // FIX (2026-08-15): this used to hand-roll its own session object and
+      // write straight to localStorage, duplicating (and collapsing
+      // "superadmin" into "admin" in) the exact logic signInWithPassword
+      // already had. Now both login paths go through the same helper.
+      const session = applySessionFromAuthResponse({ ...j.user, email: j.user?.email ?? email });
 
       toast.success(`Signed in as ${session.name} (${session.role})`);
-      const dest = session.role === "admin"
+      const dest = isAdminOrAbove(session.role)
         ? "/admin/actions"
         : ((redirect as string) || "/resident/overview");
       navigate({ to: dest });

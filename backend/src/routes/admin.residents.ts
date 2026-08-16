@@ -22,7 +22,10 @@ const PatchBody = z.object({
 
 export async function routes(app: FastifyInstance) {
   app.addHook("preHandler", app.auth);
-  app.addHook("preHandler", app.requireRole(["admin","superadmin"]));
+  // FIX (2026-08-15): "Residents & Whitelist" is an Admin Controls screen --
+  // plain "admin" accounts should see Admin Dashboards but NOT Admin
+  // Controls. Only superadmin manages residents and role assignments now.
+  app.addHook("preHandler", app.requireRole(["superadmin"]));
 
   app.get("/", async (req) => {
     const p = req.user;
@@ -40,6 +43,12 @@ export async function routes(app: FastifyInstance) {
   app.post("/", async (req, reply) => {
     const p = req.user;
     const body = Body.parse(req.body);
+    // Defense-in-depth: even though the route above is already
+    // superadmin-only, this stops a future loosening of that guard from
+    // silently allowing role escalation to superadmin too.
+    if (body.role === "superadmin" && !p.roles.includes("superadmin")) {
+      return reply.code(403).send({ error: "only_superadmin_can_grant_superadmin" });
+    }
     const created = await withTx(async (c) => {
       const r = await c.query(
         `INSERT INTO allowed_emails (email, community_id, role, flat_id, flat_code, name, invited_by)
@@ -60,6 +69,9 @@ export async function routes(app: FastifyInstance) {
     const p = req.user;
     const { email } = z.object({ email: z.string().email() }).parse(req.params);
     const body = PatchBody.parse(req.body);
+    if (body.role === "superadmin" && !p.roles.includes("superadmin")) {
+      return reply.code(403).send({ error: "only_superadmin_can_grant_superadmin" });
+    }
     const updated = await withTx(async (c) => {
       const before = (await c.query(`SELECT * FROM allowed_emails WHERE email=$1 AND community_id=$2`,
         [email.toLowerCase(), p.cid])).rows[0];

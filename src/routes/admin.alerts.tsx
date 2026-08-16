@@ -22,6 +22,9 @@ function deriveAnalytics(
   sliceMonthly: <T>(arr: T[]) => T[],
   priorSliceMonthly: <T>(arr: T[]) => T[],
 ) {
+  // FIX (2026-08-15): sort by Amount (current), descending -- this table
+  // lists every category (not a top-N ranking by severity), so it should
+  // default to biggest spend first, like the other item tables.
   const momChanges = tree.map((c) => {
     const m = categoryMonthly(c);
     const cur = total(sliceMonthly(m));
@@ -29,7 +32,7 @@ function deriveAnalytics(
     const change = prev ? ((cur - prev) / Math.abs(prev)) * 100 : 0;
     const periodChange = change;
     return { category: c.name, current: cur, previous: prev, change, periodChange };
-  });
+  }).sort((a, b) => b.current - a.current);
   const anomalies = tree
     .map((c) => {
       const m = categoryMonthly(c);

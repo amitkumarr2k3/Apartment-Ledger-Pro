@@ -389,9 +389,15 @@ export function PortalShell({
       window.removeEventListener("storage", refresh);
     };
   }, []);
-  const isAdmin = session?.role === "admin";
+  // FIX (2026-08-15): plain "admin" now sees Admin Dashboards but not
+  // Admin Controls (Transactions CRUD, Residents & Whitelist, Dashboard
+  // Controls, Audit Trail, ...). Only superadmin sees Controls sections.
+  // isAdmin means "admin or above" so the persona toggle and Admin
+  // *dashboards* still work for plain admins.
+  const isSuperAdmin = session?.role === "superadmin";
+  const isAdmin = session?.role === "admin" || isSuperAdmin;
   const visibleNavSections = isAdmin
-    ? navSections
+    ? navSections.filter((s) => s.group !== "controls" || isSuperAdmin)
     : navSections.filter((s) => s.tone === "resident");
 
   const personaSections = visibleNavSections.filter((s) => s.tone === persona);

@@ -20,7 +20,10 @@ export async function routes(app: FastifyInstance) {
     return rows;
   });
 
-  app.patch("/dashboards", { preHandler: app.requireRole(["admin","superadmin"]) }, async (req, reply) => {
+  // FIX (2026-08-15): "Dashboard Controls" is an Admin Controls screen --
+  // only superadmin may change what's visible. GET above intentionally
+  // stays open to any authenticated user, unchanged.
+  app.patch("/dashboards", { preHandler: app.requireRole(["superadmin"]) }, async (req, reply) => {
     const p = req.user;
     const body = z.array(z.object({
       dashboard_key: z.enum(DASHBOARD_KEYS),

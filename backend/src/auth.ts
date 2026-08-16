@@ -15,13 +15,18 @@ export type JwtPayload = {
 const AUTH_ENABLED = (process.env.AUTH_ENABLED ?? "false").toLowerCase() !== "false";
 const SUPERADMIN_EMAIL = (process.env.SUPERADMIN_EMAIL || "admin@example.com").toLowerCase();
 
+// FIX (2026-08-15): removed. This used to force-inject "superadmin"+"admin"
+// onto any JWT whose email matched SUPERADMIN_EMAIL, on every request --
+// regardless of the database. That meant (a) that account's email was
+// effectively hardcoded forever, and (b) you could never actually revoke
+// superadmin from it via the DB, since this override re-granted it anyway.
+// seed.js already writes a durable (user_id, 'superadmin') row into
+// user_roles at bootstrap, and loadUserByEmail() aggregates real roles from
+// that table -- so the JWT issued at login already carries correct roles
+// for every account, including the bootstrap superadmin. The account's
+// email can now be changed freely (see routes/me.ts) without affecting role.
 function normaliseJwtUser(user: JwtPayload | undefined): JwtPayload | undefined {
-  if (!user) return user;
-  if (user.email?.toLowerCase() !== SUPERADMIN_EMAIL) return user;
-  return {
-    ...user,
-    roles: Array.from(new Set([...(user.roles ?? []), "superadmin", "admin"])),
-  };
+  return user;
 }
 
 let cachedGuest: JwtPayload | null = null;
@@ -68,9 +73,18 @@ export async function registerAuth(app: FastifyInstance) {
 }
 
 export async function loadUserByEmail(email: string) {
+  // FIX (2026-08-15): user_roles.role is a Postgres ENUM, not plain text.
+  // node-postgres has a built-in array parser for well-known types like
+  // text[], but not for arrays of custom enum types -- so without an
+  // explicit ::text[] cast, this query silently returned the raw Postgres
+  // array-literal STRING "{superadmin,admin}" instead of a real JS array
+  // ["superadmin","admin"]. Every `Array.isArray(roles)` check on the
+  // frontend then failed and fell back to [], resolving role to "resident"
+  // no matter what was actually in the database. Casting each role to text
+  // before aggregating fixes this at the source.
   const { rows } = await pool.query(
     `SELECT u.id, u.email, u.community_id, u.name,
-            COALESCE(array_agg(r.role) FILTER (WHERE r.role IS NOT NULL), '{}') AS roles
+            COALESCE(array_agg(r.role::text) FILTER (WHERE r.role IS NOT NULL), '{}'::text[]) AS roles
      FROM users u LEFT JOIN user_roles r ON r.user_id = u.id
      WHERE u.email = $1
      GROUP BY u.id`,

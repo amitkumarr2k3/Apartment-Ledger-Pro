@@ -29,6 +29,8 @@ function Inner() {
   const { data: monthlyTotals = [] } = useMonthlyTotals();
   const { sliceMonthly, labels, view } = usePeriod();
   const reportableIncomeTree = filterReportableIncomeCategories(incomeTree);
+  // FIX (2026-08-15): sort item-based tables by Amount, descending, so the
+  // biggest income sources always appear first (previously unsorted).
   const rows = reportableIncomeTree.flatMap((c) =>
     c.vendors.flatMap((v) =>
       v.items.map((it) => {
@@ -49,7 +51,7 @@ function Inner() {
         };
       }),
     ),
-  );
+  ).sort((a, b) => b.total - a.total);
   const totalIncome = rows.reduce((s, r) => s + r.total, 0);
 
   // AD-31: expense-to-income ratio per month.

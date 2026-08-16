@@ -17,7 +17,9 @@ const TxnBody = z.object({
 
 export async function routes(app: FastifyInstance) {
   app.addHook("preHandler", app.auth);
-  app.addHook("preHandler", app.requireRole(["admin", "superadmin"]));
+  // FIX (2026-08-15): "Transactions (CRUD)" is an Admin Controls screen --
+  // plain "admin" accounts should see Admin Dashboards but not this.
+  app.addHook("preHandler", app.requireRole(["superadmin"]));
 
   app.get("/", async (req) => {
     const p = req.user;

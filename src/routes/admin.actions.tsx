@@ -68,13 +68,17 @@ function Inner() {
     );
   }
 
+  // FIX (2026-08-15): previously concatenated then sliced to 5 with NO sort
+  // at all, so "Top 5 items needing attention" wasn't actually the top
+  // anything -- just whichever anomalies/rising-cost items happened to come
+  // first in tree order. Now sorted by Amount, descending, before slicing.
   const risingItems = momChanges.filter((c) => c.periodChange > 15).map((c) => ({
-    kind: "Rising cost", label: c.category, detail: `${pct(c.periodChange)} vs prior period`, to: "/admin/alerts",
+    kind: "Rising cost", label: c.category, detail: `${pct(c.periodChange)} vs prior period`, to: "/admin/alerts", amount: c.current,
   }));
   const anomalyItems = anomalies.map((a) => ({
-    kind: "Anomaly", label: a.category, detail: `Current ${inr(a.cur)} · ${a.ratio.toFixed(1)}× 3-mo avg`, to: "/admin/alerts",
+    kind: "Anomaly", label: a.category, detail: `Current ${inr(a.cur)} · ${a.ratio.toFixed(1)}× 3-mo avg`, to: "/admin/alerts", amount: a.cur,
   }));
-  const actions = [...anomalyItems, ...risingItems].slice(0, 5);
+  const actions = [...anomalyItems, ...risingItems].sort((a, b) => b.amount - a.amount).slice(0, 5);
 
   const projectionCandidates = [
     ...anomalies
@@ -110,12 +114,14 @@ function Inner() {
     { month: "+2 mo", actual: null, projected: projB },
   ];
 
+  // FIX (2026-08-15): sort by Amount (spent), descending -- previously
+  // unsorted, showing categories in whatever order the tree returned them.
   const budgetRows = expenseTree.map((c) => {
     const spent = total(sliceMonthly(categoryMonthly(c)));
     const budget = getUploadedBudgetForCategory(c.name);
     const variance = budget && budget > 0 ? ((spent - budget) / budget) * 100 : null;
     return { category: c.name, budget, spent, variance };
-  });
+  }).sort((a, b) => b.spent - a.spent);
 
   return (
     <>

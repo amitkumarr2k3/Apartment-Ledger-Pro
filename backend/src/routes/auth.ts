@@ -288,14 +288,25 @@ export async function routes(app: FastifyInstance) {
 
     await pool.query(`UPDATE users SET last_login_at=now() WHERE id=$1`, [row.id]);
 
-    // Self-heal: password-login users are superadmins by definition; make sure
-    // their user_roles has both 'superadmin' and 'admin' so the frontend RBAC
-    // maps them to the admin persona even if a previous seed run missed a row.
-    await pool.query(
-      `INSERT INTO user_roles (user_id, role) VALUES ($1,'superadmin'),($1,'admin')
-       ON CONFLICT DO NOTHING`,
-      [row.id],
-    );
+    // FIX (2026-08-15): this used to run for EVERY password-login user with
+    // no restriction -- "password-login users are superadmins by
+    // definition" meant any account that ever gets a password_hash set (now
+    // or via a future feature) would silently self-grant superadmin+admin
+    // on its next login. That is a real privilege-escalation hole: role
+    // assignment must be an explicit, superadmin-only action (see
+    // admin.residents.ts), never an automatic side effect of logging in.
+    //
+    // We keep the *resilience* intent (self-heal if a seed run missed a
+    // row) but scope it strictly to the one bootstrap superadmin email --
+    // never to "any user with a password."
+    const SUPERADMIN_EMAIL = (process.env.SUPERADMIN_EMAIL || "admin@example.com").toLowerCase();
+    if (lower === SUPERADMIN_EMAIL) {
+      await pool.query(
+        `INSERT INTO user_roles (user_id, role) VALUES ($1,'superadmin'),($1,'admin')
+         ON CONFLICT DO NOTHING`,
+        [row.id],
+      );
+    }
 
     // Self-heal: ensure users.community_id points at an existing community.
     // A prior --full cleanup can wipe communities and leave the superadmin

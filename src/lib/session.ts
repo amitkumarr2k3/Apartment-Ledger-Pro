@@ -3,14 +3,14 @@
 // (see backend/src/routes/auth.ts). The whitelist here mirrors the
 // `allowed_emails` table by reading `seedResidents` from the mock — an email
 // is eligible for OTP only when its row is `status: "active"`. Revoked/invited
-import { seedResidents, type ResidentRow } from "./finance-mock";
+import { seedResidents, navSections, type ResidentRow } from "./finance-mock";
 import { AUTH_ENABLED, GUEST_SESSION } from "./feature-flags";
 
 export type Session = {
   email: string;
   name: string;
   flatCode?: string | null;
-  role: "resident" | "admin";
+  role: "resident" | "admin" | "superadmin";
   issuedAt: number;
 };
 
@@ -24,13 +24,13 @@ function isBrowser() {
   return typeof window !== "undefined";
 }
 
+// FIX (2026-08-15): removed the hardcoded-email override. Role now comes
+// straight from the backend's real roles array (see signInWithPassword)
+// instead of being force-set here whenever the email matched a constant --
+// which is exactly the "hardcoded superadmin" behaviour we're removing.
+// (If you have an old session in localStorage from before this fix, log
+// out and back in once to pick up the corrected role.)
 function normaliseSession(session: Session): Session {
-  // Older localStorage sessions may have been written before the superadmin
-  // role fix and can incorrectly say `resident`. Always trust the bootstrap
-  // superadmin email as an admin on the client, matching backend policy.
-  if (session.email?.toLowerCase() === SUPERADMIN) {
-    return { ...session, name: session.name || "Super Admin", role: "admin" };
-  }
   return session;
 }
 
@@ -100,14 +100,15 @@ export async function signInWithPassword(email: string, password: string):
     if (!r.ok) return { ok: false, reason: r.status === 401 ? "invalid_credentials" : "server_error" };
     const j = await r.json();
     window.localStorage.setItem("apf.token", j.token);
-    const roles: string[] = Array.isArray(j.user?.roles) ? j.user.roles : [];
-    // A user with a valid password hash (accepted by /login-password) is a
-    // superadmin by policy — treat as admin even if user_roles is empty.
-    const isAdmin =
-      roles.includes("admin") ||
-      roles.includes("superadmin") ||
-      j.user?.email?.toLowerCase() === "admin@example.com";
-    const role: "admin" | "resident" = isAdmin ? "admin" : "resident";
+    // FIX (2026-08-15): removed the hardcoded "admin@example.com" fallback.
+    // The backend's user_roles table (seeded durably at bootstrap, see
+    // seed.js) is the single source of truth -- trust `roles` as returned.
+    // Role is no longer collapsed to a binary admin/resident either:
+    // superadmin is now preserved end-to-end.
+    const roles: string[] = normaliseRoles(j.user?.roles);
+    const role: "resident" | "admin" | "superadmin" =
+      roles.includes("superadmin") ? "superadmin" :
+      roles.includes("admin") ? "admin" : "resident";
     const session = normaliseSession({
       email: j.user.email,
       name: j.user.name || j.user.email,
@@ -141,6 +142,97 @@ export function getSession(): Session | null {
   return null;
 }
 
+// FIX (2026-08-15): self-service profile update, pairs with PATCH /api/me.
+// Updates localStorage (token + session) in place so the UI reflects the
+// new email/name immediately, without forcing a logout/login round-trip.
+export async function updateMyProfile(patch: { email?: string; name?: string }):
+  Promise<{ ok: boolean; session?: Session; reason?: string }> {
+  if (!isBrowser()) return { ok: false, reason: "no_browser" };
+  const API = (import.meta as any).env?.VITE_API_URL ?? "/api";
+  const token = window.localStorage.getItem("apf.token");
+  if (!token) return { ok: false, reason: "not_authenticated" };
+  try {
+    const r = await fetch(`${API}/me`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify(patch),
+    });
+    if (!r.ok) {
+      if (r.status === 409) return { ok: false, reason: "email_taken" };
+      return { ok: false, reason: r.status === 401 ? "unauthorized" : "server_error" };
+    }
+    const j = await r.json();
+    window.localStorage.setItem("apf.token", j.token);
+    const current = getSession();
+    const session: Session = {
+      email: j.user.email,
+      name: j.user.name || j.user.email,
+      flatCode: current?.flatCode ?? null,
+      role: current?.role ?? "resident",
+      issuedAt: Date.now(),
+    };
+    window.localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+    window.dispatchEvent(new Event("apf-session-change"));
+    return { ok: true, session };
+  } catch {
+    return { ok: false, reason: "server_error" };
+  }
+}
+
+// FIX (2026-08-15): shared helper so every login path (password AND OTP)
+// derives + stores the session the same way. Before this, login.tsx's OTP
+// verify() had its OWN hand-rolled copy of this logic that collapsed
+// "superadmin" into "admin" -- a second instance of the exact bug we'd
+// already fixed in signInWithPassword, just duplicated in a file that
+// hadn't been reviewed yet. Centralising it here means there is now only
+// ONE place that decides what role a login response maps to.
+// FIX (2026-08-15): defensive parsing for a real bug found in production --
+// a backend query returned roles as the raw Postgres array-literal string
+// "{superadmin,admin}" instead of a JSON array, because array_agg() over a
+// custom enum column has no default node-postgres parser. The root cause is
+// fixed server-side (see auth.ts loadUserByEmail), but this stays as a
+// safety net in case any other endpoint has the same latent issue.
+function normaliseRoles(raw: unknown): string[] {
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw === "string") {
+    const trimmed = raw.trim();
+    if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+      const inner = trimmed.slice(1, -1);
+      return inner.length ? inner.split(",").map((s) => s.trim()) : [];
+    }
+  }
+  return [];
+}
+
+export function applySessionFromAuthResponse(user: {
+  email?: string; name?: string; roles?: string[]; flatCode?: string | null; flat_code?: string | null;
+}): Session {
+  const roles: string[] = normaliseRoles(user.roles);
+  const role: "resident" | "admin" | "superadmin" =
+    roles.includes("superadmin") ? "superadmin" :
+    roles.includes("admin") ? "admin" : "resident";
+  const session: Session = {
+    email: (user.email ?? "").toLowerCase(),
+    name: user.name || user.email || "",
+    flatCode: user.flatCode ?? user.flat_code ?? null,
+    role,
+    issuedAt: Date.now(),
+  };
+  if (isBrowser()) {
+    window.localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+    window.dispatchEvent(new Event("apf-session-change"));
+  }
+  return session;
+}
+
+// FIX (2026-08-15): callers used to check `role === "admin"` to decide
+// whether to land on the admin area, which silently excluded "superadmin"
+// once that became its own distinct value. Use this everywhere instead of
+// re-writing the check inline.
+export function isAdminOrAbove(role: "resident" | "admin" | "superadmin" | null | undefined): boolean {
+  return role === "admin" || role === "superadmin";
+}
+
 export function signOut() {
   if (!isBrowser()) return;
   window.localStorage.removeItem(SESSION_KEY);
@@ -152,10 +244,18 @@ export function signOut() {
 }
 
 // Simple RBAC map used by the client-side route guard.
-export function canAccess(pathname: string, role: "resident" | "admin" | null): boolean {
+// FIX (2026-08-15): widened to the real 3-tier role, and added a check
+// against navSections' `group: "controls"` metadata so plain "admin"
+// accounts can view Admin Dashboards but are blocked from Admin Controls
+// screens (Transactions CRUD, Residents & Whitelist, Dashboard Controls,
+// Audit Trail, etc.) even via direct URL -- hiding the nav link alone
+// (portal-shell.tsx) is not real access control.
+export function canAccess(pathname: string, role: "resident" | "admin" | "superadmin" | null): boolean {
   if (!AUTH_ENABLED) return true; // login disabled → everything is open
   if (!role) return false;
-  if (pathname.startsWith("/admin")) return role === "admin";
-  if (pathname.startsWith("/resident")) return role === "resident" || role === "admin";
+  const section = navSections.find((s) => s.items.some((it) => pathname.startsWith(it.to)));
+  if (section?.group === "controls" && role !== "superadmin") return false;
+  if (pathname.startsWith("/admin")) return role === "admin" || role === "superadmin";
+  if (pathname.startsWith("/resident")) return true; // resident, admin, and superadmin can all view resident dashboards
   return true; // /, /login, misc
 }

@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { seedResidents, type ResidentRow } from "@/lib/finance-mock";
+import { getSession } from "@/lib/session";
 import { Pencil, Plus, ShieldOff, ShieldCheck, Search, MailCheck } from "lucide-react";
 import { toast } from "sonner";
 import { useShowMockData, NoDbData } from "@/components/mock-gate";
@@ -347,7 +348,10 @@ function ResidentTable({
                   <SelectContent>
                     <SelectItem value="resident">Resident</SelectItem>
                     <SelectItem value="admin">Admin</SelectItem>
-                    <SelectItem value="superadmin">Superadmin</SelectItem>
+                    {/* FIX (2026-08-15): only a superadmin viewer can grant/see the
+                        Superadmin option. Backend also enforces this independently
+                        (admin.residents.ts POST/PATCH) -- this is defense-in-depth. */}
+                    {getSession()?.role === "superadmin" && <SelectItem value="superadmin">Superadmin</SelectItem>}
                   </SelectContent>
                 </Select>
               </Field>
