@@ -49,6 +49,12 @@ function deriveAnalytics(
 }
 
 function Page() {
+  // FIX (2026-08-15): this page is the EXPENSE-specific deep-dive -- full
+  // detail behind the expense anomalies/rising-cost items that also
+  // surface (ranked alongside income/collection/vendor signals) on Action
+  // Needed. Action Needed is the cross-cutting hub; this is where you
+  // come to see the complete expense picture, not just the top flagged
+  // items.
   return (
     <PortalShell title="Cost trend & anomaly alerts" reqIds="AD-01 · AD-02 · AD-03 · AD-04 · AD-05" persona="admin">
       <Inner />

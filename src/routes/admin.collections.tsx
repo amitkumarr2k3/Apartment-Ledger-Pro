@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Tooltip, Bar, BarChart, CartesianGrid, ComposedChart, Line, ResponsiveContainer, XAxis, YAxis, Legend, Area, AreaChart } from "recharts";
 import { SmartTooltipContent, getTooltipTrigger } from "@/components/smart-tooltip";
-import { inr, pct, months12 } from "@/lib/finance-mock";
+import { inr, pct, months12, categoryMonthly } from "@/lib/finance-mock";
 import { AlertTriangle } from "lucide-react";
 import { useMonthlyTotals, useIncomeTree } from "@/lib/hooks";
 import { sumMaintenanceChargeMonthly } from "@/lib/income-utils";
@@ -43,9 +43,28 @@ function Inner() {
   // total (previously ~30.49L here vs ~25.77L on Overview for Jul '26).
   const maintenanceMonthly = sumMaintenanceChargeMonthly(incomeTree, months12.length);
   const maintenanceByMonth = new Map(months12.map((m, i) => [m, maintenanceMonthly[i]]));
+
+  // FIX (2026-08-15): "vs expected" was in this chart's title from day one,
+  // but no Expected Collection series was ever actually computed or
+  // plotted -- the single biggest gap identified in the admin persona
+  // review ("collection gaps" is an explicitly named focus area). Wired in
+  // using the EXACT same per-sqft-rate formula as resident.overview.tsx /
+  // resident.cashflow.tsx (Maintenance Rate Reference category, /100 to
+  // un-scale the stored rate, x TOTAL_SQFT), so this number always agrees
+  // with the resident-facing dashboards.
+  const TOTAL_SQFT = 701591;
+  const isMaintenanceRateReference = (name: string) => /maintenance rate reference/i.test(name || "");
+  const rateCategory = incomeTree.find((c) => isMaintenanceRateReference(c.name));
+  const rateMonthlyFull = rateCategory ? categoryMonthly(rateCategory) : [];
+  const expectedByMonth = new Map(months12.map((m, i) => [m, ((rateMonthlyFull[i] ?? 0) / 100) * TOTAL_SQFT]));
+
+  // FIX (2026-08-15): renamed collection -> actualCollection to match the
+  // exact terminology resident.cashflow.tsx uses for the same figure
+  // ("Actual Collection"), so both dashboards speak the same language.
   const adjustedSource = source.map((m) => {
-    const collection = maintenanceByMonth.get(m.month) ?? m.collection;
-    return { ...m, collection, net: collection - m.expense };
+    const actualCollection = maintenanceByMonth.get(m.month) ?? m.collection;
+    const expectedCollection = expectedByMonth.get(m.month) ?? 0;
+    return { ...m, collection: actualCollection, expectedCollection, net: actualCollection - m.expense };
   });
 
   const data = sliceMonthly(adjustedSource).map((m, i, arr) => {
@@ -55,6 +74,12 @@ function Inner() {
   });
 
   const sharpDrops = data.filter((d) => d.change < -10);
+
+  // Collection performance vs target -- same concept and language as
+  // resident.cashflow.tsx's "Collection performance vs target" card.
+  const totalActual = data.reduce((s, d) => s + d.collection, 0);
+  const totalExpected = data.reduce((s, d) => s + d.expectedCollection, 0);
+  const collectionVariancePct = totalExpected === 0 ? 0 : ((totalActual - totalExpected) / totalExpected) * 100;
 
   let cum = 0;
   const cumulative = data.map((d) => {
@@ -83,9 +108,13 @@ function Inner() {
         </Alert>
       )}
 
+      {/* FIX (2026-08-15): title/legend/table now say "Actual Collection" and
+          "Expected Collection" -- matching resident.cashflow.tsx's exact
+          terminology for the same two figures, instead of the old bare
+          "Collection" label that didn't distinguish actual from target. */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Monthly collection vs expense vs expected</CardTitle>
+          <CardTitle className="text-base">Monthly collection: Actual vs Expected</CardTitle>
           <CardDescription>AD-20, AD-24 · Aggregate (uploaded data only)</CardDescription>
         </CardHeader>
         <CardContent>
@@ -97,8 +126,9 @@ function Inner() {
                 <YAxis tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} fontSize={11} />
                 <Tooltip trigger={getTooltipTrigger()} cursor={{ fill: "var(--color-muted)", opacity: 0.35 }} content={<SmartTooltipContent labelPrefix="Period" valueFormatter={(v) => inr(v)} />} />
                 <Legend />
-                <Bar dataKey="collection" name="Collection" fill="var(--color-chart-2)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="collection" name="Actual Collection" fill="var(--color-chart-2)" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="expense" name="Expense" fill="var(--color-chart-1)" radius={[4, 4, 0, 0]} />
+                <Line type="monotone" dataKey="expectedCollection" name="Expected Collection" stroke="var(--color-chart-4, #a855f7)" strokeWidth={2} strokeDasharray="4 2" dot={false} />
               </ComposedChart>
             </ResponsiveContainer>
           ) : (
@@ -107,7 +137,8 @@ function Inner() {
                 <thead className="bg-muted/40">
                   <tr>
                     <th className="text-left p-2">Month</th>
-                    <th className="text-right p-2">Collection</th>
+                    <th className="text-right p-2">Actual Collection</th>
+                    <th className="text-right p-2">Expected Collection</th>
                     <th className="text-right p-2">Expense</th>
                     <th className="text-right p-2">Change</th>
                   </tr>
@@ -117,6 +148,7 @@ function Inner() {
                     <tr key={d.month} className="border-t border-border">
                       <td className="p-2">{d.month}</td>
                       <td className="p-2 text-right font-mono">{inr(d.collection)}</td>
+                      <td className="p-2 text-right font-mono">{inr(d.expectedCollection)}</td>
                       <td className="p-2 text-right font-mono">{inr(d.expense)}</td>
                       <td className="p-2 text-right font-mono">{pct(d.change, 1)}</td>
                     </tr>
@@ -125,6 +157,22 @@ function Inner() {
               </table>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* New: Collection performance vs target -- same concept, same
+          language, as resident.cashflow.tsx's card of the same name. */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardDescription className="text-xs uppercase tracking-wider">Collection performance vs target</CardDescription>
+          <CardTitle className={`text-3xl font-mono ${collectionVariancePct >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
+            {collectionVariancePct >= 0 ? "+" : ""}{collectionVariancePct.toFixed(1)}%
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-xs text-muted-foreground">
+            Actual maintenance collected ({inr(totalActual)}) vs the expected target ({inr(totalExpected)}) based on the per-sqft rate.
+          </p>
         </CardContent>
       </Card>
 

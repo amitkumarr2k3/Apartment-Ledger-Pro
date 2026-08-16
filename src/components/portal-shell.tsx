@@ -130,7 +130,7 @@ type PeriodCtx = {
 const Ctx = createContext<PeriodCtx | null>(null);
 export function usePeriod(): PeriodCtx {
   return useContext(Ctx) ?? {
-    value: "range-12m", count: 12, label: "Last 12 months",
+    value: "fy", count: 12, label: FY_LABEL,
     labels: months12,
     activeLabels: months12,
     sliceMonthly: (a) => a,
@@ -329,7 +329,11 @@ export function PortalShell({
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
   const search = useSearch({ strict: false }) as { period?: string; view?: string };
-  const period = (search.period as PeriodValue) in periodConfig ? (search.period as PeriodValue) : "range-12m";
+  // FIX (2026-08-15): default period changed from "Last 12 months" to "fy"
+  // (current fiscal year, dynamically computed from today's date via
+  // fiscalStartYearFor) -- applies to every persona/role since this is the
+  // single shared PortalShell used by both admin and resident routes.
+  const period = (search.period as PeriodValue) in periodConfig ? (search.period as PeriodValue) : "fy";
   const view: "chart" | "number" = search.view === "number" ? "number" : "chart";
   const setPeriod = (v: PeriodValue) => navigate({ to: pathname, search: (((prev: any) => ({ ...prev, period: v })) as any), replace: false });
   const setView = (v: "chart" | "number") => navigate({ to: pathname, search: (((prev: any) => ({ ...prev, view: v })) as any), replace: true });

@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tooltip, Bar, BarChart, CartesianGrid, ResponsiveContainer, XAxis, YAxis } from "recharts";
 import { SmartTooltipContent, getTooltipTrigger } from "@/components/smart-tooltip";
 import { inr, pct, total, vendorMonthly } from "@/lib/finance-mock";
-import { TrendingUp, ChevronRight, ExternalLink } from "lucide-react";
+import { TrendingUp, ChevronRight, ExternalLink, PieChart } from "lucide-react";
 import { NoDbData } from "@/components/mock-gate";
 import { useExpenseTree, useIncomeTree } from "@/lib/hooks";
 import { filterReportableIncomeCategories } from "@/lib/income-utils";
@@ -96,6 +96,13 @@ function Inner() {
   const slicedTrend = sliceMonthly(vendorTrend);
   const trendData = labels.map((m, i) => ({ month: m, value: slicedTrend[i] ?? 0 }));
 
+  // New: concentration-risk signal -- "Vendor patterns" is an explicitly
+  // named persona focus area, and a sortable list alone doesn't answer the
+  // control-oriented question "are we over-reliant on a few vendors?"
+  const totalRanked = vendorRanking.reduce((s, v) => s + v.total, 0);
+  const top3Total = vendorRanking.slice(0, 3).reduce((s, v) => s + v.total, 0);
+  const top3SharePct = totalRanked > 0 ? (top3Total / totalRanked) * 100 : 0;
+
   const amountLabel = vendorHead === "expense" ? "Total spend" : "Total collected";
   const rankingNote = vendorHead === "expense"
     ? "Sorted by total spend \u00b7 flagged rows exceed +20% period change"
@@ -121,6 +128,18 @@ function Inner() {
         <NoDbData note={emptyNote} />
       ) : (
       <>
+      {/* New: concentration-risk callout -- a sortable list alone doesn't
+          answer the control-oriented question "are we over-reliant on a
+          few vendors?" This surfaces it at a glance, above the table. */}
+      {vendorRanking.length >= 3 && (
+        <div className="flex items-center gap-2 rounded-md border border-violet-500/30 bg-violet-500/5 px-3 py-2.5 text-sm text-violet-800 dark:text-violet-300">
+          <PieChart className="h-4 w-4 shrink-0 text-violet-600" />
+          <p>
+            Top 3 vendors ({vendorRanking.slice(0, 3).map((v) => v.vendor).join(", ")}) make up{" "}
+            <span className="font-semibold">{top3SharePct.toFixed(0)}%</span> of {vendorHead === "expense" ? "total spend" : "total collected"} this period.
+          </p>
+        </div>
+      )}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">

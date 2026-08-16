@@ -118,7 +118,7 @@ function Inner() {
         {/* AD-31 */}
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle className="text-base">Expense-to-income ratio trend · AD-31</CardTitle>
+            <CardTitle className="text-base">Expense / Income ratio trend · AD-31</CardTitle>
             <CardDescription>% of income spent on expenses per month (lower is healthier)</CardDescription>
           </CardHeader>
           <CardContent>
@@ -174,12 +174,22 @@ function Inner() {
       </div>
 
       {/* AD-33 */}
+      {/* FIX (2026-08-15): this card claimed "(persisted in Settings)" but
+          the Textarea had no onChange/save handler at all -- anything typed
+          here vanished on refresh, and the "ideas" shown were hardcoded
+          example text, not saved notes. For a persona that explicitly wants
+          real control (not decorative features), a non-functional save
+          claim is worse than admitting the limitation. Relabeled honestly
+          for now; wiring up real persistence (a small settings endpoint) is
+          a reasonable follow-up if this card proves useful in practice. */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
-            <Lightbulb className="h-4 w-4 text-amber-500" /> Income notes · AD-33
+            <Lightbulb className="h-4 w-4 text-amber-500" /> Income ideas · AD-33
           </CardTitle>
-          <CardDescription>Free-text brainstorming panel (persisted in Settings)</CardDescription>
+          <CardDescription>
+            Scratchpad for brainstorming — not saved between sessions yet. Copy anything worth keeping elsewhere.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <Textarea

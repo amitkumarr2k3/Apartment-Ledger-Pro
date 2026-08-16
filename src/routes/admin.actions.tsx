@@ -4,20 +4,18 @@ import { PortalShell, usePeriod } from "@/components/portal-shell";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, Bar, CartesianGrid, ComposedChart, Line, ResponsiveContainer, XAxis, YAxis, Legend } from "recharts";
 import { SmartTooltipContent, getTooltipTrigger } from "@/components/smart-tooltip";
-import { inr, pct, categoryMonthly, total, type Category } from "@/lib/finance-mock";
-import { AlertTriangle, ArrowRight, Snowflake } from "lucide-react";
+import { inr, pct, categoryMonthly, total, vendorMonthly, months12, type Category } from "@/lib/finance-mock";
+import { AlertTriangle, ArrowRight, TrendingUp } from "lucide-react";
 import { NoDbData } from "@/components/mock-gate";
-import { useExpenseTree } from "@/lib/hooks";
+import { useExpenseTree, useIncomeTree, useMonthlyTotals } from "@/lib/hooks";
+import { filterReportableIncomeCategories, sumMaintenanceChargeMonthly } from "@/lib/income-utils";
 
 export const Route = createFileRoute("/admin/actions")({
   component: Page,
   head: () => ({ meta: [{ title: "Admin · Action Needed" }] }),
 });
-
-const getUploadedBudgetForCategory = (_category: string): number | null => null;
 
 function derive(
   tree: Category[],
@@ -55,6 +53,8 @@ function Page() {
 
 function Inner() {
   const { data: expenseTree = [], isLoading } = useExpenseTree();
+  const { data: incomeTree = [] } = useIncomeTree();
+  const { data: apiMonthly = [] } = useMonthlyTotals();
   const { sliceMonthly, priorSliceMonthly, labels, view } = usePeriod();
   const { momChanges, anomalies } = useMemo(
     () => derive(expenseTree, sliceMonthly, priorSliceMonthly),
@@ -68,17 +68,105 @@ function Inner() {
     );
   }
 
-  // FIX (2026-08-15): previously concatenated then sliced to 5 with NO sort
-  // at all, so "Top 5 items needing attention" wasn't actually the top
-  // anything -- just whichever anomalies/rising-cost items happened to come
-  // first in tree order. Now sorted by Amount, descending, before slicing.
+  // FIX (2026-08-15): this card's own description always said "anomalies,
+  // rising costs, income drops" -- but the code only ever looked at
+  // expenseTree, so income drops (and collection gaps, and vendor spend
+  // spikes) never actually fed into "Top 5 items needing attention." That
+  // made this page a subset of Cost Alerts & Trends rather than a genuine
+  // cross-cutting triage hub. It now pulls flagged items from every admin
+  // dashboard's own detection logic (mirrored here, not reinvented) and
+  // ranks them together by Amount.
   const risingItems = momChanges.filter((c) => c.periodChange > 15).map((c) => ({
     kind: "Rising cost", label: c.category, detail: `${pct(c.periodChange)} vs prior period`, to: "/admin/alerts", amount: c.current,
   }));
   const anomalyItems = anomalies.map((a) => ({
     kind: "Anomaly", label: a.category, detail: `Current ${inr(a.cur)} · ${a.ratio.toFixed(1)}× 3-mo avg`, to: "/admin/alerts", amount: a.cur,
   }));
-  const actions = [...anomalyItems, ...risingItems].sort((a, b) => b.amount - a.amount).slice(0, 5);
+
+  // Income drops / irregular sources -- mirrors Income Optimisation's own
+  // row-level flagging exactly (same active-months + trailing-3-month logic).
+  const reportableIncomeTree = filterReportableIncomeCategories(incomeTree);
+  const incomeRows = reportableIncomeTree.flatMap((c) =>
+    c.vendors.flatMap((v) =>
+      v.items.map((it) => {
+        const monthly = sliceMonthly(it.monthly);
+        const t = total(monthly);
+        const active = monthly.filter((n) => n > 0).length;
+        const recent = monthly.slice(-Math.min(3, monthly.length));
+        const expectedMonths = Math.max(labels.length, 12);
+        return {
+          category: c.name, source: it.name, total: t, active,
+          irregular: active < expectedMonths && active > 0,
+          dropped: recent.length > 0 && recent.every((n) => n === 0) && active > 0,
+        };
+      }),
+    ),
+  );
+  const incomeDropItems = incomeRows.filter((r) => r.dropped || r.irregular).map((r) => ({
+    kind: r.dropped ? "Income drop" : "Income irregular",
+    label: r.source, detail: `${r.category} · ${r.active}/${labels.length} months active`, to: "/admin/income", amount: r.total,
+  }));
+
+  // Collection gaps -- mirrors Collections' sharp-drop detection, using the
+  // same corrected "Collected Maintenance" figure (not the raw, unfiltered
+  // backend collection total).
+  const maintenanceMonthly = sumMaintenanceChargeMonthly(incomeTree, months12.length);
+  const maintenanceByMonth = new Map(months12.map((m, i) => [m, maintenanceMonthly[i]]));
+  const adjustedCollections = apiMonthly.map((m) => ({
+    ...m, collection: maintenanceByMonth.get(m.month) ?? m.collection,
+  }));
+  const collectionData = sliceMonthly(adjustedCollections).map((m, i, arr) => {
+    const prev = arr[i - 1]?.collection;
+    const change = prev ? ((m.collection - prev) / prev) * 100 : 0;
+    return { ...m, change };
+  });
+  const collectionGapItems = collectionData.filter((d) => d.change < -10).map((d) => ({
+    kind: "Collection gap", label: `${d.month} collection`, detail: `${pct(d.change, 1)} vs prior month`, to: "/admin/collections", amount: d.collection,
+  }));
+
+  // Vendor spend spikes -- mirrors Vendor Insights' own >20%-change flag.
+  const vendorRanking = expenseTree.flatMap((c) => c.vendors.map((v) => {
+    const full = vendorMonthly(v);
+    const selected = sliceMonthly(full);
+    const previous = priorSliceMonthly(full);
+    const selectedTotal = total(selected);
+    const previousTotal = total(previous);
+    return {
+      vendor: v.name, category: c.name, total: selectedTotal,
+      changePct: previousTotal ? ((selectedTotal - previousTotal) / Math.abs(previousTotal)) * 100 : 0,
+    };
+  })).filter((v) => v.total > 0);
+  const vendorSpikeItems = vendorRanking.filter((v) => v.changePct > 20).map((v) => ({
+    kind: "Vendor spike", label: v.vendor, detail: `${v.category} · ${pct(v.changePct, 1)} vs prior period`, to: "/admin/vendors", amount: v.total,
+  }));
+
+  const actions = [...anomalyItems, ...risingItems, ...incomeDropItems, ...collectionGapItems, ...vendorSpikeItems]
+    .sort((a, b) => b.amount - a.amount)
+    .slice(0, 5);
+
+  // FIX (2026-08-15): "Seasonal patterns" used to be 3 HARDCODED entries
+  // (Utilities Apr-May, Maintenance Jun, Petty Cash Dec) shown regardless of
+  // actual data -- not computed from real transactions at all. True
+  // seasonality (a pattern that repeats at the same calendar month across
+  // YEARS) can't be proven with only ~12 months of data, so rather than
+  // fake that confidence, this now shows a real, honest signal instead:
+  // categories currently spending notably more than their own average over
+  // the selected period. Once 2+ years of data exist, this can be upgraded
+  // to genuine year-over-year seasonality detection.
+  const aboveAverageSpend = expenseTree
+    .map((c) => {
+      const monthly = sliceMonthly(categoryMonthly(c)).filter((n) => n > 0);
+      if (monthly.length < 3) return null;
+      const current = monthly[monthly.length - 1] ?? 0;
+      const priorMonths = monthly.slice(0, -1);
+      const avg = priorMonths.length ? priorMonths.reduce((s, n) => s + n, 0) / priorMonths.length : 0;
+      if (avg <= 0 || current <= 0) return null;
+      const ratio = current / avg;
+      return { category: c.name, current, avg, ratio };
+    })
+    .filter((s) => s !== null && s.ratio >= 1.25)
+    .sort((a, b) => b.ratio - a.ratio)
+    .slice(0, 5);
 
   const projectionCandidates = [
     ...anomalies
@@ -114,14 +202,6 @@ function Inner() {
     { month: "+2 mo", actual: null, projected: projB },
   ];
 
-  // FIX (2026-08-15): sort by Amount (spent), descending -- previously
-  // unsorted, showing categories in whatever order the tree returned them.
-  const budgetRows = expenseTree.map((c) => {
-    const spent = total(sliceMonthly(categoryMonthly(c)));
-    const budget = getUploadedBudgetForCategory(c.name);
-    const variance = budget && budget > 0 ? ((spent - budget) / budget) * 100 : null;
-    return { category: c.name, budget, spent, variance };
-  }).sort((a, b) => b.spent - a.spent);
 
   return (
     <>
@@ -130,12 +210,34 @@ function Inner() {
           <CardTitle className="text-base flex items-center gap-2">
             <AlertTriangle className="h-4 w-4 text-rose-500" /> Top 5 items needing attention · AD-41
           </CardTitle>
-          <CardDescription>Highest-priority flagged items — anomalies, rising costs, income drops</CardDescription>
+          {/* FIX (2026-08-15): description now genuinely matches what the
+              code computes -- previously said "income drops" but the code
+              never looked at income at all. This page is the cross-cutting
+              triage hub across every admin dashboard; Cost Alerts & Trends
+              is the expense-specific deep-dive behind the anomaly/rising-
+              cost subset of these signals. */}
+          <CardDescription>Highest-priority flagged items across every dashboard — expense anomalies, rising costs, income drops, collection gaps, and vendor spend spikes</CardDescription>
         </CardHeader>
         <CardContent className="divide-y divide-border">
           {actions.length === 0 && <p className="text-sm text-muted-foreground py-3">Nothing flagged. All categories look healthy.</p>}
           {actions.map((a, i) => (
-            <Link key={i} to={a.to} className="flex items-center justify-between py-3 group hover:bg-accent/40 -mx-4 px-4 rounded">
+            <Link
+              key={i}
+              to={a.to}
+              // FIX (2026-08-15): this was the ONE link in the app missing
+              // search-param preservation -- every other cross-dashboard
+              // link (nav tabs, "Drill" links on Vendor Insights/Cost
+              // Alerts) spreads {...prev} so period/view survive
+              // navigation. This one was a bare path string, so clicking
+              // any "Top 5 items needing attention" row silently reset the
+              // period filter to the default on arrival -- and since the
+              // tab bar itself correctly preserves "whatever the current
+              // period is," that reset value then propagated to every
+              // subsequent page you visited afterward, making it look like
+              // your original selection had vanished entirely.
+              search={(((prev: any) => ({ ...prev })) as any)}
+              className="flex items-center justify-between py-3 group hover:bg-accent/40 -mx-4 px-4 rounded"
+            >
               <div className="flex items-center gap-4">
                 <span className="text-xs font-mono w-6 text-muted-foreground">#{i + 1}</span>
                 <div>
@@ -226,63 +328,36 @@ function Inner() {
         </Card>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Budget vs actual · AD-43</CardTitle>
-            <CardDescription>Shows variance only when an uploaded budget baseline is available</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Category</TableHead>
-                  <TableHead className="text-right">Budget</TableHead>
-                  <TableHead className="text-right">Actual</TableHead>
-                  <TableHead className="text-right w-[100px]">Variance</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {budgetRows.map((r) => (
-                  <TableRow key={r.category}>
-                    <TableCell className="font-medium">{r.category}</TableCell>
-                    <TableCell className="text-right font-mono">{r.budget == null ? "N/A" : inr(r.budget)}</TableCell>
-                    <TableCell className="text-right font-mono">{inr(r.spent)}</TableCell>
-                    <TableCell className="text-right">
-                      {r.variance == null ? (
-                        <span className="font-mono text-xs px-2 py-0.5 rounded text-muted-foreground bg-muted/40">N/A</span>
-                      ) : (
-                        <span className={`font-mono text-xs px-2 py-0.5 rounded ${
-                          r.variance > 0 ? "bg-rose-500/10 text-rose-600" : "bg-emerald-500/10 text-emerald-600"
-                        }`}>{pct(r.variance)}</span>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-
+      {/* FIX (2026-08-15): "Budget vs actual" hidden for now -- every row
+          always showed "N/A" because getUploadedBudgetForCategory() is a
+          stub with no real budget data behind it. Showing a permanently-
+          broken-looking card undermines trust in a "control" dashboard more
+          than not showing it at all. Re-enable once a real budget-upload
+          feature exists (see admin.settings / a future Dashboard Controls
+          addition), rather than leaving a half-built feature visible. */}
+      <div className="grid gap-4">
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
-              <Snowflake className="h-4 w-4 text-cyan-500" /> Seasonal patterns · AD-42
+              <TrendingUp className="h-4 w-4 text-cyan-500" /> Above-average spend this month · AD-42
             </CardTitle>
-            <CardDescription>Categories with consistent seasonal spikes — expected, not alerts</CardDescription>
+            <CardDescription>
+              Categories currently spending noticeably more than their own period average — worth watching, not necessarily alarming
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            {[
-              { cat: "Utilities", month: "Apr–May", note: "Summer backup load typically 30% higher" },
-              { cat: "Maintenance", month: "Jun", note: "Pre-monsoon painting & waterproofing" },
-              { cat: "Petty Cash", month: "Dec", note: "Community event contributions" },
-            ].map((s) => (
-              <div key={s.cat} className="p-3 rounded-md border border-cyan-500/30 bg-cyan-500/5 text-sm">
+            {aboveAverageSpend.length === 0 && (
+              <p className="text-sm text-muted-foreground">No category is running notably above its own average this period.</p>
+            )}
+            {aboveAverageSpend.map((s) => (
+              <div key={s.category} className="p-3 rounded-md border border-cyan-500/30 bg-cyan-500/5 text-sm">
                 <div className="flex items-center justify-between">
-                  <span className="font-medium">{s.cat}</span>
-                  <Badge variant="outline" className="text-[10px]">{s.month}</Badge>
+                  <span className="font-medium">{s.category}</span>
+                  <Badge variant="outline" className="text-[10px]">{s.ratio.toFixed(1)}× avg</Badge>
                 </div>
-                <div className="text-xs text-muted-foreground mt-1">{s.note}</div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  This month {inr(s.current)} · period average {inr(Math.round(s.avg))}
+                </div>
               </div>
             ))}
           </CardContent>
