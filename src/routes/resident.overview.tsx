@@ -655,7 +655,7 @@ function AuditedReportCard() {
   const session = getSession();
   const isSuperAdmin = session?.role === "superadmin";
 
-  const recentFYs = [fiscalYearLabel(0), fiscalYearLabel(1), fiscalYearLabel(2), fiscalYearLabel(3)];
+  const recentFYs = [fiscalYearLabel(0), fiscalYearLabel(1)];
   const availableFYs = Array.from(new Set([...recentFYs, ...reports.map((r) => r.fiscal_year)])).sort().reverse();
 
   const [selectedFY, setSelectedFY] = useState(fiscalYearLabel(0));
