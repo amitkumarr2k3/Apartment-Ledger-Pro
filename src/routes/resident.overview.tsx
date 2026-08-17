@@ -18,7 +18,7 @@ import {
 } from "@/lib/finance-mock";
 import { useMonthlyTotals, useExpenseTree, useIncomeTree, useWidgetVisibility, useAuditedReports, uploadAuditedReport, fetchAuditedReportFileUrl } from "@/lib/hooks";
 import { getSession } from "@/lib/session";
-import { Wallet, ArrowRight, TrendingUp, TrendingDown, Home, Banknote, ShieldCheck, CheckCircle2, AlertTriangle, ShoppingCart, PiggyBank, Vault, HandCoins, CreditCard, Scale, Gauge, Target, FileCheck2, Eye, UploadCloud } from "lucide-react";
+import { Wallet, ArrowRight, TrendingUp, TrendingDown, Home, Banknote, ShieldCheck, CheckCircle2, AlertTriangle, ShoppingCart, PiggyBank, Vault, HandCoins, CreditCard, Scale, Gauge, Target, FileCheck2, Eye, UploadCloud, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/resident/overview")({
@@ -643,6 +643,12 @@ function AuditedReportCard() {
   const [fileLoading, setFileLoading] = useState(false);
 
   const report = reports.find((r) => r.fiscal_year === selectedFY);
+  // Most mobile browsers don't reliably render a PDF INLINE inside an
+  // <iframe> the way desktop browsers do (especially for a blob: URL
+  // sitting inside a modal) -- they show an unresponsive placeholder
+  // instead. Detect mobile and use a guaranteed-to-work "open in new tab"
+  // button there instead of the iframe.
+  const isMobile = typeof navigator !== "undefined" && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
   // Load the PDF as an authenticated blob: URL whenever the viewer is open --
   // an <iframe src="/api/reports/:id/file"> alone would send no auth header
@@ -739,7 +745,20 @@ function AuditedReportCard() {
             fileLoading ? (
               <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">Loading report…</div>
             ) : fileUrl ? (
-              <iframe src={fileUrl} title="Audited Report" className="flex-1 w-full rounded border" />
+              isMobile ? (
+                <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center px-6">
+                  <FileCheck2 className="h-10 w-10 text-indigo-400" />
+                  <p className="text-sm text-muted-foreground">
+                    Inline PDF preview isn't reliably supported on mobile browsers.
+                    Tap below to open the report.
+                  </p>
+                  <Button onClick={() => window.open(fileUrl, "_blank", "noopener,noreferrer")}>
+                    <ExternalLink className="h-4 w-4 mr-1" /> Open Report
+                  </Button>
+                </div>
+              ) : (
+                <iframe src={fileUrl} title="Audited Report" className="flex-1 w-full rounded border" />
+              )
             ) : (
               <div className="flex-1 flex items-center justify-center text-sm text-rose-600">Failed to load report. Please try again.</div>
             )
