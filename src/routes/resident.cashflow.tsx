@@ -5,7 +5,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { SmartTooltipContent, getTooltipTrigger } from "@/components/smart-tooltip";
 import { inr, categoryMonthly } from "@/lib/finance-mock";
-import { useMonthlyTotals, useIncomeTree, useWidgetVisibility } from "@/lib/hooks";
+import { useMonthlyTotals, useIncomeTree } from "@/lib/hooks";
 import { Info, TrendingDown, TrendingUp, Award, AlertOctagon } from "lucide-react";
 
 export const Route = createFileRoute("/resident/cashflow")({
@@ -25,7 +25,6 @@ const TOTAL_SQFT = 701591;
 
 function Inner() {
   const { sliceMonthly, view, labels = [] } = usePeriod();
-  const { isWidgetVisible } = useWidgetVisibility("resident.cashflow");
   const { data: monthlyTotals = [] } = useMonthlyTotals();
   const { data: incomeTree = [] } = useIncomeTree();
   const safeIncomeTree = incomeTree || [];
@@ -71,14 +70,36 @@ function Inner() {
       }, []),
   );
 
-  const outstandingByMonth = sliceMonthly(
-    safeIncomeTree
-      .filter((c) => isLiability(c.name))
-      .reduce<number[]>((acc, c) => {
-        const monthly = categoryMonthly(c);
-        return acc.length === 0 ? monthly : acc.map((v, i) => v + (monthly[i] ?? 0));
-      }, []),
-  );
+  // "Previous Arrears Brought Forward" is uploaded every month, dated for
+  // the FOLLOWING month (e.g. the entry dated 1-Aug is the closing/cumulative
+  // outstanding as of the end of July) -- it already IS the running total,
+  // no addition needed, just a one-month shift. "Current Month Unpaid
+  // Maintenance" is restricted to Income Visibility's RD-32 chart ONLY and
+  // must not be read here at all.
+  const isPreviousArrearsBF = (s: string) => (s || "").trim().toLowerCase() === "previous arrears brought forward";
+  const liabilityLineItemRawMonthly = (matchLineItem: (name: string) => boolean): number[] => {
+    let result: number[] = [];
+    safeIncomeTree.filter((c) => isLiability(c.name)).forEach((c) => {
+      (c.vendors || []).forEach((v) => {
+        (v.items || []).forEach((i) => {
+          if (matchLineItem(i.name)) {
+            const monthly = i.monthly || [];
+            result = result.length === 0 ? [...monthly] : result.map((val, idx) => val + (monthly[idx] ?? 0));
+          }
+        });
+      });
+    });
+    return result;
+  };
+  const bfRawMonthly = liabilityLineItemRawMonthly(isPreviousArrearsBF);
+
+  // Cumulative outstanding for month i = the BF entry dated the FOLLOWING
+  // calendar month (index i + 1 in the same array) -- taken at face value,
+  // no addition. Built across the FULL unsliced history first, then sliced
+  // to the selected period, so the shift lines up correctly regardless of
+  // which window is currently visible.
+  const cumulativeOutstandingFullByMonth = bfRawMonthly.map((_, idx) => bfRawMonthly[idx + 1] ?? 0);
+  const cumulativeOutstandingByMonth = sliceMonthly(cumulativeOutstandingFullByMonth);
 
   // Expected Collection = per-sqft rate x fixed area (same Rate Reference
   // data source as Overview\u2019s Expected Collection card).
@@ -86,15 +107,12 @@ function Inner() {
   const rateMonthly = rateCategory ? sliceMonthly(categoryMonthly(rateCategory)) : [];
 
   const periodMonthlyTotals = new Map(period.map((m) => [m.month, m]));
-  let runningOutstanding = 0;
   const monthlyTrend = (labels || []).map((month, i) => {
     const monthlyTotal = periodMonthlyTotals.get(month);
     const actualCollection = actualCollectionByMonth[i] ?? 0;
     const otherIncome = otherIncomeByMonth[i] ?? 0;
     const totalIncomeThisMonth = actualCollection + otherIncome;
-    const outstanding = Math.max(0, outstandingByMonth[i] ?? 0);
     const expectedCollectionThisMonth = ((rateMonthly[i] ?? 0) / 100) * TOTAL_SQFT;
-    runningOutstanding += outstanding;
     return {
       month,
       actual_collection: actualCollection,
@@ -102,8 +120,7 @@ function Inner() {
       other_income: otherIncome,
       total_income: totalIncomeThisMonth,
       expense: monthlyTotal?.expense ?? 0,
-      outstanding,
-      cumulative_outstanding: runningOutstanding,
+      cumulative_outstanding: cumulativeOutstandingByMonth[i] ?? 0,
       net: totalIncomeThisMonth - (monthlyTotal?.expense ?? 0),
     };
   });
@@ -138,7 +155,6 @@ function Inner() {
         <AlertDescription>RD-23 · Aggregate community-level view only. No individual flat-wise tracking.</AlertDescription>
       </Alert>
 
-      {isWidgetVisible("cashflow.summaryCards") && (
       <div className="grid gap-4 md:grid-cols-3">
         {/* RD-20 */}
         <Card>
@@ -173,10 +189,8 @@ function Inner() {
           </CardContent>
         </Card>
       </div>
-      )}
 
       {/* NEW INSIGHTS: Expected-vs-Actual variance + best/worst month callouts */}
-      {isWidgetVisible("cashflow.performanceVsTarget") && (
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader className="pb-2">
@@ -211,13 +225,11 @@ function Inner() {
           </CardContent>
         </Card>
       </div>
-      )}
 
       {/* RD-21 -- moved from Overview: strictly richer than the old bar chart
           it replaces (adds Expected Collection target + cumulative outstanding
           risk signal, and fixes the Tax/GST contamination that previously
           existed in the raw "collection" figure this page used to show). */}
-      {isWidgetVisible("cashflow.monthlyTrendChart") && (
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Monthly trend · actual vs expected collection, expense &amp; outstanding</CardTitle>
@@ -247,8 +259,7 @@ function Inner() {
                     <th className="text-right p-2">Actual Collection</th>
                     <th className="text-right p-2">Expected Collection</th>
                     <th className="text-right p-2">Expense</th>
-                    <th className="text-right p-2">Outstanding</th>
-                    <th className="text-right p-2">Cumulative</th>
+                    <th className="text-right p-2">Cumulative Outstanding</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -258,7 +269,6 @@ function Inner() {
                       <td className="p-2 text-right font-mono">{inr(m.actual_collection)}</td>
                       <td className="p-2 text-right font-mono">{inr(m.expected_collection)}</td>
                       <td className="p-2 text-right font-mono">{inr(m.expense)}</td>
-                      <td className="p-2 text-right font-mono">{inr(m.outstanding)}</td>
                       <td className="p-2 text-right font-mono">{inr(m.cumulative_outstanding)}</td>
                     </tr>
                   ))}
@@ -268,7 +278,6 @@ function Inner() {
           )}
         </CardContent>
       </Card>
-      )}
     </>
 
   );

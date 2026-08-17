@@ -1,8 +1,14 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-
+import { useState, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { PortalShell, usePeriod } from "@/components/portal-shell";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell,
 } from "recharts";
@@ -10,8 +16,10 @@ import { SmartTooltipContent, getTooltipTrigger } from "@/components/smart-toolt
 import {
   inr, pct, categoryMonthly, total, vendorMonthly, sumMonthly,
 } from "@/lib/finance-mock";
-import { useMonthlyTotals, useExpenseTree, useIncomeTree, useWidgetVisibility } from "@/lib/hooks";
-import { Wallet, ArrowRight, TrendingUp, TrendingDown, Home, Banknote, ShieldCheck, CheckCircle2, AlertTriangle, ShoppingCart, PiggyBank, Vault, HandCoins, CreditCard, Scale, Gauge, Target } from "lucide-react";
+import { useMonthlyTotals, useExpenseTree, useIncomeTree, useWidgetVisibility, useAuditedReports, uploadAuditedReport, fetchAuditedReportFileUrl } from "@/lib/hooks";
+import { getSession } from "@/lib/session";
+import { Wallet, ArrowRight, TrendingUp, TrendingDown, Home, Banknote, ShieldCheck, CheckCircle2, AlertTriangle, ShoppingCart, PiggyBank, Vault, HandCoins, CreditCard, Scale, Gauge, Target, FileCheck2, Eye, UploadCloud } from "lucide-react";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/resident/overview")({
   component: Page,
@@ -176,18 +184,57 @@ function Inner() {
    * Sum of all "Maintenance Outstanding"-style categories for the selected
    * period. Feeds Recovery Rate below so the two figures can never disagree.
    */
-  const outstandingDuesActual = safeIncomeTree
-    .filter((c) => isLiability(c.name))
-    .reduce((sum, c) => sum + total(sliceMonthly(categoryMonthly(c))), 0);
+  // "Previous Arrears Brought Forward" is uploaded every month, dated for
+  // the FOLLOWING month (e.g. the entry dated 1-Aug is the closing/cumulative
+  // outstanding as of the end of July) -- it already IS the running total,
+  // no addition needed. "Current Month Unpaid Maintenance" is restricted to
+  // Income Visibility's RD-32 chart ONLY and must not be read here at all.
+  const isPreviousArrearsBF = (s: string) => (s || "").trim().toLowerCase() === "previous arrears brought forward";
+  const liabilityLineItemRawMonthly = (matchLineItem: (name: string) => boolean): number[] => {
+    let result: number[] = [];
+    safeIncomeTree.filter((c) => isLiability(c.name)).forEach((c) => {
+      (c.vendors || []).forEach((v) => {
+        (v.items || []).forEach((i) => {
+          if (matchLineItem(i.name)) {
+            const monthly = i.monthly || [];
+            result = result.length === 0 ? [...monthly] : result.map((val, idx) => val + (monthly[idx] ?? 0));
+          }
+        });
+      });
+    });
+    return result;
+  };
+  const bfRawMonthly = liabilityLineItemRawMonthly(isPreviousArrearsBF);
+
+  /**
+   * OUTSTANDING DUES CARD -- CUMULATIVE (ALL-TIME).
+   * The latest available "Previous Arrears Brought Forward" entry, taken at
+   * face value -- it already represents the full cumulative default as of
+   * the end of the most recently closed month. No addition, no other line
+   * item involved. Deliberately NOT filtered by the dashboard's period
+   * selector, same "all-time" treatment as Bank Balance / Contingency Cash /
+   * Corpus.
+   */
+  let cumulativeOutstandingDue = 0;
+  for (let idx = bfRawMonthly.length - 1; idx >= 0; idx--) {
+    if (bfRawMonthly[idx]) {
+      cumulativeOutstandingDue = bfRawMonthly[idx];
+      break;
+    }
+  }
 
   /**
    * RECOVERY RATE
-   * % of total maintenance due (collected + still outstanding) actually
-   * collected for the selected period. Replaces the previous hardcoded 90%
-   * now that real collection + outstanding data exists.
+   * Redefined: % of the EXPECTED (per-sqft target) collection that was
+   * actually collected for the selected period. Neither "Current Month
+   * Unpaid Maintenance" nor "Previous Arrears Brought Forward" are used
+   * here -- both are restricted to their own designated places only
+   * (RD-32 for the former; the Outstanding Dues card / Cashflow Health's
+   * cumulative outstanding line for the latter) and must not leak into any
+   * other calculation.
    */
-  const recoveryRate = (collectedMaintenance + outstandingDuesActual) > 0
-    ? (collectedMaintenance / (collectedMaintenance + outstandingDuesActual)) * 100
+  const recoveryRate = expectedCollection > 0
+    ? (collectedMaintenance / expectedCollection) * 100
     : 0;
   const recoveryStatus =
     recoveryRate >= 90
@@ -226,6 +273,10 @@ function Inner() {
 
   return (
     <div className="space-y-6">
+      {/* Audited Report -- prominent placeholder at the very top, above
+          every other card, so it's the first thing a resident sees. */}
+      {isWidgetVisible("overview.auditedReport") && <AuditedReportCard />}
+
       {/* Section 1: Collection Health */}
       {isWidgetVisible("overview.collectionHealth") && (
       <DashboardSection 
@@ -248,10 +299,11 @@ function Inner() {
           />
           <MetricCard 
             label="OUTSTANDING DUES" 
-            value={inr(outstandingDuesActual)} 
-            subText={`PENDING DUES FOR ${periodLabel}`} 
+            value={inr(cumulativeOutstandingDue)} 
+            subText="CUMULATIVE DEFAULT · NOT FILTER-DEPENDENT" 
             icon={<AlertTriangle className="h-5 w-5 text-red-500" />}
             valueClassName="text-red-700"
+            fixed
           />
           <MetricCard 
             label="OTHER INCOME" 
@@ -303,7 +355,7 @@ function Inner() {
             label="RECOVERY RATE" 
             value={`${recoveryRate.toFixed(1)}%`} 
             icon={<Gauge className="h-5 w-5 text-blue-500" />}
-            subText={`MAINTENANCE COLLECTED VS DUE FOR ${periodLabel}`}
+            subText={`MAINTENANCE COLLECTED VS EXPECTED TARGET FOR ${periodLabel}`}
             footer={
               <div className="w-full mt-2">
                 <div className={`flex items-center gap-1 text-xs font-medium mb-1 ${recoveryStatus.color}`}>
@@ -558,6 +610,178 @@ function Inner() {
         )}
       </div>
     </div>
+  );
+}
+
+// FIY label convention matches what's shown elsewhere in the app ("FY 2026-27").
+// Independent of the dashboard's main period selector on purpose -- that
+// selector has non-FY modes (Last 12 months, a specific month, etc.) that
+// don't map cleanly to a single fiscal year, so this widget gets its own
+// small, self-contained FY picker instead of trying to reuse that state.
+function fiscalYearLabel(offsetYears: number): string {
+  const now = new Date();
+  const fyStartYear = (now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1) - offsetYears;
+  const fyEndYear = (fyStartYear + 1) % 100;
+  return `FY ${fyStartYear}-${String(fyEndYear).padStart(2, "0")}`;
+}
+
+function AuditedReportCard() {
+  const { data: reports = [] } = useAuditedReports();
+  const qc = useQueryClient();
+  const session = getSession();
+  const isSuperAdmin = session?.role === "superadmin";
+
+  const recentFYs = [fiscalYearLabel(0), fiscalYearLabel(1), fiscalYearLabel(2), fiscalYearLabel(3)];
+  const availableFYs = Array.from(new Set([...recentFYs, ...reports.map((r) => r.fiscal_year)])).sort().reverse();
+
+  const [selectedFY, setSelectedFY] = useState(fiscalYearLabel(0));
+  const [viewOpen, setViewOpen] = useState(false);
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [uploadFY, setUploadFY] = useState(fiscalYearLabel(0));
+  const [uploading, setUploading] = useState(false);
+  const [fileUrl, setFileUrl] = useState<string | null>(null);
+  const [fileLoading, setFileLoading] = useState(false);
+
+  const report = reports.find((r) => r.fiscal_year === selectedFY);
+
+  // Load the PDF as an authenticated blob: URL whenever the viewer is open --
+  // an <iframe src="/api/reports/:id/file"> alone would send no auth header
+  // at all and always come back 401. Revoke the previous blob URL on cleanup
+  // so we don't leak memory across report switches / dialog closes.
+  useEffect(() => {
+    if (!viewOpen || !report) {
+      setFileUrl(null);
+      return;
+    }
+    let cancelled = false;
+    setFileLoading(true);
+    setFileUrl(null);
+    fetchAuditedReportFileUrl(report.id).then((url) => {
+      if (cancelled) {
+        if (url) URL.revokeObjectURL(url);
+        return;
+      }
+      setFileUrl(url);
+      setFileLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [viewOpen, report?.id]);
+
+  useEffect(() => {
+    return () => {
+      if (fileUrl) URL.revokeObjectURL(fileUrl);
+    };
+  }, [fileUrl]);
+
+  async function handleUpload(file: File) {
+    if (file.type !== "application/pdf") {
+      toast.error("Only PDF files are supported.");
+      return;
+    }
+    setUploading(true);
+    const ok = await uploadAuditedReport(uploadFY, file);
+    setUploading(false);
+    if (ok) {
+      toast.success(`Audited report uploaded for ${uploadFY}`);
+      setUploadOpen(false);
+      qc.invalidateQueries({ queryKey: ["audited-reports"] });
+    } else {
+      toast.error("Upload failed \u2014 please try again.");
+    }
+  }
+
+  return (
+    <Card className="border-indigo-500/30 bg-indigo-500/5">
+      <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <FileCheck2 className="h-5 w-5 text-indigo-600" />
+          <div>
+            <CardTitle className="text-base">Audited Report</CardTitle>
+            <CardDescription>Statutory audited financial report for the society</CardDescription>
+          </div>
+        </div>
+        <Select value={selectedFY} onValueChange={setSelectedFY}>
+          <SelectTrigger className="w-[140px] h-8"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {availableFYs.map((fy) => <SelectItem key={fy} value={fy}>{fy}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </CardHeader>
+      <CardContent className="flex items-center justify-between flex-wrap gap-3">
+        {report ? (
+          <>
+            <div className="text-sm text-muted-foreground">
+              {report.file_name} · uploaded {String(report.uploaded_at).slice(0, 10)}
+            </div>
+            <Button size="sm" onClick={() => setViewOpen(true)}>
+              <Eye className="h-4 w-4 mr-1" /> View Report
+            </Button>
+          </>
+        ) : (
+          <p className="text-sm text-muted-foreground">No audited report uploaded yet for {selectedFY}.</p>
+        )}
+        {isSuperAdmin && (
+          <Button size="sm" variant="outline" onClick={() => { setUploadFY(selectedFY); setUploadOpen(true); }}>
+            <UploadCloud className="h-4 w-4 mr-1" /> {report ? "Replace" : "Upload"}
+          </Button>
+        )}
+      </CardContent>
+
+      {/* View: inline PDF embed, never a download prompt */}
+      <Dialog open={viewOpen} onOpenChange={setViewOpen}>
+        <DialogContent className="max-w-4xl h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Audited Report · {selectedFY}</DialogTitle>
+          </DialogHeader>
+          {report && (
+            fileLoading ? (
+              <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">Loading report…</div>
+            ) : fileUrl ? (
+              <iframe src={fileUrl} title="Audited Report" className="flex-1 w-full rounded border" />
+            ) : (
+              <div className="flex-1 flex items-center justify-center text-sm text-rose-600">Failed to load report. Please try again.</div>
+            )
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Upload: superadmin only */}
+      {isSuperAdmin && (
+        <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Upload audited report</DialogTitle>
+              <DialogDescription>PDF only. Uploading again for the same FY replaces the existing file.</DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Fiscal year</Label>
+                <Select value={uploadFY} onValueChange={setUploadFY}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {availableFYs.map((fy) => <SelectItem key={fy} value={fy}>{fy}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">PDF file</Label>
+                <Input
+                  type="file"
+                  accept="application/pdf"
+                  disabled={uploading}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) handleUpload(f);
+                  }}
+                />
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+    </Card>
   );
 }
 
