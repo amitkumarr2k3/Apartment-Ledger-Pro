@@ -9,6 +9,7 @@ import { routes as expensesRoutes } from "./routes/expenses";
 import { routes as incomeRoutes } from "./routes/income";
 import { routes as vendorsRoutes } from "./routes/vendors";
 import { routes as collectionsRoutes } from "./routes/collections";
+import { routes as reportsRoutes } from "./routes/reports";
 import { routes as adminTxnRoutes } from "./routes/admin.transactions";
 import { routes as adminResRoutes } from "./routes/admin.residents";
 // admin.vendors removed — vendor master is not user-managed (imported via CSV / auto-created).
@@ -68,6 +69,7 @@ export async function buildApp() {
   await app.register(incomeRoutes, { prefix: "/api/income" });
   await app.register(vendorsRoutes, { prefix: "/api/vendors" });
   await app.register(collectionsRoutes, { prefix: "/api/collections" });
+  await app.register(reportsRoutes, { prefix: "/api/reports" });
   await app.register(adminTxnRoutes, { prefix: "/api/admin/transactions" });
   await app.register(adminResRoutes, { prefix: "/api/admin/residents" });
   // vendor CRUD removed — /api/vendors (read-only insights) still available

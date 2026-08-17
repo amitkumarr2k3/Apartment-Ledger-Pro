@@ -44,6 +44,7 @@ const DASHBOARD_DEFS: DashboardDef[] = [
     key: "resident.overview",
     label: "Resident \u00B7 Overview",
     widgets: [
+      { id: "overview.auditedReport", label: "Audited Report (superadmin uploads; residents/admin view only)" },
       { id: "overview.collectionHealth", label: "Collection Health (Expected Collection, Collected Maintenance, Outstanding Dues, Other Income)" },
       { id: "overview.financialPosition", label: "Society Financial Position (Total Income/Expense, Net Surplus, Recovery Rate)" },
       { id: "overview.financialStrength", label: "Long-Term Financial Strength (Corpus, Contingency Cash, Bank Balance, Expense/Income Ratio)" },

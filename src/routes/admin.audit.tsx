@@ -22,6 +22,7 @@ const actionColor: Record<string, string> = {
   login: "border-cyan-500/40 text-cyan-600",
   import: "border-violet-500/40 text-violet-600",
   settings: "border-blue-500/40 text-blue-600",
+  upload: "border-indigo-500/40 text-indigo-600",
 };
 
 type AuditRow = {
@@ -121,7 +122,7 @@ function Page() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-emerald-500" /> Immutable activity log</CardTitle>
-          <CardDescription>Every create / update / delete / login / import is captured with actor, target entity, IP and timestamp.</CardDescription>
+          <CardDescription>Every create / update / delete / login / import / upload is captured with actor, target entity, IP and timestamp.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-2 sm:grid-cols-4">
@@ -133,7 +134,7 @@ function Page() {
               <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All actions</SelectItem>
-                {["create","update","delete","login","import","settings"].map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+                {["create","update","delete","login","import","settings","upload"].map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}
               </SelectContent>
             </Select>
             <Select value={entity} onValueChange={setEntity}>

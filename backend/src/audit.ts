@@ -7,7 +7,7 @@ export type AuditInput = {
   actorEmail?: string | null;
   entity: string;
   entityId?: string | null;
-  action: "create" | "update" | "delete" | "login" | "import" | "settings";
+  action: "create" | "update" | "delete" | "login" | "import" | "settings" | "upload";
   before?: unknown;
   after?: unknown;
   ip?: string | null;

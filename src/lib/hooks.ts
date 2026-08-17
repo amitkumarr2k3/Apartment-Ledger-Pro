@@ -101,6 +101,83 @@ export function useWidgetVisibility(dashboardKey: string) {
   return { dashboardEnabled, hiddenWidgets, isWidgetVisible };
 }
 
+// ---- Audited Report widget ----
+export type AuditedReport = {
+  id: string;
+  fiscal_year: string;
+  title?: string | null;
+  file_name: string;
+  mime_type?: string;
+  uploaded_at: string;
+};
+
+export function useAuditedReports() {
+  return useQuery({
+    queryKey: ["audited-reports", authCacheKey()],
+    enabled: hasStoredAuth(),
+    queryFn: async (): Promise<AuditedReport[]> => {
+      try {
+        const r = await fetch("/api/reports", authHeaders());
+        if (!r.ok) return [];
+        const j = await r.json();
+        return Array.isArray(j.rows) ? j.rows : [];
+      } catch {
+        return [];
+      }
+    },
+    staleTime: 30_000,
+  });
+}
+
+// Superadmin-only. fiscalYear must match exactly what the FY selector shows
+// (e.g. "FY 2026-27") so useAuditedReports() lookups by label line up.
+export async function uploadAuditedReport(fiscalYear: string, file: File): Promise<boolean> {
+  try {
+    const fd = new FormData();
+    fd.append("file", file, file.name);
+    const auth = authHeaders();
+    const r = await fetch(`/api/reports/${encodeURIComponent(fiscalYear)}`, {
+      method: "POST",
+      headers: { ...(auth.headers ?? {}) },
+      body: fd,
+    });
+    return r.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function deleteAuditedReport(id: string): Promise<boolean> {
+  try {
+    const auth = authHeaders();
+    const r = await fetch(`/api/reports/${id}`, {
+      method: "DELETE",
+      headers: { ...(auth.headers ?? {}) },
+    });
+    return r.ok;
+  } catch {
+    return false;
+  }
+}
+
+// Fetches the PDF bytes WITH the Authorization header attached, then hands
+// back a local blob: URL. This is required for viewing -- a plain
+// <iframe src="/api/reports/:id/file"> sends NO Authorization header at all,
+// since browsers only auto-attach cookies on navigation/embeds, never custom
+// headers, and this app's auth token lives in localStorage, not a cookie.
+// Caller is responsible for URL.revokeObjectURL(...) once done with it.
+export async function fetchAuditedReportFileUrl(id: string): Promise<string | null> {
+  try {
+    const auth = authHeaders();
+    const r = await fetch(`/api/reports/${id}/file`, { headers: { ...(auth.headers ?? {}) } });
+    if (!r.ok) return null;
+    const blob = await r.blob();
+    return URL.createObjectURL(blob);
+  } catch {
+    return null;
+  }
+}
+
 // ---- vendor ranking ----
 export function useVendorRanking() {
   return useQuery({
