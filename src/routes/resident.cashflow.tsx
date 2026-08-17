@@ -38,7 +38,9 @@ function Inner() {
   const isMaintenanceChargeExact = (s: string) => (s || "").trim().toLowerCase() === "maintenance charge";
   const isMaintenanceRateReference = (s: string) => /maintenance rate reference/i.test(s || "");
   const isContingencyRateReference = (s: string) => /contingency rate reference/i.test(s || "");
-  const isAnyRateReference = (s: string) => isMaintenanceRateReference(s) || isContingencyRateReference(s);
+  const isExpectedCollectionReference = (s: string) => /expected collection reference/i.test(s || "");
+  const isAnyRateReference = (s: string) =>
+    isMaintenanceRateReference(s) || isContingencyRateReference(s) || isExpectedCollectionReference(s);
 
   // Actual Collection = ONLY the "Maintenance Charge" line item (mirrors
   // Overview\u2019s Collected Maintenance card exactly).
@@ -103,8 +105,17 @@ function Inner() {
 
   // Expected Collection = per-sqft rate x fixed area (same Rate Reference
   // data source as Overview\u2019s Expected Collection card).
-  const rateCategory = safeIncomeTree.find((c) => isMaintenanceRateReference(c.name));
-  const rateMonthly = rateCategory ? sliceMonthly(categoryMonthly(rateCategory)) : [];
+  // ============================================================
+  // EXPECTED COLLECTION -- now supplied DIRECTLY via CSV (head=reference,
+  // category="Expected Collection Reference") instead of being computed
+  // here from rate x fixed area. Old calculation kept below, commented out.
+  // ============================================================
+  const expectedCollectionCategory = safeIncomeTree.find((c) => isExpectedCollectionReference(c.name));
+  const expectedCollectionByMonth = expectedCollectionCategory ? sliceMonthly(categoryMonthly(expectedCollectionCategory)) : [];
+
+  // ---- OLD calculation (rate x fixed area) -- kept for easy rollback ----
+  // const rateCategory = safeIncomeTree.find((c) => isMaintenanceRateReference(c.name));
+  // const rateMonthly = rateCategory ? sliceMonthly(categoryMonthly(rateCategory)) : [];
 
   const periodMonthlyTotals = new Map(period.map((m) => [m.month, m]));
   const monthlyTrend = (labels || []).map((month, i) => {
@@ -112,7 +123,8 @@ function Inner() {
     const actualCollection = actualCollectionByMonth[i] ?? 0;
     const otherIncome = otherIncomeByMonth[i] ?? 0;
     const totalIncomeThisMonth = actualCollection + otherIncome;
-    const expectedCollectionThisMonth = ((rateMonthly[i] ?? 0) / 100) * TOTAL_SQFT;
+    const expectedCollectionThisMonth = expectedCollectionByMonth[i] ?? 0;
+    // const expectedCollectionThisMonth = ((rateMonthly[i] ?? 0) / 100) * TOTAL_SQFT; // OLD
     return {
       month,
       actual_collection: actualCollection,

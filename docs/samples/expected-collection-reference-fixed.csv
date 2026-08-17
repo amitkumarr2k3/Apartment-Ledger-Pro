@@ -1,0 +1,12 @@
+date,head,category,vendor,vendor_kind,line_item,amount,direction,flat_code,source_ref
+2025-10-01,reference,Expected Collection Reference,Rate Card,company,Expected Collection,3227335.0,C,,
+2025-11-01,reference,Expected Collection Reference,Rate Card,company,Expected Collection,2832262.4,C,,
+2025-12-01,reference,Expected Collection Reference,Rate Card,company,Expected Collection,3082376.7,C,,
+2026-01-01,reference,Expected Collection Reference,Rate Card,company,Expected Collection,2832620.4,C,,
+2026-02-01,reference,Expected Collection Reference,Rate Card,company,Expected Collection,2876545.0,C,,
+2026-03-01,reference,Expected Collection Reference,Rate Card,company,Expected Collection,2806364.0,C,,
+2026-04-01,reference,Expected Collection Reference,Rate Card,company,Expected Collection,2876602.0,C,,
+2026-05-01,reference,Expected Collection Reference,Rate Card,company,Expected Collection,2806364.0,C,,
+2026-06-01,reference,Expected Collection Reference,Rate Card,company,Expected Collection,2806364.0,C,,
+2026-07-01,reference,Expected Collection Reference,Rate Card,company,Expected Collection,2876602.0,C,,
+2026-08-01,reference,Expected Collection Reference,Rate Card,company,Expected Collection,2946833.0,C,,

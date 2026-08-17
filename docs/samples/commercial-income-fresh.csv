@@ -1,0 +1,23 @@
+date,head,category,vendor,vendor_kind,line_item,amount,direction,flat_code,source_ref
+2025-11-01,income,Commercial Income,Laundry Pro,company,Laundry Pro,24347,C,,C|Commercial Income|Laundry Pro|Laundry Pro|2025-11
+2025-12-01,income,Commercial Income,Laundry Pro,company,Laundry Pro,29997.2,C,,C|Commercial Income|Laundry Pro|Laundry Pro|2025-12
+2026-01-01,income,Commercial Income,Laundry Pro,company,Laundry Pro,30495.8,C,,C|Commercial Income|Laundry Pro|Laundry Pro|2026-01
+2026-02-01,income,Commercial Income,Laundry Pro,company,Laundry Pro,27077,C,,C|Commercial Income|Laundry Pro|Laundry Pro|2026-02
+2026-03-01,income,Commercial Income,Laundry Pro,company,Laundry Pro,28343,C,,C|Commercial Income|Laundry Pro|Laundry Pro|2026-03
+2025-11-01,income,Commercial Income,Creaatio,company,Creaatio,16886,C,,C|Commercial Income|Laundry Pro|Laundry Pro|2025-11
+2025-12-01,income,Commercial Income,Creaatio,company,Creaatio,16786,C,,C|Commercial Income|Laundry Pro|Laundry Pro|2025-12
+2026-01-01,income,Commercial Income,Creaatio,company,Creaatio,17582,C,,C|Commercial Income|Laundry Pro|Laundry Pro|2026-01
+2026-02-01,income,Commercial Income,Creaatio,company,Creaatio,18177,C,,C|Commercial Income|Laundry Pro|Laundry Pro|2026-02
+2026-03-01,income,Commercial Income,Creaatio,company,Creaatio,18662,C,,C|Commercial Income|Laundry Pro|Laundry Pro|2026-03
+2026-04-01,income,Commercial Income,Creche,company,Creche,56450.99,C,,C|Commercial Income|Creche|Creche|2026-04
+2026-04-01,income,Commercial Income,Creaatio,company,Creaatio,20132.66,C,,C|Commercial Income|Creaatio|Creaatio|2026-04
+2026-04-01,income,Commercial Income,Laundry Pro,company,Laundry Pro,28368.4,C,,C|Commercial Income|Laundry Pro|Laundry Pro|2026-04
+2026-05-01,income,Commercial Income,Creche,company,Creche,53278.68,C,,C|Commercial Income|Creche|Creche|2026-05
+2026-05-01,income,Commercial Income,Creaatio,company,Creaatio,19979.78,C,,C|Commercial Income|Creaatio|Creaatio|2026-05
+2026-05-01,income,Commercial Income,Laundry Pro,company,Laundry Pro,24915.14,C,,C|Commercial Income|Laundry Pro|Laundry Pro|2026-05
+2026-06-01,income,Commercial Income,Creche,company,Creche,52875.14,C,,C|Commercial Income|Creche|Creche|2026-06
+2026-06-01,income,Commercial Income,Creaatio,company,Creaatio,19667.28,C,,C|Commercial Income|Creaatio|Creaatio|2026-06
+2026-06-01,income,Commercial Income,Laundry Pro,company,Laundry Pro,26293.16,C,,C|Commercial Income|Laundry Pro|Laundry Pro|2026-06
+2026-07-01,income,Commercial Income,Creche,company,Creche,53583.0,C,,C|Commercial Income|Creche|Creche|2026-07
+2026-07-01,income,Commercial Income,Creaatio,company,Creaatio,19067.0,C,,C|Commercial Income|Creaatio|Creaatio|2026-07
+2026-07-01,income,Commercial Income,Laundry Pro,company,Laundry Pro,26132.0,C,,C|Commercial Income|Laundry Pro|Laundry Pro|2026-07

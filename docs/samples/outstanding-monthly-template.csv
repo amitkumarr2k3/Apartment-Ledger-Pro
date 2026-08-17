@@ -1,3 +1,0 @@
-date,head,category,vendor,line_item,amount,direction,flat_code,source_ref
-YYYY-MM-01,income,Maintenance Outstanding,Apartment Owners,Previous Arrears Brought Forward,0,C,,OUT-BF-YYYY-MM
-YYYY-MM-01,income,Maintenance Outstanding,Apartment Owners,Current Month Unpaid Maintenance,0,C,,OUT-CUR-YYYY-MM

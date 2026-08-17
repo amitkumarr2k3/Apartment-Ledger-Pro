@@ -15,14 +15,22 @@ export const isLiabilityCategory = (name: string) =>
   /outstanding|arrears|default/i.test(name || "");
 
 // Reference/rate-card rows (e.g. "Maintenance Rate Reference",
-// "Contingency Rate Reference") exist purely so the frontend can compute
-// Expected Collection / Contingency Fund from a per-sqft rate. They are
-// NEVER real money and must never be treated as a reportable income
-// category anywhere in the app -- without this exclusion they leak into
-// "Income sources" style breakdowns as phantom line items (e.g. a
-// "Contingency Rate Reference" row showing up next to real income sources).
+// "Contingency Rate Reference", "Expected Collection Reference") exist
+// purely so the frontend can read planning/target figures uploaded via CSV
+// (per-sqft rates, contingency portions, or -- as of the Expected
+// Collection CSV migration -- the collection target amount itself,
+// supplied directly instead of computed from rate x area). They are NEVER
+// real money and must never be treated as a reportable income category
+// anywhere in the app -- without this exclusion they leak into "Income
+// sources" style breakdowns as phantom line items.
+//
+// FIX (Expected Collection CSV migration): widened from matching the
+// specific substring "rate reference" to matching by SUFFIX ("...Reference")
+// so "Expected Collection Reference" -- which doesn't contain "rate" -- is
+// also covered, along with any future reference-style category, without
+// needing another change here.
 export const isRateReferenceCategory = (name: string) =>
-  /rate reference/i.test(name || "");
+  /reference$/i.test((name || "").trim());
 
 // Statutory tax collections (CGST/SGST, "Tax Collected (Liability)") are
 // money the society holds on behalf of the government -- they are a

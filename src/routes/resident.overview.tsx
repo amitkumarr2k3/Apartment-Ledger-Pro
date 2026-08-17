@@ -68,12 +68,26 @@ function Inner() {
   // names happen to contain the substring "rate reference").
   const isMaintenanceRateReference = (name: string) => /maintenance rate reference/i.test(name || "");
   const isContingencyRateReference = (name: string) => /contingency rate reference/i.test(name || "");
-  const isAnyRateReference = (name: string) => isMaintenanceRateReference(name) || isContingencyRateReference(name);
-  // pull the rate category out of the tree, sliced to the selected period
-  const rateCategory = safeIncomeTree.find((c) => isMaintenanceRateReference(c.name));
-  const rateMonthly = rateCategory ? sliceMonthly(categoryMonthly(rateCategory)) : [];
-  // each stored value is (rate * 100); divide back, then multiply by fixed area, summed per selected period
-  const expectedCollection = rateMonthly.reduce((sum, storedVal) => sum + (storedVal / 100) * TOTAL_SQFT, 0);
+  const isExpectedCollectionReference = (name: string) => /expected collection reference/i.test(name || "");
+  const isOpeningBalanceReference = (name: string) => /opening balance reference/i.test(name || "");
+  const isAnyRateReference = (name: string) =>
+    isMaintenanceRateReference(name) || isContingencyRateReference(name) || isExpectedCollectionReference(name) || isOpeningBalanceReference(name);
+
+  // ============================================================
+  // EXPECTED COLLECTION -- now supplied DIRECTLY via CSV (head=reference,
+  // category="Expected Collection Reference") instead of being computed
+  // here from rate x fixed area. The old rate x area calculation is kept
+  // below, commented out, so it's trivial to switch back if ever needed.
+  // ============================================================
+  const expectedCollectionCategory = safeIncomeTree.find((c) => isExpectedCollectionReference(c.name));
+  const expectedCollectionMonthly = expectedCollectionCategory ? sliceMonthly(categoryMonthly(expectedCollectionCategory)) : [];
+  const expectedCollection = total(expectedCollectionMonthly);
+
+  // ---- OLD calculation (rate x fixed area) -- kept for easy rollback ----
+  // const rateCategory = safeIncomeTree.find((c) => isMaintenanceRateReference(c.name));
+  // const rateMonthly = rateCategory ? sliceMonthly(categoryMonthly(rateCategory)) : [];
+  // // each stored value is (rate * 100); divide back, then multiply by fixed area, summed per selected period
+  // const expectedCollection = rateMonthly.reduce((sum, storedVal) => sum + (storedVal / 100) * TOTAL_SQFT, 0);
 
   /**
    * CONTINGENCY FUND
@@ -252,7 +266,17 @@ function Inner() {
     .filter((c) => !isAnyRateReference(c.name) && !isLiability(c.name) && !isTax(c.name))
     .reduce((sum, c) => sum + total(categoryMonthly(c)), 0);
   const allTimeExpense = safeExpenseTree.reduce((sum, c) => sum + total(categoryMonthly(c)), 0);
-  const bankBalance = allTimeCollection - allTimeExpense;
+  // TRUE OPENING BALANCE -- supplied via CSV (head=reference, category=
+  // "Opening Balance Reference") instead of assuming the account started at
+  // Rs 0 before the earliest tracked transaction. Falls back to 0 (today's
+  // behavior) if this hasn't been uploaded yet.
+  const openingBalanceCategory = safeIncomeTree.find((c) => isOpeningBalanceReference(c.name));
+  const openingBalanceFullMonthly = openingBalanceCategory ? categoryMonthly(openingBalanceCategory) : [];
+  let trueOpeningAnchor = 0;
+  for (let idx = 0; idx < openingBalanceFullMonthly.length; idx++) {
+    if (openingBalanceFullMonthly[idx]) { trueOpeningAnchor = openingBalanceFullMonthly[idx]; break; }
+  }
+  const bankBalance = trueOpeningAnchor + allTimeCollection - allTimeExpense;
   // Contingency Cash is a RING-FENCED PORTION of Bank Balance, not additional
   // money on top of it. These two values drive the composition bar on the
   // Bank Balance card so that relationship is visually unmistakable.

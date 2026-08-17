@@ -33,10 +33,44 @@ function Inner() {
   const { data: incomeTree = [] } = useIncomeTree();
   const safeIncomeTree = incomeTree || [];
   const period = sliceMonthly(monthlyTotals);
-  // Opening at start of range = start balance + everything before this window
-  const priorNet = monthlyTotals.slice(0, monthlyTotals.length - period.length)
-    .reduce((s, m) => s + m.collection - m.expense, 0);
-  let running = balanceStrip.opening + priorNet;
+
+  // TRUE OPENING BALANCE -- supplied via CSV (head=reference, category=
+  // "Opening Balance Reference") instead of relying on the balances table
+  // (which is empty for this community) or the "derived" all-time fallback.
+  // Falls back to today's existing balanceStrip.opening behavior if this
+  // hasn't been uploaded yet, so nothing breaks for communities without it.
+  const isOpeningBalanceReference = (name: string) => /opening balance reference/i.test(name || "");
+  const openingBalanceCategory = safeIncomeTree.find((c) => isOpeningBalanceReference(c.name));
+  const openingBalanceFullMonthly = openingBalanceCategory ? categoryMonthly(openingBalanceCategory) : [];
+  let trueOpeningAnchor: number | null = null;
+  for (let idx = 0; idx < openingBalanceFullMonthly.length; idx++) {
+    if (openingBalanceFullMonthly[idx]) { trueOpeningAnchor = openingBalanceFullMonthly[idx]; break; }
+  }
+  const hasTrueAnchor = trueOpeningAnchor !== null;
+
+  // Opening at start of range = start balance + everything before this window.
+  //
+  // FIX: previously assumed the selected period was always the LAST N
+  // months in monthlyTotals ("slice off the last period.length months").
+  // That breaks the moment ANY month after the selected period exists in
+  // the data -- e.g. a reference-only CSV (Expected Collection Reference /
+  // Maintenance Rate Reference) dated for a future month stretches
+  // mv_monthly_totals's month range even though that future month has zero
+  // real income/expense. When that happens, "the last N months" no longer
+  // equals "the selected period", and the selected period's own month(s)
+  // silently stay INSIDE "prior", double-counting its net movement into
+  // the opening balance.
+  //
+  // Correct approach: find where the selected period ACTUALLY starts by
+  // matching month labels, and take everything strictly before that.
+  const periodStartMonth = period[0]?.month;
+  const periodStartIdx = periodStartMonth
+    ? monthlyTotals.findIndex((m) => m.month === periodStartMonth)
+    : -1;
+  const priorMonths = periodStartIdx >= 0 ? monthlyTotals.slice(0, periodStartIdx) : [];
+  const priorNet = priorMonths.reduce((s, m) => s + m.collection - m.expense, 0);
+  const anchorOpening = hasTrueAnchor ? (trueOpeningAnchor as number) : balanceStrip.opening;
+  let running = anchorOpening + priorNet;
   const rangeOpening = running;
   const hasOpeningGap = !Number.isFinite(rangeOpening) || rangeOpening < 0;
   const rows = period.map((m) => {
@@ -142,12 +176,31 @@ function Inner() {
         </Alert>
       )}
 
-      {/* RD-44 derived warning */}
+      {/* Plain-language explanation -- residents (not just admins) read this,
+          so no internal jargon, and no wording that reads like a
+          fill-in-the-blank for one specific month. Explains the actual
+          calculation, which works the same way for whichever period is
+          currently selected. */}
       <Alert>
         <Info className="h-4 w-4" />
         <AlertDescription>
-          RD-44 · Opening balance for {period[0]?.month ?? "range start"} is <Badge variant="outline" className="mx-1 text-[10px]">derived</Badge>
-          from earliest known carry-forward — original opening entry not present in historical sheets.
+          {hasTrueAnchor ? (
+            <>
+              How this is calculated: the starting amount recorded when the society first began tracking finances in
+              this app, plus every rupee saved (income minus expenses) from that date up to the start of whichever
+              period you're viewing. That starting amount was{" "}
+              <Badge variant="outline" className="mx-1 text-[10px] border-emerald-500/40 text-emerald-600">confirmed</Badge>
+              by the society's management, so this is a real, verified figure -- not an estimate.
+            </>
+          ) : (
+            <>
+              How this is calculated: the starting amount from when the society first began tracking finances in this
+              app, plus every rupee saved (income minus expenses) from that date up to the start of whichever period
+              you're viewing. Since the exact starting amount hasn't been confirmed yet, this is our{" "}
+              <Badge variant="outline" className="mx-1 text-[10px]">best estimate</Badge>
+              based on everything recorded so far.
+            </>
+          )}
         </AlertDescription>
       </Alert>
 

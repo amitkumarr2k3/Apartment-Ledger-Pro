@@ -1,0 +1,21 @@
+date,head,category,vendor,vendor_kind,line_item,amount,direction,flat_code,source_ref
+2025-10-01,income,Maintenance Outstanding,Apartment Owners,resident,Previous Arrears Brought Forward,250000,C,,OUT-BF-2025-10
+2025-11-01,income,Maintenance Outstanding,Apartment Owners,resident,Previous Arrears Brought Forward,450000,C,,OUT-BF-2025-11
+2025-12-01,income,Maintenance Outstanding,Apartment Owners,resident,Previous Arrears Brought Forward,660000,C,,OUT-BF-2025-12
+2026-01-01,income,Maintenance Outstanding,Apartment Owners,resident,Previous Arrears Brought Forward,880000,C,,OUT-BF-2026-01
+2026-02-01,income,Maintenance Outstanding,Apartment Owners,resident,Previous Arrears Brought Forward,1110000,C,,OUT-BF-2026-02
+2026-03-01,income,Maintenance Outstanding,Apartment Owners,resident,Previous Arrears Brought Forward,1350000,C,,OUT-BF-2026-03
+2026-04-01,income,Maintenance Outstanding,Apartment Owners,resident,Previous Arrears Brought Forward,1600000,C,,OUT-BF-2026-04
+2026-05-01,income,Maintenance Outstanding,Apartment Owners,resident,Previous Arrears Brought Forward,1860000,C,,OUT-BF-2026-05
+2026-06-01,income,Maintenance Outstanding,Apartment Owners,resident,Previous Arrears Brought Forward,2130000,C,,OUT-BF-2026-06
+2026-07-01,income,Maintenance Outstanding,Apartment Owners,resident,Previous Arrears Brought Forward,2410000,C,,OUT-BF-2026-07
+2025-10-01,income,Maintenance Outstanding,Apartment Owners,resident,Current Month Unpaid Maintenance,289219.84,C,,OUT-CUR-2025-10
+2025-11-01,income,Maintenance Outstanding,Apartment Owners,resident,Current Month Unpaid Maintenance,289049.58,C,,OUT-CUR-2025-11
+2025-12-01,income,Maintenance Outstanding,Apartment Owners,resident,Current Month Unpaid Maintenance,220679.84,C,,OUT-CUR-2025-12
+2026-01-01,income,Maintenance Outstanding,Apartment Owners,resident,Current Month Unpaid Maintenance,203124.0,C,,OUT-CUR-2026-01
+2026-02-01,income,Maintenance Outstanding,Apartment Owners,resident,Current Month Unpaid Maintenance,181179.0,C,,OUT-CUR-2026-02
+2026-03-01,income,Maintenance Outstanding,Apartment Owners,resident,Current Month Unpaid Maintenance,152200.0,C,,OUT-CUR-2026-03
+2026-04-01,income,Maintenance Outstanding,Apartment Owners,resident,Current Month Unpaid Maintenance,162548.0,C,,OUT-CUR-2026-04
+2026-05-01,income,Maintenance Outstanding,Apartment Owners,resident,Current Month Unpaid Maintenance,156328.0,C,,OUT-CUR-2026-05
+2026-06-01,income,Maintenance Outstanding,Apartment Owners,resident,Current Month Unpaid Maintenance,293994.0,C,,OUT-CUR-2026-06
+2026-07-01,income,Maintenance Outstanding,Apartment Owners,resident,Current Month Unpaid Maintenance,326677.0,C,,OUT-CUR-2026-07

@@ -1,0 +1,12 @@
+date,head,category,vendor,line_item,amount,direction,flat_code,source_ref
+2025-10-01,income,Maintenance Collection,Apartment Owners,resident,Maintenance Charge,2904706,C,,C|Maintenance Collection|Apartment Owners|Maintenance Charge|2025-10
+2025-11-01,income,Maintenance Collection,Apartment Owners,resident,Maintenance Charge,2543042.56,C,,C|Maintenance Collection|Apartment Owners|Maintenance Charge|2025-11
+2025-12-01,income,Maintenance Collection,Apartment Owners,resident,Maintenance Charge,2788788.38,C,,C|Maintenance Collection|Apartment Owners|Maintenance Charge|2025-12
+2026-01-01,income,Maintenance Collection,Apartment Owners,resident,Maintenance Charge,2606820.56,C,,C|Maintenance Collection|Apartment Owners|Maintenance Charge|2026-01
+2026-02-01,income,Maintenance Collection,Apartment Owners,resident,Maintenance Charge,2673421.00,C,,C|Maintenance Collection|Apartment Owners|Maintenance Charge|2026-02
+2026-03-01,income,Maintenance Collection,Apartment Owners,resident,Maintenance Charge,2625185.00,C,,C|Maintenance Collection|Apartment Owners|Maintenance Charge|2026-03
+2026-04-01,income,Maintenance Collection,Apartment Owners,resident,Maintenance Charge,2724402.00,C,,C|Maintenance Collection|Apartment Owners|Maintenance Charge|2026-04
+2026-05-01,income,Maintenance Collection,Apartment Owners,resident,Maintenance Charge,2643816.00,C,,C|Maintenance Collection|Apartment Owners|Maintenance Charge|2026-05
+2026-06-01,income,Maintenance Collection,Apartment Owners,resident,Maintenance Charge,2650036.00,C,,C|Maintenance Collection|Apartment Owners|Maintenance Charge|2026-06
+2026-07-01,income,Maintenance Collection,Apartment Owners,resident,Maintenance Charge,2582608.00,C,,C|Maintenance Collection|Apartment Owners|Maintenance Charge|2026-07
+2026-08-01,income,Maintenance Collection,Apartment Owners,resident,Maintenance Charge,2619609.00,C,,C|Maintenance Collection|Apartment Owners|Maintenance Charge|2026-08

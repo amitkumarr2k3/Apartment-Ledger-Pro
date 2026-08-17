@@ -46,3 +46,5 @@ backups/*
 .env
 .lovable
 AGENTS.md
+docs/samples/Back/*
+docs/samples/Back

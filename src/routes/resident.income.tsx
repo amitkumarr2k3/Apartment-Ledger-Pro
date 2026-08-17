@@ -74,15 +74,22 @@ function Inner() {
   );
   // Expected Collection target line -- same per-sqft rate x fixed area
   // formula used by Overview\u2019s / Cashflow Health\u2019s Expected Collection.
-  const isMaintenanceRateReference = (name: string) => /maintenance rate reference/i.test(name || "");
-  const TOTAL_SQFT = 701591;
-  const rateCategory = incomeTree.find((c) => isMaintenanceRateReference(c.name));
-  const rateMonthly = rateCategory ? sliceMonthly(categoryMonthly(rateCategory)) : [];
+  // EXPECTED COLLECTION -- now supplied DIRECTLY via CSV (head=reference,
+  // category="Expected Collection Reference") instead of rate x fixed area.
+  const isExpectedCollectionReference = (name: string) => /expected collection reference/i.test(name || "");
+  const expectedCollectionCategory = incomeTree.find((c) => isExpectedCollectionReference(c.name));
+  const expectedCollectionByMonth = expectedCollectionCategory ? sliceMonthly(categoryMonthly(expectedCollectionCategory)) : [];
+  // ---- OLD calculation (rate x fixed area) -- kept for easy rollback ----
+  // const isMaintenanceRateReference = (name: string) => /maintenance rate reference/i.test(name || "");
+  // const TOTAL_SQFT = 701591;
+  // const rateCategory = incomeTree.find((c) => isMaintenanceRateReference(c.name));
+  // const rateMonthly = rateCategory ? sliceMonthly(categoryMonthly(rateCategory)) : [];
   const monthlyMaintenanceData = labels.map((m, i) => {
     const collected = maintenanceMonthly[i] ?? 0;
     const outstanding = Math.max(0, outstandingMonthly[i] ?? 0);
     const totalMaintenance = collected + outstanding;
-    const expectedCollection = ((rateMonthly[i] ?? 0) / 100) * TOTAL_SQFT;
+    const expectedCollection = expectedCollectionByMonth[i] ?? 0;
+    // const expectedCollection = ((rateMonthly[i] ?? 0) / 100) * TOTAL_SQFT; // OLD
     return {
       month: m,
       collected,
