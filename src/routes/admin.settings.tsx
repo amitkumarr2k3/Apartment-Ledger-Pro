@@ -59,7 +59,8 @@ const DASHBOARD_DEFS: DashboardDef[] = [
     widgets: [
       { id: "cashflow.summaryCards", label: "Expense/Income, Surplus months, Deficit months summary" },
       { id: "cashflow.performanceVsTarget", label: "Collection performance vs target + Best/worst month" },
-      { id: "cashflow.monthlyTrendChart", label: "Monthly trend chart (actual vs expected collection, expense, outstanding)" },
+      { id: "cashflow.maintenanceRateTrend", label: "Maintenance rate trend (per-sqft rate sparkline for the selected range)" },
+      { id: "cashflow.monthlyTrendChart", label: "Monthly trend chart (total income, expense & outstanding dues -- NOT maintenance-specific, see Income Visibility for that)" },
     ],
   },
   {
@@ -68,7 +69,8 @@ const DASHBOARD_DEFS: DashboardDef[] = [
     widgets: [
       { id: "income.sourcesBreakdown", label: "Income sources (maintenance + other income breakdown)" },
       { id: "income.expenseRatio", label: "Expense / Income ratio card" },
-      { id: "income.maintenanceVsOutstanding", label: "Maintenance collection vs outstanding chart" },
+      { id: "income.collectedVsUnpaid", label: "Collected vs unpaid maintenance chart (bars + expected collection target)" },
+      { id: "income.recoveryRateTrend", label: "Recovery rate trend chart (with 90% healthy benchmark line)" },
     ],
   },
   {
