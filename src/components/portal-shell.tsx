@@ -11,7 +11,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import {
   CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator,
 } from "@/components/ui/command";
-import { Home, BarChart3, Table2, Menu, ChevronLeft, LogOut, UserCircle2, HelpCircle } from "lucide-react";
+import { Home, BarChart3, Table2, Menu, ChevronLeft, LogOut, UserCircle2, HelpCircle, Code2 } from "lucide-react";
 
 // ─── Period context ──────────────────────────────────────────────────────
 export type PeriodValue = "month-prev" | "range-3m" | "range-6m" | "range-12m" | "fy" | "fy-prev";
@@ -627,6 +627,26 @@ export function PortalShell({
           <p className="text-sm text-muted-foreground font-mono">{reqIds} · {periodCtx.label}</p>
         </div>
         <div className="p-4 sm:p-6 xl:p-8 space-y-6 w-full max-w-[1680px] mx-auto">{children}</div>
+      {/* Persistent credit -- appears on every page since it lives in the
+          shared layout. Kept understated (no "open to opportunities"
+          framing, no banner-style callout) since this is a live app for
+          real residents -- but given real contrast/a background band so it
+          actually registers instead of disappearing into the page. */}
+      <footer className="py-4 text-center text-xs sm:text-[13px] text-muted-foreground border-t border-border bg-muted/30 mt-4">
+        <span className="inline-flex items-center gap-1.5">
+          <Code2 className="h-3.5 w-3.5 opacity-70" />
+          Built by <span className="font-medium text-foreground">Amit Kumar</span>
+          <span className="opacity-40">·</span>
+          <a
+            href="https://www.amitkumardev.com/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-medium text-primary hover:underline underline-offset-2"
+          >
+            View Portfolio
+          </a>
+        </span>
+      </footer>
       </main>
     </div>
 
