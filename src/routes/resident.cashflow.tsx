@@ -117,6 +117,13 @@ function Inner() {
   // const rateCategory = safeIncomeTree.find((c) => isMaintenanceRateReference(c.name));
   // const rateMonthly = rateCategory ? sliceMonthly(categoryMonthly(rateCategory)) : [];
 
+  // Per-sqft rate -- shown as a 5th line on the trend chart below (its own
+  // right-hand axis, since a Rs 4/sqft rate is invisible on a scale that
+  // runs into the lakhs). Display only -- NOT used to compute Expected
+  // Collection, which now comes directly from the CSV.
+  const rateCategoryForDisplay = safeIncomeTree.find((c) => isMaintenanceRateReference(c.name));
+  const rateMonthlyForDisplay = rateCategoryForDisplay ? sliceMonthly(categoryMonthly(rateCategoryForDisplay)) : [];
+
   const periodMonthlyTotals = new Map(period.map((m) => [m.month, m]));
   const monthlyTrend = (labels || []).map((month, i) => {
     const monthlyTotal = periodMonthlyTotals.get(month);
@@ -133,6 +140,7 @@ function Inner() {
       total_income: totalIncomeThisMonth,
       expense: monthlyTotal?.expense ?? 0,
       cumulative_outstanding: cumulativeOutstandingByMonth[i] ?? 0,
+      per_sqft_rate: (rateMonthlyForDisplay[i] ?? 0) / 100,
       net: totalIncomeThisMonth - (monthlyTotal?.expense ?? 0),
     };
   });
@@ -249,17 +257,23 @@ function Inner() {
         </CardHeader>
         <CardContent>
           {view === "chart" ? (
-            <ResponsiveContainer width="100%" height={320}>
-              <LineChart data={monthlyTrend} margin={{ left: 8, right: 8 }}>
+            <ResponsiveContainer width="100%" height={340}>
+              <LineChart data={monthlyTrend} margin={{ left: 8, right: 8, top: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                 <XAxis dataKey="month" fontSize={11} />
-                <YAxis tickFormatter={(v) => `\u20B9${(v / 1000).toFixed(0)}k`} fontSize={11} />
+                {/* Left axis -- rupee amounts (collection/expense/outstanding),
+                    all in the lakhs. Right axis -- the per-sqft rate, a
+                    completely different scale (a few rupees) that would be
+                    an invisible flat line if plotted against the left axis. */}
+                <YAxis yAxisId="amount" tickFormatter={(v) => `\u20B9${(v / 1000).toFixed(0)}k`} fontSize={11} />
+                <YAxis yAxisId="rate" orientation="right" tickFormatter={(v) => `\u20B9${v.toFixed(1)}`} fontSize={11} domain={[0, "dataMax + 1"]} />
                 <Tooltip trigger={getTooltipTrigger()} cursor={{ fill: "var(--color-muted)", opacity: 0.35 }} content={<SmartTooltipContent labelPrefix="Month" valueFormatter={(v) => inr(v)} />} />
                 <Legend />
-                <Line type="monotone" dataKey="actual_collection" stroke="var(--color-chart-2)" strokeWidth={2} name="Actual Collection" />
-                <Line type="monotone" dataKey="expected_collection" stroke="var(--color-chart-4, #a855f7)" strokeWidth={2} strokeDasharray="4 2" name="Expected Collection" />
-                <Line type="monotone" dataKey="expense" stroke="var(--color-chart-1)" strokeWidth={2} name="Expense" />
-                <Line type="monotone" dataKey="cumulative_outstanding" stroke="var(--color-chart-3)" strokeWidth={2} name="Cumulative outstanding" />
+                <Line yAxisId="amount" type="monotone" dataKey="actual_collection" stroke="var(--color-chart-2)" strokeWidth={2} name="Actual Collection" />
+                <Line yAxisId="amount" type="monotone" dataKey="expected_collection" stroke="var(--color-chart-4, #a855f7)" strokeWidth={2} strokeDasharray="4 2" name="Expected Collection" />
+                <Line yAxisId="amount" type="monotone" dataKey="expense" stroke="var(--color-chart-1)" strokeWidth={2} name="Expense" />
+                <Line yAxisId="amount" type="monotone" dataKey="cumulative_outstanding" stroke="var(--color-chart-3)" strokeWidth={2} name="Cumulative outstanding" />
+                <Line yAxisId="rate" type="monotone" dataKey="per_sqft_rate" stroke="var(--color-chart-5, #9333ea)" strokeWidth={2} dot={{ r: 3 }} name="Per Sqft Rate" />
               </LineChart>
             </ResponsiveContainer>
           ) : (
@@ -272,6 +286,7 @@ function Inner() {
                     <th className="text-right p-2">Expected Collection</th>
                     <th className="text-right p-2">Expense</th>
                     <th className="text-right p-2">Cumulative Outstanding</th>
+                    <th className="text-right p-2">Per Sqft Rate</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -282,6 +297,7 @@ function Inner() {
                       <td className="p-2 text-right font-mono">{inr(m.expected_collection)}</td>
                       <td className="p-2 text-right font-mono">{inr(m.expense)}</td>
                       <td className="p-2 text-right font-mono">{inr(m.cumulative_outstanding)}</td>
+                      <td className="p-2 text-right font-mono">{inr(m.per_sqft_rate)}</td>
                     </tr>
                   ))}
                 </tbody>
