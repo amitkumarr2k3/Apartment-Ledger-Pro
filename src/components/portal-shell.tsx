@@ -11,7 +11,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import {
   CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator,
 } from "@/components/ui/command";
-import { Home, BarChart3, Table2, Menu, ChevronLeft, LogOut, UserCircle2 } from "lucide-react";
+import { Home, BarChart3, Table2, Menu, ChevronLeft, LogOut, UserCircle2, HelpCircle } from "lucide-react";
 
 // ─── Period context ──────────────────────────────────────────────────────
 export type PeriodValue = "month-prev" | "range-3m" | "range-6m" | "range-12m" | "fy" | "fy-prev";
@@ -449,7 +449,7 @@ export function PortalShell({
             <div className="flex min-w-0 items-center gap-2 sm:gap-3">
               <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
                 <SheetTrigger asChild>
-                  <Button variant="ghost" size="icon" className="lg:hidden shrink-0" aria-label="Open navigation menu">
+                  <Button variant="ghost" size="icon" className="lg:hidden shrink-0 hover:bg-accent/80 transition-colors" aria-label="Open navigation menu">
                     <Menu className="h-5 w-5" />
                   </Button>
                 </SheetTrigger>
@@ -504,24 +504,26 @@ export function PortalShell({
                   </ToggleGroup>
                 </div>
               )}
-              <Select value={period} onValueChange={(v) => setPeriod(v as PeriodValue)}>
-                <SelectTrigger className="w-[130px] sm:w-[180px]"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {(Object.keys(periodConfig) as PeriodValue[]).map((k) => (
-                    <SelectItem key={k} value={k}>{periodConfig[k].label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {showViewToggle && (
-                <ToggleGroup type="single" value={view} onValueChange={(v) => v && setView(v as "chart" | "number")}>
-                  <ToggleGroupItem value="chart" size="sm" aria-label="Chart view">
-                    <BarChart3 className="h-4 w-4" />
-                  </ToggleGroupItem>
-                  <ToggleGroupItem value="number" size="sm" aria-label="Number view">
-                    <Table2 className="h-4 w-4" />
-                  </ToggleGroupItem>
-                </ToggleGroup>
-              )}
+              <div className="flex items-center gap-1.5 rounded-xl border border-border/70 bg-muted/40 p-1 shadow-sm">
+                <Select value={period} onValueChange={(v) => setPeriod(v as PeriodValue)}>
+                  <SelectTrigger className="w-[130px] sm:w-[180px] border-none bg-background shadow-none focus:ring-1 focus:ring-primary/40"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {(Object.keys(periodConfig) as PeriodValue[]).map((k) => (
+                      <SelectItem key={k} value={k}>{periodConfig[k].label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {showViewToggle && (
+                  <ToggleGroup type="single" value={view} onValueChange={(v) => v && setView(v as "chart" | "number")} className="bg-background rounded-lg">
+                    <ToggleGroupItem value="chart" size="sm" aria-label="Chart view" className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground transition-colors">
+                      <BarChart3 className="h-4 w-4" />
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="number" size="sm" aria-label="Number view" className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground transition-colors">
+                      <Table2 className="h-4 w-4" />
+                    </ToggleGroupItem>
+                  </ToggleGroup>
+                )}
+              </div>
             </div>
           </div>
           <div className="px-4 sm:hidden pb-3 space-y-2">
@@ -627,6 +629,25 @@ export function PortalShell({
         <div className="p-4 sm:p-6 xl:p-8 space-y-6 w-full max-w-[1680px] mx-auto">{children}</div>
       </main>
     </div>
+
+    {/* Floating help button -- fixed to the viewport, always visible on every
+        page regardless of scroll position, deliberately NOT buried inside the
+        header toolbar where it's easy to overlook among the other controls.
+        A brief pulse ring draws the eye on first paint; the visible "Need
+        help?" label (not just an icon) makes its purpose obvious without
+        requiring a hover tooltip, which doesn't work on touch devices anyway. */}
+    <button
+      type="button"
+      onClick={() => window.open(isAdmin ? "/dashboard-user-guide-admin.html" : "/dashboard-user-guide-resident.html", "_blank", "noopener,noreferrer")}
+      aria-label="How to read this dashboard"
+      className="fixed bottom-5 right-5 sm:bottom-6 sm:right-6 z-50 flex items-center gap-2 rounded-full bg-gradient-to-br from-indigo-500 to-blue-600 pl-3 pr-3 py-3 sm:pr-4 text-white shadow-lg shadow-indigo-500/30 transition-all duration-200 hover:scale-105 hover:shadow-xl hover:shadow-indigo-500/40 active:scale-95"
+    >
+      <span className="relative flex h-5 w-5 shrink-0 items-center justify-center">
+        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white/40 opacity-75" />
+        <HelpCircle className="relative h-5 w-5" />
+      </span>
+      <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Need help?</span>
+    </button>
     </TooltipProvider>
     </Ctx.Provider>
   );
