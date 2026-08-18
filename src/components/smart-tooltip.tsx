@@ -14,7 +14,11 @@ export function getTooltipTrigger(): "hover" | "click" {
 
 type ContentProps = {
   labelPrefix?: string;
-  valueFormatter?: (v: number) => string;
+  // Second arg (series name/dataKey) is optional -- lets ONE tooltip
+  // format different series differently (e.g. a chart mixing currency
+  // lines with a percentage line), while every existing single-arg
+  // valueFormatter across the app keeps working unchanged.
+  valueFormatter?: (v: number, name?: string) => string;
   labelFormatter?: (label: unknown) => string;
   // Recharts injects these:
   active?: boolean;
@@ -76,7 +80,7 @@ export function SmartTooltipContent({
                 {p.name ?? p.dataKey}
               </span>
               <span className="font-mono tabular-nums text-foreground">
-                {valueFormatter(Number(p.value ?? NaN))}
+                {valueFormatter(Number(p.value ?? NaN), typeof p.name === "string" ? p.name : (typeof p.dataKey === "string" ? p.dataKey : undefined))}
               </span>
             </li>
           );

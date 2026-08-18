@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { PortalShell, usePeriod } from "@/components/portal-shell";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from "@tanstack/react-router";
-import { Bar, BarChart, CartesianGrid, Cell, ComposedChart, LabelList, Line, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend } from "recharts";
+import { Bar, BarChart, CartesianGrid, Cell, ComposedChart, LabelList, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend } from "recharts";
 import { SmartTooltipContent, getTooltipTrigger } from "@/components/smart-tooltip";
 import { inr, categoryMonthly, total, sumMonthly } from "@/lib/finance-mock";
 import { useIncomeTree, useMonthlyTotals } from "@/lib/hooks";
@@ -172,7 +172,12 @@ function Inner() {
         </Card>
       </div>
 
-      {/* RD-32 */}
+      {/* RD-32 -- split into two focused, side-by-side charts instead of one
+          dense 4-legend/dual-axis chart. "Collected vs Unpaid" stays a pure
+          rupee comparison; "Recovery Rate Trend" is its own %-only chart,
+          which also structurally prevents the currency/percentage tooltip
+          mixing bug from ever resurfacing here -- there's no rupee series
+          left in the same chart for a shared formatter to get confused by. */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Maintenance collection vs outstanding · RD-32</CardTitle>
@@ -199,20 +204,44 @@ function Inner() {
           </div>
 
           {view === "chart" ? (
-            <ResponsiveContainer width="100%" height={300}>
-              <ComposedChart data={monthlyMaintenanceData}>
-                <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                <XAxis dataKey="month" fontSize={11} />
-                <YAxis yAxisId="amount" tickFormatter={(v) => "₹" + (v / 1000).toFixed(0) + "k"} fontSize={11} />
-                <YAxis yAxisId="pct" orientation="right" tickFormatter={(v) => `${v}%`} fontSize={11} domain={[0, 100]} />
-                <Tooltip trigger={getTooltipTrigger()} cursor={{ fill: "var(--color-muted)", opacity: 0.35 }} content={<SmartTooltipContent labelPrefix="Month" valueFormatter={(v) => inr(v)} />} />
-                <Legend />
-                <Bar yAxisId="amount" dataKey="collected" name="Maintenance collected" fill="var(--color-chart-2)" radius={[4, 4, 0, 0]} />
-                <Bar yAxisId="amount" dataKey="outstanding" name="Unpaid maintenance" fill="var(--color-chart-1)" radius={[4, 4, 0, 0]} />
-                <Line yAxisId="amount" type="monotone" dataKey="expectedCollection" name="Expected Collection" stroke="var(--color-chart-4, #a855f7)" strokeWidth={2} strokeDasharray="4 2" dot={false} />
-                <Line yAxisId="pct" type="monotone" dataKey="recoveryPct" name="Recovery %" stroke="var(--color-chart-3)" strokeWidth={2} dot={false} />
-              </ComposedChart>
-            </ResponsiveContainer>
+            <div className="grid gap-4 lg:grid-cols-2">
+              {/* Left: pure rupee comparison -- collected vs unpaid vs target, one axis, 3 legends */}
+              <div>
+                <div className="text-sm font-medium mb-1">Collected vs unpaid maintenance</div>
+                <div className="text-xs text-muted-foreground mb-2">Are we hitting the per-sqft target, and how big is the unpaid gap?</div>
+                <ResponsiveContainer width="100%" height={260}>
+                  <ComposedChart data={monthlyMaintenanceData}>
+                    <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                    <XAxis dataKey="month" fontSize={11} />
+                    <YAxis tickFormatter={(v) => "\u20B9" + (v / 1000).toFixed(0) + "k"} fontSize={11} />
+                    <Tooltip trigger={getTooltipTrigger()} cursor={{ fill: "var(--color-muted)", opacity: 0.35 }} content={<SmartTooltipContent labelPrefix="Month" valueFormatter={(v) => inr(v)} />} />
+                    <Legend />
+                    <Bar dataKey="collected" name="Collected Maintenance" fill="var(--color-chart-2)" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="outstanding" name="Unpaid Maintenance" fill="var(--color-chart-1)" radius={[4, 4, 0, 0]} />
+                    <Line type="monotone" dataKey="expectedCollection" name="Expected Collection" stroke="var(--color-chart-4, #a855f7)" strokeWidth={2} strokeDasharray="4 2" dot={false} />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Right: recovery % ALONE on its own 0-100% axis -- no currency
+                  series sharing this chart, so there's nothing for a tooltip
+                  formatter to mix up. A reference line at 90% gives an
+                  at-a-glance "healthy" benchmark instead of just a bare line. */}
+              <div>
+                <div className="text-sm font-medium mb-1">Recovery rate trend</div>
+                <div className="text-xs text-muted-foreground mb-2">Month-by-month collection efficiency, vs. the 90% healthy benchmark</div>
+                <ResponsiveContainer width="100%" height={260}>
+                  <LineChart data={monthlyMaintenanceData}>
+                    <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                    <XAxis dataKey="month" fontSize={11} />
+                    <YAxis tickFormatter={(v) => `${v}%`} fontSize={11} domain={[0, 100]} />
+                    <Tooltip trigger={getTooltipTrigger()} cursor={{ fill: "var(--color-muted)", opacity: 0.35 }} content={<SmartTooltipContent labelPrefix="Month" valueFormatter={(v) => `${v}%`} />} />
+                    <ReferenceLine y={90} stroke="var(--color-chart-3)" strokeDasharray="3 3" label={{ value: "Healthy (90%)", position: "insideTopRight", fontSize: 10, fill: "var(--color-chart-3)" }} />
+                    <Line type="monotone" dataKey="recoveryPct" name="Recovery Rate" stroke="var(--color-chart-2)" strokeWidth={2} dot={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
           ) : (
             <div className="space-y-3">
               <div className="rounded-md border border-border overflow-hidden">
@@ -220,10 +249,10 @@ function Inner() {
                   <thead className="bg-muted/40">
                     <tr>
                       <th className="text-left p-2">Month</th>
-                      <th className="text-right p-2">Collected</th>
-                      <th className="text-right p-2">Expected</th>
-                      <th className="text-right p-2">Outstanding</th>
-                      <th className="text-right p-2">Recovery %</th>
+                      <th className="text-right p-2">Collected Maintenance</th>
+                      <th className="text-right p-2">Expected Collection</th>
+                      <th className="text-right p-2">Unpaid Maintenance</th>
+                      <th className="text-right p-2">Recovery Rate</th>
                     </tr>
                   </thead>
                   <tbody>

@@ -210,8 +210,10 @@ function Inner() {
         </Card>
       </div>
 
-      {/* NEW INSIGHTS: Expected-vs-Actual variance + best/worst month callouts */}
-      <div className="grid gap-4 md:grid-cols-2">
+      {/* NEW INSIGHTS: Expected-vs-Actual variance + best/worst month callouts +
+          current per-sqft rate (as a compact stat, not a whole extra chart --
+          a rate that barely moves month to month doesn't need its own axis). */}
+      <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="pb-2">
             <CardDescription className="text-xs uppercase tracking-wider">Collection performance vs target</CardDescription>
@@ -244,36 +246,84 @@ function Inner() {
             )}
           </CardContent>
         </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription className="text-xs uppercase tracking-wider">Maintenance rate trend · selected range</CardDescription>
+            <CardTitle className="text-3xl font-mono">
+              {"\u20B9"}{(rateMonthlyForDisplay[rateMonthlyForDisplay.length - 1] ?? 0) / 100}/sqft
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {(() => {
+              // Trim leading months with no rate on file yet (stored as 0)
+              // instead of plotting a false "rate was Rs 0" flat prefix --
+              // that both looks like a sharp/artificial rise AND produces a
+              // misleading "up from Rs 0" insight below. Start the trend at
+              // the FIRST month a rate actually exists for.
+              const firstAvailableIdx = rateMonthlyForDisplay.findIndex((v) => (v ?? 0) > 0);
+              const trimmedLabels = firstAvailableIdx >= 0 ? labels.slice(firstAvailableIdx) : [];
+              const trimmedRates = firstAvailableIdx >= 0 ? rateMonthlyForDisplay.slice(firstAvailableIdx) : [];
+              const rateTrendData = trimmedLabels.map((m, i) => ({ month: m, rate: (trimmedRates[i] ?? 0) / 100 }));
+              const first = (trimmedRates[0] ?? 0) / 100;
+              const last = (trimmedRates[trimmedRates.length - 1] ?? 0) / 100;
+              const delta = last - first;
+              return (
+                <>
+                  <p className="text-xs text-muted-foreground mb-1">
+                    {rateTrendData.length === 0
+                      ? "No rate has been uploaded yet for this range"
+                      : rateTrendData.length < 2 || delta === 0
+                        ? "Unchanged across the selected range"
+                        : `${delta > 0 ? "Up" : "Down"} from \u20B9${first}/sqft at the start of this range (${trimmedLabels[0]})`}
+                  </p>
+                  {rateTrendData.length > 0 && (
+                    // Sparkline -- the trend itself, without the overhead of a
+                    // full chart (no gridlines/legend). The X axis is real but
+                    // hidden -- needed so the tooltip resolves actual month
+                    // labels (e.g. "Apr '26") instead of falling back to a
+                    // raw row index when no axis/dataKey is present at all.
+                    <ResponsiveContainer width="100%" height={48}>
+                      <LineChart data={rateTrendData} margin={{ top: 4, right: 4, bottom: 0, left: 4 }}>
+                        <XAxis dataKey="month" hide />
+                        <Tooltip trigger={getTooltipTrigger()} content={<SmartTooltipContent labelPrefix="Month" valueFormatter={(v) => `\u20B9${v}/sqft`} />} />
+                        <Line type="monotone" dataKey="rate" stroke="var(--color-chart-5, #9333ea)" strokeWidth={2} dot={{ r: 2 }} activeDot={{ r: 4 }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  )}
+                </>
+              );
+            })()}
+          </CardContent>
+        </Card>
       </div>
 
-      {/* RD-21 -- moved from Overview: strictly richer than the old bar chart
-          it replaces (adds Expected Collection target + cumulative outstanding
-          risk signal, and fixes the Tax/GST contamination that previously
-          existed in the raw "collection" figure this page used to show). */}
+      {/* RD-21 -- redesigned to eliminate cross-page duplication. The previous
+          version re-plotted "Actual/Expected Collection" here too, which is
+          MAINTENANCE-ONLY data that Income Visibility already owns entirely.
+          This chart now shows what Cashflow Health should uniquely own: the
+          full cash-flow picture using TOTAL income (maintenance + every
+          other income source, not just maintenance) against Total Expense,
+          plus the cumulative Outstanding Dues trend -- none of which
+          duplicates Income Visibility's maintenance-collection detail.
+          Per Sqft Rate moved to a compact stat card above (a rate that
+          barely moves month to month doesn't need its own chart+axis). */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Monthly trend · actual vs expected collection, expense &amp; outstanding</CardTitle>
-          <CardDescription>RD-21 · Moved from Overview · Includes cumulative outstanding signal</CardDescription>
+          <CardTitle className="text-base">Monthly trend · total income, expense &amp; outstanding dues</CardTitle>
+          <CardDescription>RD-21 · Total income here includes ALL income sources, not maintenance alone -- see Income Visibility for the maintenance-specific breakdown</CardDescription>
         </CardHeader>
         <CardContent>
           {view === "chart" ? (
-            <ResponsiveContainer width="100%" height={340}>
+            <ResponsiveContainer width="100%" height={320}>
               <LineChart data={monthlyTrend} margin={{ left: 8, right: 8, top: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                 <XAxis dataKey="month" fontSize={11} />
-                {/* Left axis -- rupee amounts (collection/expense/outstanding),
-                    all in the lakhs. Right axis -- the per-sqft rate, a
-                    completely different scale (a few rupees) that would be
-                    an invisible flat line if plotted against the left axis. */}
-                <YAxis yAxisId="amount" tickFormatter={(v) => `\u20B9${(v / 1000).toFixed(0)}k`} fontSize={11} />
-                <YAxis yAxisId="rate" orientation="right" tickFormatter={(v) => `\u20B9${v.toFixed(1)}`} fontSize={11} domain={[0, "dataMax + 1"]} />
+                <YAxis tickFormatter={(v) => `\u20B9${(v / 1000).toFixed(0)}k`} fontSize={11} />
                 <Tooltip trigger={getTooltipTrigger()} cursor={{ fill: "var(--color-muted)", opacity: 0.35 }} content={<SmartTooltipContent labelPrefix="Month" valueFormatter={(v) => inr(v)} />} />
                 <Legend />
-                <Line yAxisId="amount" type="monotone" dataKey="actual_collection" stroke="var(--color-chart-2)" strokeWidth={2} name="Actual Collection" />
-                <Line yAxisId="amount" type="monotone" dataKey="expected_collection" stroke="var(--color-chart-4, #a855f7)" strokeWidth={2} strokeDasharray="4 2" name="Expected Collection" />
-                <Line yAxisId="amount" type="monotone" dataKey="expense" stroke="var(--color-chart-1)" strokeWidth={2} name="Expense" />
-                <Line yAxisId="amount" type="monotone" dataKey="cumulative_outstanding" stroke="var(--color-chart-3)" strokeWidth={2} name="Cumulative outstanding" />
-                <Line yAxisId="rate" type="monotone" dataKey="per_sqft_rate" stroke="var(--color-chart-5, #9333ea)" strokeWidth={2} dot={{ r: 3 }} name="Per Sqft Rate" />
+                <Line type="monotone" dataKey="total_income" stroke="var(--color-chart-2)" strokeWidth={2} name="Total Income" />
+                <Line type="monotone" dataKey="expense" stroke="var(--color-chart-1)" strokeWidth={2} name="Total Expense" />
+                <Line type="monotone" dataKey="cumulative_outstanding" stroke="var(--color-chart-3)" strokeWidth={2} name="Outstanding Dues (cumulative)" />
               </LineChart>
             </ResponsiveContainer>
           ) : (
@@ -282,22 +332,18 @@ function Inner() {
                 <thead className="bg-muted/40">
                   <tr>
                     <th className="text-left p-2">Month</th>
-                    <th className="text-right p-2">Actual Collection</th>
-                    <th className="text-right p-2">Expected Collection</th>
-                    <th className="text-right p-2">Expense</th>
-                    <th className="text-right p-2">Cumulative Outstanding</th>
-                    <th className="text-right p-2">Per Sqft Rate</th>
+                    <th className="text-right p-2">Total Income</th>
+                    <th className="text-right p-2">Total Expense</th>
+                    <th className="text-right p-2">Outstanding Dues (cumulative)</th>
                   </tr>
                 </thead>
                 <tbody>
                   {monthlyTrend.map((m) => (
                     <tr key={m.month} className="border-t border-border">
                       <td className="p-2">{m.month}</td>
-                      <td className="p-2 text-right font-mono">{inr(m.actual_collection)}</td>
-                      <td className="p-2 text-right font-mono">{inr(m.expected_collection)}</td>
+                      <td className="p-2 text-right font-mono">{inr(m.total_income)}</td>
                       <td className="p-2 text-right font-mono">{inr(m.expense)}</td>
                       <td className="p-2 text-right font-mono">{inr(m.cumulative_outstanding)}</td>
-                      <td className="p-2 text-right font-mono">{inr(m.per_sqft_rate)}</td>
                     </tr>
                   ))}
                 </tbody>
