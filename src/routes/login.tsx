@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { z } from "zod";
 import { fallback, zodValidator } from "@tanstack/zod-adapter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { requestOtp as requestOtpApi, verifyOtp as verifyOtpApi } from "@/lib/api";
 import { signInWithPassword, applySessionFromAuthResponse, isAdminOrAbove } from "@/lib/session";
-import { KeyRound, Mail, MailQuestion, ShieldCheck, RefreshCw, Lock, Loader2, Building2, Sparkles } from "lucide-react";
+import { KeyRound, Mail, MailQuestion, ShieldCheck, RefreshCw, Lock, Loader2, Building2, Sparkles, Activity } from "lucide-react";
 
 
 const searchSchema = z.object({
@@ -22,11 +22,82 @@ export const Route = createFileRoute("/login")({
   validateSearch: zodValidator(searchSchema),
   head: () => ({
     meta: [
-      { title: "Sign in · CG Boulevard Apartment Ledger Portal" },
+      { title: "Sign in · PulseLedger — CG Boulevard" },
       { name: "description", content: "OTP-based sign in for whitelisted residents and admins." },
     ],
   }),
 });
+
+// Six-box OTP entry -- the "new-age app" pattern (banking apps, Stripe, etc.)
+// instead of one plain text field. Supports auto-advance while typing,
+// backspace-to-previous, pasting/autofilling a full 6-digit code into any
+// box, and fires onComplete exactly once when the code first becomes full
+// (not on every subsequent edit, so correcting a digit doesn't re-trigger it).
+function OtpBoxes({
+  value,
+  onChange,
+  onComplete,
+  disabled,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onComplete: (v: string) => void;
+  disabled?: boolean;
+}) {
+  const inputsRef = useRef<Array<HTMLInputElement | null>>([]);
+
+  function applyNext(next: string, focusIndex: number) {
+    const prevDigits = value.replace(/\D/g, "").length;
+    const nextDigits = next.replace(/\D/g, "").length;
+    onChange(next);
+    if (focusIndex >= 0) inputsRef.current[Math.min(focusIndex, 5)]?.focus();
+    if (prevDigits < 6 && nextDigits === 6) onComplete(next);
+  }
+
+  function handleChange(index: number, raw: string) {
+    const digits = raw.replace(/\D/g, "");
+    if (digits.length <= 1) {
+      const chars = value.padEnd(6, " ").split("");
+      chars[index] = digits;
+      applyNext(chars.join("").replace(/ /g, "").slice(0, 6), digits ? index + 1 : index);
+      return;
+    }
+    // Multi-character input = a paste or SMS autofill landing in one box.
+    const chars = value.padEnd(6, " ").split("");
+    for (let i = 0; i < digits.length && index + i < 6; i++) {
+      chars[index + i] = digits[i];
+    }
+    const next = chars.join("").replace(/ /g, "").slice(0, 6);
+    applyNext(next, index + digits.length);
+  }
+
+  function handleKeyDown(index: number, e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Backspace" && !value[index] && index > 0) {
+      inputsRef.current[index - 1]?.focus();
+    }
+  }
+
+  return (
+    <div className="flex gap-2" role="group" aria-label="One-time code, 6 digits">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <input
+          key={i}
+          ref={(el) => { inputsRef.current[i] = el; }}
+          type="text"
+          inputMode="numeric"
+          maxLength={6}
+          value={value[i] ?? ""}
+          onChange={(e) => handleChange(i, e.target.value)}
+          onKeyDown={(e) => handleKeyDown(i, e)}
+          disabled={disabled}
+          autoComplete={i === 0 ? "one-time-code" : "off"}
+          aria-label={`Digit ${i + 1} of 6`}
+          className="h-12 w-11 sm:h-14 sm:w-12 rounded-lg border border-input bg-background text-center text-xl font-semibold tracking-widest focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-shadow disabled:opacity-50"
+        />
+      ))}
+    </div>
+  );
+}
 
 function LoginPage() {
   const navigate = useNavigate();
@@ -89,10 +160,10 @@ function LoginPage() {
     }
   }
 
-  async function verify() {
+  async function verify(code: string = otp) {
     setBusy(true);
     try {
-      const j = await verifyOtpApi(email, otp);
+      const j = await verifyOtpApi(email, code);
       // FIX (2026-08-15): this used to hand-roll its own session object and
       // write straight to localStorage, duplicating (and collapsing
       // "superadmin" into "admin" in) the exact logic signInWithPassword
@@ -120,7 +191,19 @@ function LoginPage() {
               <Badge variant="outline" className="text-[10px]">Secure Community Finance</Badge>
               <Badge variant="secondary" className="text-[10px]">Mobile Ready</Badge>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">CG Boulevard Apartment Ledger Portal</h1>
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-xl bg-gradient-to-br from-[#0082c9] to-[#005f91] text-white shadow-md shadow-blue-500/20 flex-shrink-0">
+                <Activity className="h-7 w-7 sm:h-8 sm:w-8" strokeWidth={2.5} />
+              </div>
+              <div className="flex flex-col">
+                <h1 className="text-2xl sm:text-3xl font-black tracking-tight leading-none">
+                  Pulse<span className="text-[#0082c9]">Ledger</span>
+                </h1>
+                <span className="text-[11px] sm:text-xs font-bold text-muted-foreground uppercase tracking-[0.15em] mt-1.5">
+                  CG Boulevard Apartment Ledger Portal
+                </span>
+              </div>
+            </div>
             <p className="text-sm sm:text-base text-muted-foreground max-w-2xl">
               A unified workspace for transparent collections, expense tracking, and audit-ready administration for residents and committee members.
             </p>
@@ -218,20 +301,19 @@ function LoginPage() {
             {mode === "otp" && stage === "otp" && (
               <>
                 <div className="space-y-1.5">
-                  <Label htmlFor="otp"><KeyRound className="inline h-3.5 w-3.5 mr-1" /> One-time code</Label>
-                  <Input
-                    id="otp"
-                    inputMode="numeric"
-                    maxLength={6}
-                    placeholder="123456"
+                  <Label htmlFor="otp-0"><KeyRound className="inline h-3.5 w-3.5 mr-1" /> One-time code</Label>
+                  <OtpBoxes
                     value={otp}
-                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
-                    autoComplete="one-time-code"
+                    onChange={setOtp}
+                    onComplete={(code) => { if (!busy) verify(code); }}
+                    disabled={busy}
                   />
                 </div>
                 <div className="flex gap-2">
-                  <Button className="flex-1" onClick={verify} disabled={otp.length !== 6}>
-                    Verify & sign in
+                  <Button className="flex-1" onClick={() => verify()} disabled={otp.length !== 6 || busy}>
+                    {busy ? (
+                      <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Verifying...</>
+                    ) : "Verify & sign in"}
                   </Button>
                   <Button
                     variant="outline"
