@@ -654,7 +654,7 @@ export function PortalShell({
             href="https://www.amitkumardev.com/"
             target="_blank"
             rel="noopener noreferrer"
-            className="font-medium text-primary hover:underline underline-offset-2"
+            className="font-medium text-[#0082c9] dark:text-[#4db8f0] underline decoration-[#0082c9]/40 dark:decoration-[#4db8f0]/40 underline-offset-2 hover:decoration-[#0082c9] dark:hover:decoration-[#4db8f0] transition-colors"
           >
             View Portfolio
           </a>
