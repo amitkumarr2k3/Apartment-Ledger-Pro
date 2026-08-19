@@ -11,7 +11,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import {
   CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator,
 } from "@/components/ui/command";
-import { Home, BarChart3, Table2, Menu, ChevronLeft, LogOut, UserCircle2, HelpCircle, Code2 } from "lucide-react";
+import { Home, BarChart3, Table2, Menu, ChevronLeft, LogOut, UserCircle2, HelpCircle, Code2, Activity } from "lucide-react";
 
 // ─── Period context ──────────────────────────────────────────────────────
 export type PeriodValue = "month-prev" | "range-3m" | "range-6m" | "range-12m" | "fy" | "fy-prev";
@@ -158,10 +158,23 @@ function SidebarNav({
   const isAdmin = session?.role === "admin";
   return (
     <>
-      <div className="p-5 border-b border-border space-y-3">
-        <Link to="/" onClick={onNavigate} className="flex items-center gap-2 text-sm font-semibold">
-          <Home className="h-4 w-4" />
-          CG Boulevard Ledger
+      <div className="p-6 mb-2 border-b border-border space-y-4">
+        <Link 
+          to="/" 
+          onClick={onNavigate} 
+          className="group flex items-center gap-3 transition-all duration-200"
+        >
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#0082c9] to-[#005f91] text-white shadow-md shadow-blue-500/20 group-hover:scale-105 transition-transform">
+            <Activity className="h-6 w-6" strokeWidth={2.5} />
+          </div>
+          <div className="flex flex-col">
+            <span className="text-xl font-black leading-none tracking-tight text-slate-900 dark:text-white">
+              Pulse<span className="text-[#0082c9]">Ledger</span>
+            </span>
+            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.15em] mt-1">
+              CG Boulevard
+            </span>
+          </div>
         </Link>
         {isAdmin && (
           <div>
