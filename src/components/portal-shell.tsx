@@ -12,23 +12,20 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import {
   CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator,
 } from "@/components/ui/command";
-import { Home, BarChart3, Table2, Menu, ChevronLeft, LogOut, UserCircle2, HelpCircle, Code2, Activity, MessageSquare, Send, X, Bot, FileText, Sparkles } from "lucide-react";
+import { Home, BarChart3, Table2, Menu, ChevronLeft, LogOut, UserCircle2, HelpCircle, Code2, Activity, MessageSquare, Send, X, Bot, FileText, Sparkles, Minus, ChevronUp } from "lucide-react";
 
 // ─── Period context ──────────────────────────────────────────────────────
 
 // —————————————————————————————————————————————————————————————————————————————————————
 // Help Chat (BETA)
-// Three layers of answers, checked in priority order:
-//   1) ROUTE_MAP     -- "where can I find X" -> exact page + a clickable link
-//   2) CURATED       -- precise, page-aware answers for real on-screen UI terms
-//                        (Vendor ranking, Preview, Drill, Period change, etc.) so a
-//                        word like "preview" answers differently on Vendor Insights
-//                        vs CSV Imports instead of colliding.
-//   3) HELP_* (guide) -- generic answers auto-derived from the two user-guide HTML
-//                        files, used as a fallback for broader "what does X mean"
-//                        questions the curated list doesn't cover yet.
-// Chat history + open/closed state persist in sessionStorage so navigating between
-// pages (which remounts PortalShell) does not reset the conversation.
+// Answer priority, highest first: ROUTE_MAP ("where can I find X"), then CURATED
+// (page-aware exact UI terms), then HELP_* (generic, auto-derived from the guides).
+// Matching uses normalizeWords()+stem() so plurals/typos still hit, instead of
+// brittle raw substring checks.
+// Persistence: chat history, open state, and minimized state live in sessionStorage
+// so they survive a route change -- PortalShell fully remounts on navigation.
+// History is explicitly cleared when the user clicks X to close -- persists until
+// closed, not forever.
 // —————————————————————————————————————————————————————————————————————————————————————
 type HelpEntry = { keywords: string[]; answer: string };
 type CuratedEntry = { keywords: string[]; answer: string; contexts?: string[] };
@@ -41,20 +38,28 @@ const HELP_COMMON: HelpEntry[] = [
   { keywords: ["arrow", "blue", "corner", "clickable"], answer: "The small blue arrow in the corner of a card means it's clickable -- tap or click it to jump into a detailed, line-by-line breakdown of that number." },
   { keywords: ["filter", "date", "period", "range"], answer: "Use the period dropdown at the top of the page to change the reporting range (e.g. Last 3 months, current fiscal year). Most charts, tables and cards update automatically -- except any card marked 'All-Time'." },
   { keywords: ["export", "print", "pdf"], answer: "Most dashboard pages support printing/exporting via your browser's print dialog (Ctrl/Cmd+P) -- the layout switches to a clean print-friendly header automatically." },
+  { keywords: ["otp", "login", "password"], answer: "Residents sign in with a one-time code (OTP) emailed to their registered address. Only the Super Admin account uses a traditional email + password login." },
+  { keywords: ["superadmin", "admin", "role", "roles"], answer: "There are three roles: Resident (view-only, own flat data), Admin (sees all Admin Dashboards but not Controls), and Super Admin (full access including Transactions CRUD, Residents & Whitelist, Dashboard Controls, and Audit Trail)." },
 ];
 
 // Precise, page-aware answers for concrete UI terms. `contexts`, when present,
-// restricts the entry to specific currentView labels so the same word (e.g.
-// "preview") can mean different things on different pages without colliding.
+// restricts the entry to specific currentView labels so the same word, such as
+// "preview", can mean different things on different pages without colliding.
 const CURATED: CuratedEntry[] = [
   { keywords: ["vendor", "rank", "ranking"], contexts: ["Vendor Insights"],
      answer: "Vendor ranking lists every vendor sorted by total spend for the selected period. The 'Period change' column shows how much that vendor's spend moved versus the prior period -- rows are flagged when it's more than +20%. Click Preview for a quick chart without leaving the page, or Drill to open the full category to vendor to line-item breakdown." },
+  { keywords: ["top", "vendors", "concentration"], contexts: ["Vendor Insights"],
+     answer: "This callout shows how concentrated your spend is -- e.g. 'Top 3 vendors make up 85% of total spend' means most of the budget flows through just a handful of vendors, useful to know for negotiation leverage or over-reliance risk." },
   { keywords: ["preview"], contexts: ["Vendor Insights", "Cost Alerts & Trends", "Action Needed"],
      answer: "Preview opens a quick chart or detail panel for that specific row right on this page -- no navigation needed. Use Drill instead if you want the full breakdown on the Head Drill-down page." },
   { keywords: ["preview"], contexts: ["CSV Imports"],
      answer: "During a CSV import, Preview shows exactly what will be written before anything is saved -- your file is read and checked entirely in your browser; nothing touches the database until you explicitly click Commit." },
   { keywords: ["drill"], contexts: ["Vendor Insights", "Cost Alerts & Trends", "Action Needed"],
      answer: "Drill takes you straight to the Head Drill-down page, pre-filtered to that category or vendor, so you can see every underlying line item." },
+  { keywords: ["monthly", "trend", "steady", "rise", "pattern"], contexts: ["Vendor Insights"],
+     answer: "A vendor's monthly trend chart plots that vendor's spend month by month, so you can visually spot a steady rise, a one-off spike, or a seasonal pattern rather than just reading a single total-spend number." },
+  { keywords: ["line", "items", "breakdown"], contexts: ["Vendor Insights"],
+     answer: "Line items lists every individual expense entry that makes up a vendor's total spend -- e.g. Security Guards Salary, Housekeeping, Management Fee -- so you can see exactly what you're paying that vendor for." },
   { keywords: ["period", "change"],
      answer: "Period change is the percentage difference between this period's value and the prior period for that same row -- rows are flagged when the increase exceeds the threshold (usually +20%)." },
   { keywords: ["flagged", "flag"],
@@ -62,43 +67,39 @@ const CURATED: CuratedEntry[] = [
   { keywords: ["cumulative", "movement"], contexts: ["Collections"],
      answer: "Cumulative net movement is a running total of collections minus expenses across the whole period, so you can see whether the society's overall cash position is trending up or down -- not just a single month's number." },
   { keywords: ["quarterly", "pattern"], contexts: ["Collections"],
-     answer: "Quarterly pattern groups the monthly figures into quarters, which makes seasonal pressure (e.g. spikes around certain months) easier to spot than scrolling through 12 separate months." },
+     answer: "Quarterly pattern groups the monthly figures into quarters, which makes seasonal pressure, such as spikes around certain months, easier to spot than scrolling through 12 separate months." },
+  { keywords: ["actual", "expected", "monthly", "collection"], contexts: ["Collections"],
+     answer: "This chart compares Actual Collection (green) against Expense (orange) each month, with a dashed line marking Expected Collection -- the target derived from the per-sqft maintenance rate. If the green bar falls short of the dashed line, that month collected less than expected." },
   { keywords: ["collection", "performance", "target"],
      answer: "Collection performance vs target compares what was actually collected against the expected amount, which is calculated from the per-sqft maintenance rate. A negative percentage means the society collected less than expected for that period." },
   { keywords: ["expected", "collection"],
      answer: "Expected Collection is the target amount the society should collect for the period, calculated from the per-sqft maintenance rate multiplied by the total billable area." },
-  { keywords: ["top", "vendors"], contexts: ["Vendor Insights"],
-     answer: "This callout shows how concentrated your spend is -- e.g. 'Top 3 vendors make up 85% of total spend' means most of the budget flows through just a handful of vendors, useful to know for negotiation leverage or over-reliance risk." },
   { keywords: ["steady", "irregular", "dropped"],
      answer: "These badges describe how consistently an income source is received: Steady = recorded every month in range, Irregular = present in some months but not others, Dropped = zero for the last 3 consecutive months after being active before." },
-];
-
-// "Where can I find X" -- maps common terms to the exact page that has them,
-// plus an in-chat link so the user can jump there directly.
-const ROUTE_MAP: RouteEntry[] = [
-  { keywords: ["sqft", "squarefoot", "persqft", "rate"], page: "Collections", to: "/admin/collections", description: "the per-sqft collection rate and the 'Collection performance vs target' trend" },
-  { keywords: ["vendor", "vendors", "ranking", "rank"], page: "Vendor Insights", to: "/admin/vendors", description: "vendor ranking, spend by vendor, and vendor monthly trends" },
-  { keywords: ["cashflow", "cash", "flow"], page: "Cashflow Health", to: "/resident/cashflow", description: "community cashflow health (income vs expense over time)" },
-  { keywords: ["income", "sources", "maintenance"], page: "Income Visibility", to: "/resident/income", description: "income sources and maintenance collection breakdown" },
-  { keywords: ["balance", "opening", "closing", "corpus", "contingency", "bank"], page: "Opening & Closing Balance", to: "/resident/balance", description: "opening/closing balance, bank balance, corpus and contingency cash" },
-  { keywords: ["drilldown", "drill", "lineitem", "category"], page: "Head Drill-down", to: "/resident/drilldown", description: "the full category to vendor to line-item drill-down" },
-  { keywords: ["action", "needed"], page: "Action Needed", to: "/admin/actions", description: "flagged items that need committee attention" },
-  { keywords: ["alert", "alerts", "anomaly", "spike"], page: "Cost Alerts & Trends", to: "/admin/alerts", description: "cost alerts and month-over-month spend trends" },
-  { keywords: ["optimisation", "optimization", "steady", "irregular", "dropped"], page: "Income Optimisation", to: "/admin/income", description: "income consistency status (Steady / Irregular / Dropped)" },
-  { keywords: ["transaction", "transactions", "crud"], page: "Transactions (CRUD)", to: "/admin/transactions", description: "creating, editing or deleting individual transactions" },
-  { keywords: ["resident", "residents", "whitelist"], page: "Residents & Whitelist", to: "/admin/residents", description: "managing resident accounts and the login whitelist" },
-  { keywords: ["widget", "dashboardcontrol", "settings"], page: "Dashboard Controls", to: "/admin/settings", description: "toggling which widgets/dashboards residents can see" },
-  { keywords: ["audit", "trail", "log"], page: "Audit Trail", to: "/admin/audit", description: "a log of every create, update, delete and import action taken in the system" },
-  { keywords: ["import", "csv", "upload", "bulk"], page: "CSV Imports", to: "/admin/imports", description: "bulk-importing transactions, residents or vendors via CSV" },
-  { keywords: ["etl", "integration"], page: "ETL Integration", to: "/admin/etl", description: "automated data integration / ETL sessions" },
+  { keywords: ["outstanding", "dues"],
+     answer: "Outstanding Dues is an All-Time figure -- the total maintenance still owed by residents across the entire history of the society, not just the selected period." },
+  { keywords: ["audited", "report"],
+     answer: "The Audited Report card links to the society's official, professionally audited financial statement for the year -- a PDF prepared and signed off by an independent chartered accountant." },
+  { keywords: ["collected", "maintenance"],
+     answer: "Collected Maintenance shows how much maintenance money has actually been received from residents so far for the selected period, as opposed to Expected Collection which is the target." },
+  { keywords: ["other", "income"],
+     answer: "Other Income covers everything besides maintenance dues -- e.g. clubhouse rent, parking charges, event income -- kept separate so you can see how reliant the society is on maintenance alone." },
+  { keywords: ["total", "income"],
+     answer: "Total Income is Maintenance Collections plus Other Income combined for the selected period." },
+  { keywords: ["net", "surplus", "deficit", "operating"],
+     answer: "Net Operating Surplus/Deficit is Total Income minus Total Expense for the period -- shown in green as 'Positive' when the society saved money, or in red as a deficit when expenses exceeded income." },
+  { keywords: ["commit", "import", "csv", "template", "mapping", "step"], contexts: ["CSV Imports"],
+     answer: "CSV import is a 4-step, cautious process: choose what you're importing, Transactions, Residents, or Vendors, each with its own required column format, choose your file and map columns if needed, Preview -- checked entirely in your browser, nothing saved yet, then explicitly click Commit to write it to the database. You can back out at any step before Commit." },
+  { keywords: ["etl", "session", "provider"], contexts: ["ETL Integration"],
+     answer: "ETL Integration tracks automated data-sync sessions from connected external providers, separate from manual CSV uploads -- useful for auditing when and how data last refreshed automatically." },
 ];
 
 const HELP_RESIDENT: HelpEntry[] = [
   { keywords: ["collected", "maintenance", "unpaid", "maintenance", "recovery", "rate", "months", "dues"], answer: "Four headline figures for the selected period, giving you the summary before you look at the month-by-month detail in the two charts below. 📊 Collected vs unpaid maintenance Shows, month by month: how much maintenance was collected (green bars), how much remained unpaid (red bars), and the Expected Collection target (dashed line) — a clean, currency-only view of whether the society is hitting its per-square-foot…" },
   { keywords: ["little", "blue", "arrow", "corner", "card"], answer: "If you see a small circular arrow tucked into the corner of a card, that card is clickable — tap or click it to jump straight into a detailed, line-by-line breakdown of that number. 🏠 Overview Your one-page summary — if you only ever look at one screen, make it this one. 📄 Audited Report The society's official, professionally audited financial report for the year, prepared by an independent chartered accountant." },
   { keywords: ["surplus", "months", "deficit", "months"], answer: "Out of all the months in your selected range, how many months did the society end up saving money (Surplus), and how many months did it spend more than it earned (Deficit)? Collection performance vs target Compares actual maintenance collected against the Expected Collection target, shown as a percentage difference. A number like \"−7.9%\" means collection came in just under 8% short of the target for that period." },
-  { keywords: ["monthly", "contingency", "fund", "collection"], answer: "Tracks how much was added to the emergency reserve each month (bars) and the running total built up over time (line) — the same reserve referenced in the Contingency Cash card on Overview. 🔍 Head Drill-down The \"zoom in\" page — follow any number all the way down to the smallest transaction. How to use this page Start by choosing Expense or Income . From there, simply keep clicking to go deeper: Category (e.g." },
   { keywords: ["closing", "balance"], answer: "Opening Balance plus Net Movement — the society's cash position at the end of your selected period. This becomes next period's Opening Balance. Months of expense covered A simple \"safety cushion\" indicator: if the society stopped collecting any income today, how many months could it keep paying its regular expenses using only the money it currently has? A higher number means a stronger financial safety net." },
+  { keywords: ["monthly", "contingency", "fund", "collection"], answer: "Tracks how much was added to the emergency reserve each month (bars) and the running total built up over time (line) — the same reserve referenced in the Contingency Cash card on Overview. 🔍 Head Drill-down The \"zoom in\" page — follow any number all the way down to the smallest transaction. How to use this page Start by choosing Expense or Income . From there, simply keep clicking to go deeper: Category." },
   { keywords: ["expense", "income", "ratio"], answer: "What percentage of income has been spent, for your selected period. A colored bar and label (Healthy / Caution / Over Budget) give you an instant read on whether spending is under control. 📊 Top 5 charts (expense categories, income sources, vendors) Three quick-glance charts showing the society's biggest expense categories, its top income sources (excluding maintenance), and the vendors paid the most." },
   { keywords: ["opening", "balance"], answer: "How this is calculated: the starting amount recorded when the society first began tracking finances digitally, plus every rupee saved (income minus expenses) from that date up to the start of whichever period you're viewing. A small badge next to this figure tells you whether it's a real, confirmed starting figure or our best estimate (see the note just below the balance strip for details)." },
   { keywords: ["expense", "income"], answer: "A compact summary card showing total income, total expense, and whether the period ended in Surplus or Deficit — the same calculation used everywhere else on the dashboard. Collected Maintenance / Unpaid Maintenance / Recovery Rate / Months with Dues Four headline figures for the selected period, giving you the summary before you look at the month-by-month detail in the two charts below." },
@@ -116,23 +117,57 @@ const HELP_ADMIN: HelpEntry[] = [
   { keywords: ["preview", "resident", "save", "changes"], answer: "Click Preview as resident on any dashboard card to see exactly what a resident would see with your current toggle settings, before committing to anything. Changes only take effect the next time a resident loads the app — someone already viewing the dashboard in another tab won't see things disappear live. Don't forget to click Save changes at the top — toggling switches alone doesn't persist anything until you do." },
   { keywords: ["collected", "maintenance", "unpaid", "maintenance", "recovery", "rate", "months", "dues"], answer: "Four headline figures for the selected period, giving you the summary before you look at the month-by-month detail in the two charts below. 📊 Collected vs unpaid maintenance Shows, month by month: how much maintenance was collected (green bars), how much remained unpaid (red bars), and the Expected Collection target (dashed line) — a clean, currency-only view of whether the society is hitting its per-square-foot…" },
   { keywords: ["surplus", "months", "deficit", "months"], answer: "Out of all the months in your selected range, how many months did the society end up saving money (Surplus), and how many months did it spend more than it earned (Deficit)? Collection performance vs target Compares actual maintenance collected against the Expected Collection target, shown as a percentage difference. A number like \"−7.9%\" means collection came in just under 8% short of the target for that period." },
-  { keywords: ["monthly", "contingency", "fund", "collection"], answer: "Tracks how much was added to the emergency reserve each month (bars) and the running total built up over time (line) — the same reserve referenced in the Contingency Cash card on Overview. 🔍 Head Drill-down The \"zoom in\" page — follow any number all the way down to the smallest transaction. How to use this page Start by choosing Expense or Income . From there, simply keep clicking to go deeper: Category (e.g." },
   { keywords: ["why", "head", "drill", "down", "has", "whole", "page", "toggle"], answer: "That page is one continuous flow (Category → Vendor → Line item, each screen replacing the last), so individual sections can't be hidden without breaking the navigation itself — it's an all-or-nothing page by design. \"Preview as resident\" and \"Save changes\" Click Preview as resident on any dashboard card to see exactly what a resident would see with your current toggle settings, before committing to anything." },
   { keywords: ["closing", "balance"], answer: "Opening Balance plus Net Movement — the society's cash position at the end of your selected period. This becomes next period's Opening Balance. Months of expense covered A simple \"safety cushion\" indicator: if the society stopped collecting any income today, how many months could it keep paying its regular expenses using only the money it currently has? A higher number means a stronger financial safety net." },
   { keywords: ["expense", "income", "ratio", "trend"], answer: "What percentage of income was spent on expenses, tracked month by month as a line chart. A lower line is healthier; a climbing line over several months is worth investigating before it becomes a real problem. Irregular sources A focused list of exactly which income sources are inconsistent — present in some months, absent in others — along with how many of the last 12 months each one was actually active in." },
   { keywords: ["total", "emails", "active", "pending", "invites", "admins"], answer: "A snapshot of your access list: how many people are whitelisted in total, how many have an active account, how many have been invited but haven't logged in yet, and how many hold admin-level access. Residents table & the three roles Each row shows an email, name, flat number, role, status, and when they were invited. The three roles, from least to most access: resident — sees only the Resident dashboards." },
+  { keywords: ["monthly", "contingency", "fund", "collection"], answer: "Tracks how much was added to the emergency reserve each month (bars) and the running total built up over time (line) — the same reserve referenced in the Contingency Cash card on Overview. 🔍 Head Drill-down The \"zoom in\" page — follow any number all the way down to the smallest transaction. How to use this page Start by choosing Expense or Income . From there, simply keep clicking to go deeper: Category." },
   { keywords: ["cost", "alerts"], answer: "Lists every expense category whose spend increased by more than 15% compared to the prior period. If nothing qualifies, you'll see a reassuring \"No categories exceed the 15% threshold this period\" message instead of an empty table. Sudden spike anomalies Flags a category when its most recent month's spend is dramatically higher than its own trailing 3-month average — shown as a multiplier (e.g. \"1.9×\")." },
   { keywords: ["above", "average", "spend", "month"], answer: "Categories currently spending noticeably more than their own historical average for the selected range — shown as a multiplier (e.g. \"1.6× avg\"). This is intentionally a softer signal than the red \"Top 5\" alerts above: worth keeping an eye on, not necessarily a red flag on its own. 📈 Cost Alerts & Trends Requirement IDs AD-01 → AD-05 · The full expense-side deep-dive behind the alerts on Action Needed." },
   { keywords: ["expense", "income", "ratio"], answer: "What percentage of income has been spent, for your selected period. A colored bar and label (Healthy / Caution / Over Budget) give you an instant read on whether spending is under control. 📊 Top 5 charts (expense categories, income sources, vendors) Three quick-glance charts showing the society's biggest expense categories, its top income sources (excluding maintenance), and the vendors paid the most." },
   { keywords: ["concentration", "risk", "callout"], answer: "A one-line summary like \"Top 3 vendors make up 84% of total spend\" — this answers a genuine risk-management question: are you dangerously dependent on a handful of vendors, where losing one relationship (or one contract renegotiation going badly) could seriously disrupt operations? Vendor ranking table Every vendor, sorted by total spend (or total collected, on the Income tab) with the highest first." },
 ];
 
+const ROUTE_MAP: RouteEntry[] = [
+  { keywords: ["sqft", "squarefoot", "persqft", "rate"], page: "Collections", to: "/admin/collections", description: "the per-sqft collection rate and the 'Collection performance vs target' trend" },
+  { keywords: ["vendor", "vendors", "ranking", "rank"], page: "Vendor Insights", to: "/admin/vendors", description: "vendor ranking, spend by vendor, and vendor monthly trends" },
+  { keywords: ["cashflow", "cash", "flow"], page: "Cashflow Health", to: "/resident/cashflow", description: "community cashflow health, income vs expense over time" },
+  { keywords: ["income", "sources", "maintenance"], page: "Income Visibility", to: "/resident/income", description: "income sources and maintenance collection breakdown" },
+  { keywords: ["balance", "opening", "closing", "corpus", "contingency", "bank"], page: "Opening & Closing Balance", to: "/resident/balance", description: "opening/closing balance, bank balance, corpus and contingency cash" },
+  { keywords: ["drilldown", "drill", "lineitem", "category"], page: "Head Drill-down", to: "/resident/drilldown", description: "the full category to vendor to line-item drill-down" },
+  { keywords: ["action", "needed"], page: "Action Needed", to: "/admin/actions", description: "flagged items that need committee attention" },
+  { keywords: ["alert", "alerts", "anomaly", "spike"], page: "Cost Alerts & Trends", to: "/admin/alerts", description: "cost alerts and month-over-month spend trends" },
+  { keywords: ["optimisation", "optimization", "steady", "irregular", "dropped"], page: "Income Optimisation", to: "/admin/income", description: "income consistency status, Steady, Irregular, or Dropped" },
+  { keywords: ["transaction", "transactions", "crud"], page: "Transactions (CRUD)", to: "/admin/transactions", description: "creating, editing or deleting individual transactions" },
+  { keywords: ["resident", "residents", "whitelist"], page: "Residents & Whitelist", to: "/admin/residents", description: "managing resident accounts and the login whitelist" },
+  { keywords: ["widget", "dashboardcontrol", "settings"], page: "Dashboard Controls", to: "/admin/settings", description: "toggling which widgets/dashboards residents can see" },
+  { keywords: ["audit", "trail", "log"], page: "Audit Trail", to: "/admin/audit", description: "a log of every create, update, delete and import action taken in the system" },
+  { keywords: ["import", "csv", "upload", "bulk"], page: "CSV Imports", to: "/admin/imports", description: "bulk-importing transactions, residents or vendors via CSV" },
+  { keywords: ["etl", "integration"], page: "ETL Integration", to: "/admin/etl", description: "automated data integration / ETL sessions" },
+];
+
 const WHERE_INTENT = /\b(where|which page|find|navigate|locate|show me)\b/;
 
+function normalizeWords(s: string): string[] {
+  return s
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
+function stem(w: string): string {
+  return w.replace(/(ings|ing)$/, "").replace(/(es|s)$/, "").replace(/ed$/, "");
+}
+
 function tokenScore(query: string, keywords: string[]): number {
+  const qWords = new Set(normalizeWords(query).map(stem));
+  const qLower = query.toLowerCase();
   let score = 0;
   for (const k of keywords) {
-    if (query.includes(k)) score += k.length;
+    const kl = k.toLowerCase();
+    if (qWords.has(stem(kl))) score += Math.max(2, kl.length);
+    else if (qLower.includes(kl)) score += 1;
   }
   return score;
 }
@@ -146,23 +181,16 @@ function getBotAnswer(rawQuery: string, persona: "resident" | "admin", currentVi
     return { text: `Hi! I'm your PulseLedger assistant (beta). You're currently on **${currentView}**. Ask me about any card, badge, or chart you see here, or ask "where can I find..." to be pointed to the right page.` };
   }
 
-  // 1) Navigation intent -- "where can I find X"
   if (WHERE_INTENT.test(q)) {
     const routeMatches = ROUTE_MAP.map((r) => ({ r, score: tokenScore(q, r.keywords) }))
       .filter((s) => s.score > 0)
       .sort((a, b) => b.score - a.score);
     if (routeMatches.length > 0) {
       const best = routeMatches[0].r;
-      return {
-        text: `You'll find ${best.description} on the **${best.page}** page.`,
-        link: { to: best.to, label: best.page },
-      };
+      return { text: `You'll find ${best.description} on the **${best.page}** page.`, link: { to: best.to, label: best.page } };
     }
   }
 
-  // 2) Curated, page-aware answers for concrete UI terms (weighted higher so they
-  //    beat generic guide text, and filtered so "preview" means the right thing
-  //    on the right page)
   const curatedPool = CURATED.filter((c) => !c.contexts || c.contexts.includes(currentView));
   const curatedScored = curatedPool
     .map((c) => ({ c, score: tokenScore(q, c.keywords) * 3 }))
@@ -172,7 +200,6 @@ function getBotAnswer(rawQuery: string, persona: "resident" | "admin", currentVi
     return { text: curatedScored[0].c.answer };
   }
 
-  // 3) Generic guide-derived knowledge, common + persona-specific
   const pool = [...HELP_COMMON, ...(persona === "admin" ? HELP_ADMIN : HELP_RESIDENT)];
   const scored = pool
     .map((entry) => ({ entry, score: tokenScore(q, entry.keywords) }))
@@ -182,16 +209,12 @@ function getBotAnswer(rawQuery: string, persona: "resident" | "admin", currentVi
     return { text: scored[0].entry.answer };
   }
 
-  // 4) Fallback -- also try a route guess as a last resort before giving up
   const looseRoute = ROUTE_MAP.map((r) => ({ r, score: tokenScore(q, r.keywords) }))
     .filter((s) => s.score > 0)
     .sort((a, b) => b.score - a.score);
   if (looseRoute.length > 0) {
     const best = looseRoute[0].r;
-    return {
-      text: `I'm not fully sure what you meant, but that sounds related to the **${best.page}** page (${best.description}). Want to head there?`,
-      link: { to: best.to, label: best.page },
-    };
+    return { text: `I'm not fully sure what you meant, but that sounds related to the **${best.page}** page -- ${best.description}. Want to head there?`, link: { to: best.to, label: best.page } };
   }
 
   return {
@@ -218,7 +241,16 @@ function saveStoredMessages(persona: "resident" | "admin", messages: ChatMessage
   try {
     window.sessionStorage.setItem(`${CHAT_STORAGE_PREFIX}-${persona}`, JSON.stringify(messages));
   } catch {
-    // sessionStorage unavailable (private mode etc.) -- fail silently, chat still works, just won't persist
+    // sessionStorage unavailable, e.g. private browsing -- chat still works, just won't persist
+  }
+}
+
+function clearStoredMessages(persona: "resident" | "admin") {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.removeItem(`${CHAT_STORAGE_PREFIX}-${persona}`);
+  } catch {
+    // ignore
   }
 }
 
@@ -232,15 +264,32 @@ function HelpChat({ persona, currentView, onClose }: { persona: "resident" | "ad
   });
   const [input, setInput] = useState("");
   const [typing, setTyping] = useState(false);
+  const [minimized, setMinimized] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      return window.sessionStorage.getItem(`${CHAT_STORAGE_PREFIX}-minimized-${persona}`) === "1";
+    } catch {
+      return false;
+    }
+  });
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [messages, typing]);
+  }, [messages, typing, minimized]);
 
   useEffect(() => {
     saveStoredMessages(persona, messages);
   }, [persona, messages]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.sessionStorage.setItem(`${CHAT_STORAGE_PREFIX}-minimized-${persona}`, minimized ? "1" : "0");
+    } catch {
+      // ignore
+    }
+  }, [persona, minimized]);
 
   function handleSend() {
     const text = input.trim();
@@ -255,9 +304,17 @@ function HelpChat({ persona, currentView, onClose }: { persona: "resident" | "ad
     }, 500 + Math.random() * 400);
   }
 
+  function handleClose() {
+    clearStoredMessages(persona);
+    onClose();
+  }
+
   return (
-    <div className="flex flex-col h-[460px] w-[320px] sm:w-[380px] bg-card border border-border rounded-2xl shadow-2xl overflow-hidden">
-      <div className="p-4 bg-gradient-to-br from-indigo-500 to-blue-600 text-white flex items-center justify-between shrink-0">
+    <div className={`flex flex-col bg-card border border-border rounded-2xl shadow-2xl overflow-hidden transition-all duration-200 ${minimized ? "h-auto w-[280px]" : "h-[460px] w-[320px] sm:w-[380px]"}`}>
+      <div
+        className="p-4 bg-gradient-to-br from-indigo-500 to-blue-600 text-white flex items-center justify-between shrink-0 cursor-pointer"
+        onClick={() => minimized && setMinimized(false)}
+      >
         <div className="flex items-center gap-2 min-w-0">
           <div className="bg-white/20 p-1.5 rounded-lg shrink-0">
             <Bot className="h-5 w-5" />
@@ -267,67 +324,90 @@ function HelpChat({ persona, currentView, onClose }: { persona: "resident" | "ad
               Pulse Assistant
               <span className="text-[8px] font-bold uppercase tracking-wide bg-white/25 px-1.5 py-0.5 rounded-full shrink-0">Beta</span>
             </div>
-            <div className="text-[10px] opacity-80 flex items-center gap-1">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-              <span className="truncate">Viewing: {currentView}</span>
-            </div>
+            {!minimized && (
+              <div className="text-[10px] opacity-80 flex items-center gap-1">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                <span className="truncate">Viewing: {currentView}</span>
+              </div>
+            )}
           </div>
         </div>
-        <Button variant="ghost" size="icon" className="text-white hover:bg-white/10 h-8 w-8 shrink-0" onClick={onClose} aria-label="Close chat">
-          <X className="h-4 w-4" />
-        </Button>
-      </div>
-
-      <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3">
-        {messages.map((m, i) => (
-          <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-            <div
-              className={`max-w-[85%] p-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words ${
-                m.role === "user"
-                  ? "bg-indigo-600 text-white rounded-tr-none"
-                  : "bg-muted text-foreground rounded-tl-none border border-border"
-              }`}
-            >
-              <div>{m.text}</div>
-              {m.link && (
-                <Link
-                  to={m.link.to}
-                  className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline"
-                >
-                  Go to {m.link.label} →
-                </Link>
-              )}
-            </div>
-          </div>
-        ))}
-        {typing && (
-          <div className="flex justify-start">
-            <div className="bg-muted border border-border rounded-2xl rounded-tl-none px-4 py-3 flex gap-1">
-              <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:-0.3s]" />
-              <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:-0.15s]" />
-              <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60 animate-bounce" />
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className="p-3 border-t border-border bg-muted/30 shrink-0 space-y-1.5">
-        <div className="flex items-center gap-2">
-          <input
-            className="flex-1 bg-background border border-border rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all"
-            placeholder="Ask about this dashboard..."
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleSend()}
-          />
-          <Button size="icon" className="rounded-xl bg-indigo-600 hover:bg-indigo-700 shrink-0" onClick={handleSend} aria-label="Send">
-            <Send className="h-4 w-4" />
+        <div className="flex items-center gap-1 shrink-0">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-white hover:bg-white/10 h-8 w-8"
+            onClick={(e) => { e.stopPropagation(); setMinimized((v) => !v); }}
+            aria-label={minimized ? "Expand chat" : "Minimize chat"}
+          >
+            {minimized ? <ChevronUp className="h-4 w-4" /> : <Minus className="h-4 w-4" />}
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-white hover:bg-white/10 h-8 w-8"
+            onClick={(e) => { e.stopPropagation(); handleClose(); }}
+            aria-label="Close chat"
+          >
+            <X className="h-4 w-4" />
           </Button>
         </div>
-        <p className="text-[10px] text-muted-foreground text-center leading-tight">
-          Beta feature, still learning -- thanks for testing!
-        </p>
       </div>
+
+      {!minimized && (
+        <>
+          <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3">
+            {messages.map((m, i) => (
+              <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+                <div
+                  className={`max-w-[85%] p-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words ${
+                    m.role === "user"
+                      ? "bg-indigo-600 text-white rounded-tr-none"
+                      : "bg-muted text-foreground rounded-tl-none border border-border"
+                  }`}
+                >
+                  <div>{m.text}</div>
+                  {m.link && (
+                    <Link
+                      to={m.link.to}
+                      className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline"
+                    >
+                      Go to {m.link.label} →
+                    </Link>
+                  )}
+                </div>
+              </div>
+            ))}
+            {typing && (
+              <div className="flex justify-start">
+                <div className="bg-muted border border-border rounded-2xl rounded-tl-none px-4 py-3 flex gap-1">
+                  <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:-0.3s]" />
+                  <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:-0.15s]" />
+                  <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60 animate-bounce" />
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="p-3 border-t border-border bg-muted/30 shrink-0 space-y-1.5">
+            <div className="flex items-center gap-2">
+              <input
+                className="flex-1 bg-background border border-border rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all"
+                placeholder="Ask about this dashboard..."
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSend()}
+              />
+              <Button size="icon" className="rounded-xl bg-indigo-600 hover:bg-indigo-700 shrink-0" onClick={handleSend} aria-label="Send">
+                <Send className="h-4 w-4" />
+              </Button>
+            </div>
+            <p className="text-[10px] text-muted-foreground text-center leading-tight">
+              Beta feature, still learning -- thanks for testing!
+            </p>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -733,7 +813,7 @@ export function PortalShell({
 
   // ── Session-driven RBAC: residents never see admin sections. Admins see both
   // and can flip persona via the sidebar toggle to preview the resident view.
-  const [session, setSession] = useState<Session | null>(null);
+  const [session, setSession] = useState<Session | null>(() => (typeof window !== "undefined" ? getSession() : null));
   useEffect(() => {
     const refresh = () => setSession(getSession());
     refresh();
@@ -1004,11 +1084,10 @@ export function PortalShell({
     </div>
 
     {/* Floating help launcher -- fixed to the viewport, always visible on every
-        page regardless of scroll position. Clicking it opens a small CONTROLLED
-        menu (menuOpen state) so selecting either option closes the menu
-        immediately instead of lingering until an unrelated click dismisses it.
-        chatOpen + the chat's own message history persist via sessionStorage so
-        navigating between pages does not reset the conversation. */}
+        page regardless of scroll position. Clicking it opens a CONTROLLED menu
+        (menuOpen) that closes immediately on selection. chatOpen/minimized/
+        history persist via sessionStorage across navigation, and are cleared
+        only when the user explicitly closes the chat (X). */}
     <div className="fixed bottom-5 right-5 sm:bottom-6 sm:right-6 z-50 flex flex-col items-end gap-3">
       {chatOpen && (
         <HelpChat persona={isAdmin ? "admin" : "resident"} currentView={currentViewLabel} onClose={() => setChatOpen(false)} />
