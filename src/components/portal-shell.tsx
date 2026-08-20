@@ -1,5 +1,5 @@
 import { Link, useRouterState, useNavigate, useSearch } from "@tanstack/react-router";
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, useRef, type ReactNode } from "react";
 import { navSections, monthlyTotals, months12, inr, expenseTree, incomeTree } from "@/lib/finance-mock";
 import { getSession, signOut, type Session } from "@/lib/session";
 import { Badge } from "@/components/ui/badge";
@@ -8,12 +8,189 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetHeader } from "@/components/ui/sheet";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator,
 } from "@/components/ui/command";
-import { Home, BarChart3, Table2, Menu, ChevronLeft, LogOut, UserCircle2, HelpCircle, Code2, Activity } from "lucide-react";
+import { Home, BarChart3, Table2, Menu, ChevronLeft, LogOut, UserCircle2, HelpCircle, Code2, Activity, MessageSquare, Send, X, Bot, FileText, Sparkles } from "lucide-react";
 
 // ─── Period context ──────────────────────────────────────────────────────
+
+// —————————————————————————————————————————————————————————————————————————————————————
+// Help Chat (BETA): knowledge base auto-derived from the resident/admin user guides.
+// This is an early "user testing" feature -- kept clearly labelled as Beta in the UI
+// (menu item + chat header + a one-line footer note) so testers know answers may be
+// incomplete and are encouraged to fall back to the full User Guide or give feedback.
+// —————————————————————————————————————————————————————————————————————————————————————
+type HelpEntry = { keywords: string[]; answer: string };
+
+const HELP_COMMON: HelpEntry[] = [
+  { keywords: ["all", "time", "badge", "dashed"], answer: "The 'All-Time' badge (dashed border, light grey background) means that card always shows the complete picture from day one until today. Changing the date filter at the top will NOT change these numbers -- every other card responds to whatever date range you've picked." },
+  { keywords: ["arrow", "blue", "corner", "clickable"], answer: "The small blue arrow in the corner of a card means it's clickable -- tap or click it to jump into a detailed, line-by-line breakdown of that number." },
+  { keywords: ["filter", "date", "period", "range"], answer: "Use the period dropdown at the top of the page to change the reporting range (e.g. Last 3 months, current fiscal year). Most charts, tables and cards update automatically -- except any card marked 'All-Time'." },
+  { keywords: ["export", "print", "pdf"], answer: "Most dashboard pages support printing/exporting via your browser's print dialog (Ctrl/Cmd+P) -- the layout switches to a clean print-friendly header automatically." },
+];
+
+const HELP_RESIDENT: HelpEntry[] = [
+  { keywords: ["all", "time", "badge", "dashed", "border", "light", "grey", "background"], answer: "All-Time A handful of cards (like Bank Balance, Contingency Cash, and Corpus) are marked \"All-Time.\" This means they always show the complete picture from day one until today — changing the date filter at the top of the page will not change these numbers. Every other card respond" },
+  { keywords: ["little", "blue", "arrow", "corner", "card"], answer: "If you see a small circular arrow tucked into the corner of a card, that card is clickable — tap or click it to jump straight into a detailed, line-by-line breakdown of that number. 🏠 Overview Your one-page summary — if you only ever look at one screen, make it this one. 📄 Audite" },
+  { keywords: ["audited", "report"], answer: "The society's official, professionally audited financial report for the year, prepared by an independent chartered accountant. You can view it right here or download it as a PDF — this is the same document your management committee is legally required to share with all residents." },
+  { keywords: ["expected", "collection"], answer: "The target amount the society should collect this period, based on the maintenance rate (per square foot) multiplied by the total built-up area of all flats. Think of it as \"how much we're supposed to collect.\" Collected Maintenance How much maintenance money has actually been re" },
+  { keywords: ["collected", "maintenance"], answer: "How much maintenance money has actually been received from residents so far, for the period you're viewing. Outstanding Dues All-Time The total unpaid maintenance dues built up across the society's entire history — money residents still owe, carried forward month after month. Thi" },
+  { keywords: ["outstanding", "dues", "all", "time"], answer: "All-Time The total unpaid maintenance dues built up across the society's entire history — money residents still owe, carried forward month after month. This is deliberately shown as an all-time figure so it always reflects the true, complete picture of what's pending, no matter w" },
+  { keywords: ["other", "income"], answer: "Money the society earns from things other than maintenance — renting the community hall, parking charges, late-payment penalties, advertising space, and similar sources. 🟢 Society Financial Position Total Income Click for details Maintenance collected plus all other income, combi" },
+  { keywords: ["total", "income"], answer: "Click for details Maintenance collected plus all other income, combined. Click this card to see exactly which categories make up this total. Total Expense Click for details Everything the society spent during the period — staff salaries, electricity, water, housekeeping, repairs," },
+  { keywords: ["total", "expense"], answer: "Click for details Everything the society spent during the period — staff salaries, electricity, water, housekeeping, repairs, and more. Click to see the full breakdown. Net Operating Surplus Total Income minus Total Expense. Shown in green with \"Positive\" when the society saved m" },
+  { keywords: ["net", "operating", "surplus"], answer: "Total Income minus Total Expense. Shown in green with \"Positive\" when the society saved money during the period; shown in red as \"Net Operating Deficit\" if it spent more than it earned. Recovery Rate What percentage of the Expected Collection target was actually collected. 90% or" },
+  { keywords: ["recovery", "rate"], answer: "What percentage of the Expected Collection target was actually collected. 90% or higher is considered Healthy ; lower percentages are flagged as Watch or At Risk , prompting the management committee to follow up with residents who haven't paid. 🟠 Long-Term Financial Strength Corp" },
+  { keywords: ["corpus", "interest", "accumulated", "all", "time"], answer: "All-Time The society's long-term savings fund (sometimes called a \"sinking fund\") — money set aside over the years for major future repairs, like repainting the building or replacing lifts. Contingency Cash All-Time Click for trend A small portion of every resident's maintenance " },
+  { keywords: ["contingency", "cash", "all", "time", "trend"], answer: "All-Time Click for trend A small portion of every resident's maintenance payment is deliberately set aside as an emergency reserve, separate from day-to-day operating funds. Important: this money is not extra cash on top of the Bank Balance — it's already included inside it, just" },
+  { keywords: ["bank", "balance", "all", "time"], answer: "All-Time The actual amount of cash the society holds right now, added up from the very first day of digital record-keeping until today. Because it's \"all-time,\" this figure includes the Contingency Cash reserve described above — it isn't a separate pot of money. Expense / Income " },
+];
+
+const HELP_ADMIN: HelpEntry[] = [
+  { keywords: ["all", "time", "badge"], answer: "All-Time A few figures (Bank Balance, Contingency Cash, Corpus, Outstanding Dues) always show the complete picture from day one to today — the date filter at the top of the page does not affect them. Status badges: Steady Irregular Dropped These three appear across the admin-only" },
+  { keywords: ["status", "badges", "steady", "irregular", "dropped"], answer: "Steady Irregular Dropped These three appear across the admin-only analytics pages (Income Optimisation, Action Needed) to describe how consistently an income source is being received: Steady — recorded in every month of the selected range, no concerns. Irregular — present in some" },
+  { keywords: ["little", "blue", "arrow", "corner", "card"], answer: "On the Resident Dashboards below, a small circular arrow tucked into the corner of a card means that card is clickable -- tap or click it to jump straight into a detailed, line-by-line breakdown of that number on the Head Drill-down page. \"Preview\" and \"Drill\" links On tables lik" },
+  { keywords: ["preview", "drill", "links"], answer: "On tables like Vendor Insights, Preview loads that row's chart and detail panel right there on the same page, while Drill (with the small external-link icon) takes you to the full Head Drill-down page for a complete transaction-level breakdown. 🏠 Resident Dashboards As an Admin o" },
+  { keywords: ["audited", "report"], answer: "The society's official, professionally audited financial report for the year, prepared by an independent chartered accountant. You can view it right here or download it as a PDF — this is the same document your management committee is legally required to share with all residents." },
+  { keywords: ["expected", "collection"], answer: "The target amount the society should collect this period, based on the maintenance rate (per square foot) multiplied by the total built-up area of all flats. Think of it as \"how much we're supposed to collect.\" Collected Maintenance How much maintenance money has actually been re" },
+  { keywords: ["collected", "maintenance"], answer: "How much maintenance money has actually been received from residents so far, for the period you're viewing. Outstanding Dues All-Time The total unpaid maintenance dues built up across the society's entire history — money residents still owe, carried forward month after month. Thi" },
+  { keywords: ["outstanding", "dues", "all", "time"], answer: "All-Time The total unpaid maintenance dues built up across the society's entire history — money residents still owe, carried forward month after month. This is deliberately shown as an all-time figure so it always reflects the true, complete picture of what's pending, no matter w" },
+  { keywords: ["other", "income"], answer: "Money the society earns from things other than maintenance — renting the community hall, parking charges, late-payment penalties, advertising space, and similar sources. 🟢 Society Financial Position Total Income Click for details Maintenance collected plus all other income, combi" },
+  { keywords: ["total", "income"], answer: "Click for details Maintenance collected plus all other income, combined. Click this card to see exactly which categories make up this total. Total Expense Click for details Everything the society spent during the period — staff salaries, electricity, water, housekeeping, repairs," },
+  { keywords: ["total", "expense"], answer: "Click for details Everything the society spent during the period — staff salaries, electricity, water, housekeeping, repairs, and more. Click to see the full breakdown. Net Operating Surplus Total Income minus Total Expense. Shown in green with \"Positive\" when the society saved m" },
+  { keywords: ["net", "operating", "surplus"], answer: "Total Income minus Total Expense. Shown in green with \"Positive\" when the society saved money during the period; shown in red as \"Net Operating Deficit\" if it spent more than it earned. Recovery Rate What percentage of the Expected Collection target was actually collected. 90% or" },
+  { keywords: ["recovery", "rate"], answer: "What percentage of the Expected Collection target was actually collected. 90% or higher is considered Healthy ; lower percentages are flagged as Watch or At Risk , prompting the management committee to follow up with residents who haven't paid. 🟠 Long-Term Financial Strength Corp" },
+  { keywords: ["corpus", "interest", "accumulated", "all", "time"], answer: "All-Time The society's long-term savings fund (sometimes called a \"sinking fund\") — money set aside over the years for major future repairs, like repainting the building or replacing lifts. Contingency Cash All-Time Click for trend A small portion of every resident's maintenance " },
+];
+
+function scoreMatch(query: string, entry: HelpEntry): number {
+  let score = 0;
+  for (const k of entry.keywords) {
+    if (query.includes(k)) score += k.length; // longer/more specific keyword matches score higher
+  }
+  return score;
+}
+
+function getBotResponse(query: string, persona: "resident" | "admin", currentView: string): string {
+  const q = query.toLowerCase().trim();
+  if (!q) return "Go ahead, ask me anything about this dashboard -- e.g. \"what does the All-Time badge mean?\" or \"how do I read Cashflow Health?\"";
+
+  if (/^(hi|hello|hey)\b/.test(q)) {
+    return `Hi! I'm your PulseLedger assistant (beta). You're currently on **${currentView}**. Ask me about any card, badge, or chart you see here.`;
+  }
+
+  const pool = [...HELP_COMMON, ...(persona === "admin" ? HELP_ADMIN : HELP_RESIDENT)];
+  const scored = pool
+    .map((entry) => ({ entry, score: scoreMatch(q, entry) }))
+    .filter((s) => s.score > 0)
+    .sort((a, b) => b.score - a.score);
+
+  if (scored.length > 0) {
+    return scored[0].entry.answer;
+  }
+
+  return `I couldn't find an exact match for that yet (this assistant is still in beta). Try asking about specific terms you see on screen (e.g. "All-Time badge", "outstanding dues", "steady vs dropped income"), or open the full User Guide from the menu above for ${currentView}.`;
+}
+
+function HelpChat({ persona, currentView, onClose }: { persona: "resident" | "admin"; currentView: string; onClose: () => void }) {
+  const [messages, setMessages] = useState<{ role: "bot" | "user"; text: string }[]>([
+    { role: "bot", text: `Hi! I'm your PulseLedger assistant. You're currently viewing **${currentView}**. Ask me anything about the cards, badges, or charts on this page.` },
+  ]);
+  const [input, setInput] = useState("");
+  const [typing, setTyping] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+  }, [messages, typing]);
+
+  function handleSend() {
+    const text = input.trim();
+    if (!text) return;
+    setInput("");
+    setMessages((prev) => [...prev, { role: "user", text }]);
+    setTyping(true);
+    window.setTimeout(() => {
+      const answer = getBotResponse(text, persona, currentView);
+      setMessages((prev) => [...prev, { role: "bot", text: answer }]);
+      setTyping(false);
+    }, 500 + Math.random() * 400);
+  }
+
+  return (
+    <div className="flex flex-col h-[460px] w-[320px] sm:w-[380px] bg-card border border-border rounded-2xl shadow-2xl overflow-hidden">
+      <div className="p-4 bg-gradient-to-br from-indigo-500 to-blue-600 text-white flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="bg-white/20 p-1.5 rounded-lg shrink-0">
+            <Bot className="h-5 w-5" />
+          </div>
+          <div className="min-w-0">
+            <div className="font-bold text-sm leading-tight flex items-center gap-1.5">
+              Pulse Assistant
+              <span className="text-[8px] font-bold uppercase tracking-wide bg-white/25 px-1.5 py-0.5 rounded-full shrink-0">Beta</span>
+            </div>
+            <div className="text-[10px] opacity-80 flex items-center gap-1">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+              <span className="truncate">Viewing: {currentView}</span>
+            </div>
+          </div>
+        </div>
+        <Button variant="ghost" size="icon" className="text-white hover:bg-white/10 h-8 w-8 shrink-0" onClick={onClose} aria-label="Close chat">
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
+
+      <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3">
+        {messages.map((m, i) => (
+          <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+            <div
+              className={`max-w-[85%] p-3 rounded-2xl text-sm leading-relaxed ${
+                m.role === "user"
+                  ? "bg-indigo-600 text-white rounded-tr-none"
+                  : "bg-muted text-foreground rounded-tl-none border border-border"
+              }`}
+            >
+              {m.text}
+            </div>
+          </div>
+        ))}
+        {typing && (
+          <div className="flex justify-start">
+            <div className="bg-muted border border-border rounded-2xl rounded-tl-none px-4 py-3 flex gap-1">
+              <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:-0.3s]" />
+              <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:-0.15s]" />
+              <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60 animate-bounce" />
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="p-3 border-t border-border bg-muted/30 shrink-0 space-y-1.5">
+        <div className="flex items-center gap-2">
+          <input
+            className="flex-1 bg-background border border-border rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all"
+            placeholder="Ask about this dashboard..."
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleSend()}
+          />
+          <Button size="icon" className="rounded-xl bg-indigo-600 hover:bg-indigo-700 shrink-0" onClick={handleSend} aria-label="Send">
+            <Send className="h-4 w-4" />
+          </Button>
+        </div>
+        {/* Small, non-intrusive beta disclosure -- present so testers understand this
+            is an early feature, without turning the chat into a legal-disclaimer wall. */}
+        <p className="text-[10px] text-muted-foreground text-center leading-tight">
+          Beta feature, still learning -- thanks for testing!
+        </p>
+      </div>
+    </div>
+  );
+}
+
+
 export type PeriodValue = "month-prev" | "range-3m" | "range-6m" | "range-12m" | "fy" | "fy-prev";
 
 // Format like "Jul '26" — matches finance-mock months12 and hooks.isoMonthToLabel
@@ -352,6 +529,7 @@ export function PortalShell({
   const setView = (v: "chart" | "number") => navigate({ to: pathname, search: (((prev: any) => ({ ...prev, view: v })) as any), replace: true });
   const [mobileOpen, setMobileOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -416,6 +594,8 @@ export function PortalShell({
   const visibleNavSections = isAdmin
     ? navSections.filter((s) => s.group !== "controls" || isSuperAdmin)
     : navSections.filter((s) => s.tone === "resident");
+
+  const currentViewLabel = navSections.flatMap((s) => s.items).find((it) => it.to === pathname)?.label ?? title;
 
   const personaSections = visibleNavSections.filter((s) => s.tone === persona);
   const personaItems = personaSections.flatMap((s) => s.items);
@@ -663,24 +843,58 @@ export function PortalShell({
       </main>
     </div>
 
-    {/* Floating help button -- fixed to the viewport, always visible on every
-        page regardless of scroll position, deliberately NOT buried inside the
-        header toolbar where it's easy to overlook among the other controls.
-        A brief pulse ring draws the eye on first paint; the visible "Need
-        help?" label (not just an icon) makes its purpose obvious without
-        requiring a hover tooltip, which doesn't work on touch devices anyway. */}
-    <button
-      type="button"
-      onClick={() => window.open(isAdmin ? "/dashboard-user-guide-admin.html" : "/dashboard-user-guide-resident.html", "_blank", "noopener,noreferrer")}
-      aria-label="How to read this dashboard"
-      className="fixed bottom-5 right-5 sm:bottom-6 sm:right-6 z-50 flex items-center gap-2 rounded-full bg-gradient-to-br from-indigo-500 to-blue-600 pl-3 pr-3 py-3 sm:pr-4 text-white shadow-lg shadow-indigo-500/30 transition-all duration-200 hover:scale-105 hover:shadow-xl hover:shadow-indigo-500/40 active:scale-95"
-    >
-      <span className="relative flex h-5 w-5 shrink-0 items-center justify-center">
-        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white/40 opacity-75" />
-        <HelpCircle className="relative h-5 w-5" />
-      </span>
-      <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Need help?</span>
-    </button>
+    {/* Floating help launcher -- fixed to the viewport, always visible on every
+        page regardless of scroll position. Clicking it opens a small menu:
+        "Read User Guide" (opens the full static guide, same as before) or
+        "Chat with Assistant" (BETA -- opens an inline Q&A chat scoped to the
+        current page/persona, clearly tagged as beta so early testers know
+        answers may be incomplete). The chat panel floats above this launcher
+        so both can coexist on screen. */}
+    <div className="fixed bottom-5 right-5 sm:bottom-6 sm:right-6 z-50 flex flex-col items-end gap-3">
+      {chatOpen && (
+        <HelpChat persona={isAdmin ? "admin" : "resident"} currentView={currentViewLabel} onClose={() => setChatOpen(false)} />
+      )}
+
+      <Popover>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            aria-label="How to read this dashboard"
+            className="flex items-center gap-2 rounded-full bg-gradient-to-br from-indigo-500 to-blue-600 pl-3 pr-3 py-3 sm:pr-4 text-white shadow-lg shadow-indigo-500/30 transition-all duration-200 hover:scale-105 hover:shadow-xl hover:shadow-indigo-500/40 active:scale-95"
+          >
+            <span className="relative flex h-5 w-5 shrink-0 items-center justify-center">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white/40 opacity-75" />
+              <HelpCircle className="relative h-5 w-5" />
+            </span>
+            <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Need help?</span>
+          </button>
+        </PopoverTrigger>
+        <PopoverContent align="end" side="top" className="w-60 p-2 rounded-2xl border-border shadow-xl">
+          <div className="grid gap-1">
+            <Button
+              variant="ghost"
+              className="justify-start gap-2 rounded-xl text-sm h-11"
+              onClick={() => window.open(isAdmin ? "/dashboard-user-guide-admin.html" : "/dashboard-user-guide-resident.html", "_blank", "noopener,noreferrer")}
+            >
+              <FileText className="h-4 w-4 text-blue-500" />
+              Read User Guide
+            </Button>
+            <Button variant="ghost" className="justify-start gap-2 rounded-xl text-sm h-11" onClick={() => setChatOpen(true)}>
+              <div className="relative">
+                <MessageSquare className="h-4 w-4 text-indigo-500" />
+                <Sparkles className="h-2 w-2 text-amber-400 absolute -top-1 -right-1" />
+              </div>
+              <span className="flex items-center gap-1.5">
+                Chat with Assistant
+                <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 leading-none border-amber-500/40 text-amber-600 dark:text-amber-400 font-semibold">
+                  Beta
+                </Badge>
+              </span>
+            </Button>
+          </div>
+        </PopoverContent>
+      </Popover>
+    </div>
     </TooltipProvider>
     </Ctx.Provider>
   );
