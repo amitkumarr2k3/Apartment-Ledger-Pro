@@ -17,18 +17,80 @@ import { Home, BarChart3, Table2, Menu, ChevronLeft, LogOut, UserCircle2, HelpCi
 // ─── Period context ──────────────────────────────────────────────────────
 
 // —————————————————————————————————————————————————————————————————————————————————————
-// Help Chat (BETA): knowledge base auto-derived from the resident/admin user guides.
-// Answers are pre-truncated with smart_truncate() at build time so they always end on
-// a full sentence or word (never mid-word) -- this fixes the earlier bug where replies
-// were being cut off abruptly (e.g. "...saved m").
+// Help Chat (BETA)
+// Three layers of answers, checked in priority order:
+//   1) ROUTE_MAP     -- "where can I find X" -> exact page + a clickable link
+//   2) CURATED       -- precise, page-aware answers for real on-screen UI terms
+//                        (Vendor ranking, Preview, Drill, Period change, etc.) so a
+//                        word like "preview" answers differently on Vendor Insights
+//                        vs CSV Imports instead of colliding.
+//   3) HELP_* (guide) -- generic answers auto-derived from the two user-guide HTML
+//                        files, used as a fallback for broader "what does X mean"
+//                        questions the curated list doesn't cover yet.
+// Chat history + open/closed state persist in sessionStorage so navigating between
+// pages (which remounts PortalShell) does not reset the conversation.
 // —————————————————————————————————————————————————————————————————————————————————————
 type HelpEntry = { keywords: string[]; answer: string };
+type CuratedEntry = { keywords: string[]; answer: string; contexts?: string[] };
+type RouteEntry = { keywords: string[]; page: string; to: string; description: string };
+type ChatLink = { to: string; label: string };
+type ChatMessage = { role: "bot" | "user"; text: string; link?: ChatLink };
 
 const HELP_COMMON: HelpEntry[] = [
   { keywords: ["all", "time", "badge", "dashed"], answer: "The 'All-Time' badge (dashed border, light grey background) means that card always shows the complete picture from day one until today. Changing the date filter at the top will NOT change these numbers -- every other card responds to whatever date range you've picked." },
   { keywords: ["arrow", "blue", "corner", "clickable"], answer: "The small blue arrow in the corner of a card means it's clickable -- tap or click it to jump into a detailed, line-by-line breakdown of that number." },
   { keywords: ["filter", "date", "period", "range"], answer: "Use the period dropdown at the top of the page to change the reporting range (e.g. Last 3 months, current fiscal year). Most charts, tables and cards update automatically -- except any card marked 'All-Time'." },
   { keywords: ["export", "print", "pdf"], answer: "Most dashboard pages support printing/exporting via your browser's print dialog (Ctrl/Cmd+P) -- the layout switches to a clean print-friendly header automatically." },
+];
+
+// Precise, page-aware answers for concrete UI terms. `contexts`, when present,
+// restricts the entry to specific currentView labels so the same word (e.g.
+// "preview") can mean different things on different pages without colliding.
+const CURATED: CuratedEntry[] = [
+  { keywords: ["vendor", "rank", "ranking"], contexts: ["Vendor Insights"],
+     answer: "Vendor ranking lists every vendor sorted by total spend for the selected period. The 'Period change' column shows how much that vendor's spend moved versus the prior period -- rows are flagged when it's more than +20%. Click Preview for a quick chart without leaving the page, or Drill to open the full category to vendor to line-item breakdown." },
+  { keywords: ["preview"], contexts: ["Vendor Insights", "Cost Alerts & Trends", "Action Needed"],
+     answer: "Preview opens a quick chart or detail panel for that specific row right on this page -- no navigation needed. Use Drill instead if you want the full breakdown on the Head Drill-down page." },
+  { keywords: ["preview"], contexts: ["CSV Imports"],
+     answer: "During a CSV import, Preview shows exactly what will be written before anything is saved -- your file is read and checked entirely in your browser; nothing touches the database until you explicitly click Commit." },
+  { keywords: ["drill"], contexts: ["Vendor Insights", "Cost Alerts & Trends", "Action Needed"],
+     answer: "Drill takes you straight to the Head Drill-down page, pre-filtered to that category or vendor, so you can see every underlying line item." },
+  { keywords: ["period", "change"],
+     answer: "Period change is the percentage difference between this period's value and the prior period for that same row -- rows are flagged when the increase exceeds the threshold (usually +20%)." },
+  { keywords: ["flagged", "flag"],
+     answer: "Flagged rows are ones whose spend changed by more than the threshold (usually +20%) compared to the prior period -- worth a closer look before approving next month's budget." },
+  { keywords: ["cumulative", "movement"], contexts: ["Collections"],
+     answer: "Cumulative net movement is a running total of collections minus expenses across the whole period, so you can see whether the society's overall cash position is trending up or down -- not just a single month's number." },
+  { keywords: ["quarterly", "pattern"], contexts: ["Collections"],
+     answer: "Quarterly pattern groups the monthly figures into quarters, which makes seasonal pressure (e.g. spikes around certain months) easier to spot than scrolling through 12 separate months." },
+  { keywords: ["collection", "performance", "target"],
+     answer: "Collection performance vs target compares what was actually collected against the expected amount, which is calculated from the per-sqft maintenance rate. A negative percentage means the society collected less than expected for that period." },
+  { keywords: ["expected", "collection"],
+     answer: "Expected Collection is the target amount the society should collect for the period, calculated from the per-sqft maintenance rate multiplied by the total billable area." },
+  { keywords: ["top", "vendors"], contexts: ["Vendor Insights"],
+     answer: "This callout shows how concentrated your spend is -- e.g. 'Top 3 vendors make up 85% of total spend' means most of the budget flows through just a handful of vendors, useful to know for negotiation leverage or over-reliance risk." },
+  { keywords: ["steady", "irregular", "dropped"],
+     answer: "These badges describe how consistently an income source is received: Steady = recorded every month in range, Irregular = present in some months but not others, Dropped = zero for the last 3 consecutive months after being active before." },
+];
+
+// "Where can I find X" -- maps common terms to the exact page that has them,
+// plus an in-chat link so the user can jump there directly.
+const ROUTE_MAP: RouteEntry[] = [
+  { keywords: ["sqft", "squarefoot", "persqft", "rate"], page: "Collections", to: "/admin/collections", description: "the per-sqft collection rate and the 'Collection performance vs target' trend" },
+  { keywords: ["vendor", "vendors", "ranking", "rank"], page: "Vendor Insights", to: "/admin/vendors", description: "vendor ranking, spend by vendor, and vendor monthly trends" },
+  { keywords: ["cashflow", "cash", "flow"], page: "Cashflow Health", to: "/resident/cashflow", description: "community cashflow health (income vs expense over time)" },
+  { keywords: ["income", "sources", "maintenance"], page: "Income Visibility", to: "/resident/income", description: "income sources and maintenance collection breakdown" },
+  { keywords: ["balance", "opening", "closing", "corpus", "contingency", "bank"], page: "Opening & Closing Balance", to: "/resident/balance", description: "opening/closing balance, bank balance, corpus and contingency cash" },
+  { keywords: ["drilldown", "drill", "lineitem", "category"], page: "Head Drill-down", to: "/resident/drilldown", description: "the full category to vendor to line-item drill-down" },
+  { keywords: ["action", "needed"], page: "Action Needed", to: "/admin/actions", description: "flagged items that need committee attention" },
+  { keywords: ["alert", "alerts", "anomaly", "spike"], page: "Cost Alerts & Trends", to: "/admin/alerts", description: "cost alerts and month-over-month spend trends" },
+  { keywords: ["optimisation", "optimization", "steady", "irregular", "dropped"], page: "Income Optimisation", to: "/admin/income", description: "income consistency status (Steady / Irregular / Dropped)" },
+  { keywords: ["transaction", "transactions", "crud"], page: "Transactions (CRUD)", to: "/admin/transactions", description: "creating, editing or deleting individual transactions" },
+  { keywords: ["resident", "residents", "whitelist"], page: "Residents & Whitelist", to: "/admin/residents", description: "managing resident accounts and the login whitelist" },
+  { keywords: ["widget", "dashboardcontrol", "settings"], page: "Dashboard Controls", to: "/admin/settings", description: "toggling which widgets/dashboards residents can see" },
+  { keywords: ["audit", "trail", "log"], page: "Audit Trail", to: "/admin/audit", description: "a log of every create, update, delete and import action taken in the system" },
+  { keywords: ["import", "csv", "upload", "bulk"], page: "CSV Imports", to: "/admin/imports", description: "bulk-importing transactions, residents or vendors via CSV" },
+  { keywords: ["etl", "integration"], page: "ETL Integration", to: "/admin/etl", description: "automated data integration / ETL sessions" },
 ];
 
 const HELP_RESIDENT: HelpEntry[] = [
@@ -65,39 +127,109 @@ const HELP_ADMIN: HelpEntry[] = [
   { keywords: ["concentration", "risk", "callout"], answer: "A one-line summary like \"Top 3 vendors make up 84% of total spend\" — this answers a genuine risk-management question: are you dangerously dependent on a handful of vendors, where losing one relationship (or one contract renegotiation going badly) could seriously disrupt operations? Vendor ranking table Every vendor, sorted by total spend (or total collected, on the Income tab) with the highest first." },
 ];
 
-function scoreMatch(query: string, entry: HelpEntry): number {
+const WHERE_INTENT = /\b(where|which page|find|navigate|locate|show me)\b/;
+
+function tokenScore(query: string, keywords: string[]): number {
   let score = 0;
-  for (const k of entry.keywords) {
-    if (query.includes(k)) score += k.length; // longer/more specific keyword matches score higher
+  for (const k of keywords) {
+    if (query.includes(k)) score += k.length;
   }
   return score;
 }
 
-function getBotResponse(query: string, persona: "resident" | "admin", currentView: string): string {
-  const q = query.toLowerCase().trim();
-  if (!q) return "Go ahead, ask me anything about this dashboard -- e.g. \"what does the All-Time badge mean?\" or \"how do I read Cashflow Health?\"";
-
+function getBotAnswer(rawQuery: string, persona: "resident" | "admin", currentView: string): { text: string; link?: ChatLink } {
+  const q = rawQuery.toLowerCase().trim();
+  if (!q) {
+    return { text: "Go ahead, ask me anything about this dashboard -- e.g. \"what is vendor rank?\" or \"where can I find the per-sqft trend?\"" };
+  }
   if (/^(hi|hello|hey)\b/.test(q)) {
-    return `Hi! I'm your PulseLedger assistant (beta). You're currently on **${currentView}**. Ask me about any card, badge, or chart you see here.`;
+    return { text: `Hi! I'm your PulseLedger assistant (beta). You're currently on **${currentView}**. Ask me about any card, badge, or chart you see here, or ask "where can I find..." to be pointed to the right page.` };
   }
 
-  const pool = [...HELP_COMMON, ...(persona === "admin" ? HELP_ADMIN : HELP_RESIDENT)];
-  const scored = pool
-    .map((entry) => ({ entry, score: scoreMatch(q, entry) }))
+  // 1) Navigation intent -- "where can I find X"
+  if (WHERE_INTENT.test(q)) {
+    const routeMatches = ROUTE_MAP.map((r) => ({ r, score: tokenScore(q, r.keywords) }))
+      .filter((s) => s.score > 0)
+      .sort((a, b) => b.score - a.score);
+    if (routeMatches.length > 0) {
+      const best = routeMatches[0].r;
+      return {
+        text: `You'll find ${best.description} on the **${best.page}** page.`,
+        link: { to: best.to, label: best.page },
+      };
+    }
+  }
+
+  // 2) Curated, page-aware answers for concrete UI terms (weighted higher so they
+  //    beat generic guide text, and filtered so "preview" means the right thing
+  //    on the right page)
+  const curatedPool = CURATED.filter((c) => !c.contexts || c.contexts.includes(currentView));
+  const curatedScored = curatedPool
+    .map((c) => ({ c, score: tokenScore(q, c.keywords) * 3 }))
     .filter((s) => s.score > 0)
     .sort((a, b) => b.score - a.score);
-
-  if (scored.length > 0) {
-    return scored[0].entry.answer;
+  if (curatedScored.length > 0) {
+    return { text: curatedScored[0].c.answer };
   }
 
-  return `I couldn't find an exact match for that yet (this assistant is still in beta). Try asking about specific terms you see on screen (e.g. "All-Time badge", "outstanding dues", "steady vs dropped income"), or open the full User Guide from the menu above for ${currentView}.`;
+  // 3) Generic guide-derived knowledge, common + persona-specific
+  const pool = [...HELP_COMMON, ...(persona === "admin" ? HELP_ADMIN : HELP_RESIDENT)];
+  const scored = pool
+    .map((entry) => ({ entry, score: tokenScore(q, entry.keywords) }))
+    .filter((s) => s.score > 0)
+    .sort((a, b) => b.score - a.score);
+  if (scored.length > 0) {
+    return { text: scored[0].entry.answer };
+  }
+
+  // 4) Fallback -- also try a route guess as a last resort before giving up
+  const looseRoute = ROUTE_MAP.map((r) => ({ r, score: tokenScore(q, r.keywords) }))
+    .filter((s) => s.score > 0)
+    .sort((a, b) => b.score - a.score);
+  if (looseRoute.length > 0) {
+    const best = looseRoute[0].r;
+    return {
+      text: `I'm not fully sure what you meant, but that sounds related to the **${best.page}** page (${best.description}). Want to head there?`,
+      link: { to: best.to, label: best.page },
+    };
+  }
+
+  return {
+    text: `I couldn't find an exact match for that yet (this assistant is still in beta). Try asking about specific terms you see on screen (e.g. "vendor rank", "period change", "All-Time badge"), or ask "where can I find..." followed by what you're looking for.`,
+  };
+}
+
+const CHAT_STORAGE_PREFIX = "pulseledger-help-chat";
+
+function loadStoredMessages(persona: "resident" | "admin"): ChatMessage[] | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(`${CHAT_STORAGE_PREFIX}-${persona}`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveStoredMessages(persona: "resident" | "admin", messages: ChatMessage[]) {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(`${CHAT_STORAGE_PREFIX}-${persona}`, JSON.stringify(messages));
+  } catch {
+    // sessionStorage unavailable (private mode etc.) -- fail silently, chat still works, just won't persist
+  }
 }
 
 function HelpChat({ persona, currentView, onClose }: { persona: "resident" | "admin"; currentView: string; onClose: () => void }) {
-  const [messages, setMessages] = useState<{ role: "bot" | "user"; text: string }[]>([
-    { role: "bot", text: `Hi! I'm your PulseLedger assistant. You're currently viewing **${currentView}**. Ask me anything about the cards, badges, or charts on this page.` },
-  ]);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    const stored = loadStoredMessages(persona);
+    if (stored) return stored;
+    return [
+      { role: "bot", text: `Hi! I'm your PulseLedger assistant. You're currently viewing **${currentView}**. Ask me anything about the cards, badges, or charts on this page -- or ask "where can I find..." something.` },
+    ];
+  });
   const [input, setInput] = useState("");
   const [typing, setTyping] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -106,6 +238,10 @@ function HelpChat({ persona, currentView, onClose }: { persona: "resident" | "ad
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, typing]);
 
+  useEffect(() => {
+    saveStoredMessages(persona, messages);
+  }, [persona, messages]);
+
   function handleSend() {
     const text = input.trim();
     if (!text) return;
@@ -113,8 +249,8 @@ function HelpChat({ persona, currentView, onClose }: { persona: "resident" | "ad
     setMessages((prev) => [...prev, { role: "user", text }]);
     setTyping(true);
     window.setTimeout(() => {
-      const answer = getBotResponse(text, persona, currentView);
-      setMessages((prev) => [...prev, { role: "bot", text: answer }]);
+      const answer = getBotAnswer(text, persona, currentView);
+      setMessages((prev) => [...prev, { role: "bot", text: answer.text, link: answer.link }]);
       setTyping(false);
     }, 500 + Math.random() * 400);
   }
@@ -152,7 +288,15 @@ function HelpChat({ persona, currentView, onClose }: { persona: "resident" | "ad
                   : "bg-muted text-foreground rounded-tl-none border border-border"
               }`}
             >
-              {m.text}
+              <div>{m.text}</div>
+              {m.link && (
+                <Link
+                  to={m.link.to}
+                  className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline"
+                >
+                  Go to {m.link.label} →
+                </Link>
+              )}
             </div>
           </div>
         ))}
@@ -527,7 +671,25 @@ export function PortalShell({
   const setView = (v: "chart" | "number") => navigate({ to: pathname, search: (((prev: any) => ({ ...prev, view: v })) as any), replace: true });
   const [mobileOpen, setMobileOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
-  const [chatOpen, setChatOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [chatOpen, setChatOpenState] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      return window.sessionStorage.getItem("pulseledger-help-chat-open") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const setChatOpen = (v: boolean) => {
+    setChatOpenState(v);
+    if (typeof window !== "undefined") {
+      try {
+        window.sessionStorage.setItem("pulseledger-help-chat-open", v ? "1" : "0");
+      } catch {
+        // ignore -- sessionStorage may be unavailable (e.g. private browsing)
+      }
+    }
+  };
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -842,18 +1004,17 @@ export function PortalShell({
     </div>
 
     {/* Floating help launcher -- fixed to the viewport, always visible on every
-        page regardless of scroll position. Clicking it opens a small menu:
-        "Read User Guide" (opens the full static guide, same as before) or
-        "Chat with Assistant" (BETA -- opens an inline Q&A chat scoped to the
-        current page/persona, clearly tagged as beta so early testers know
-        answers may be incomplete). The chat panel floats above this launcher
-        so both can coexist on screen. */}
+        page regardless of scroll position. Clicking it opens a small CONTROLLED
+        menu (menuOpen state) so selecting either option closes the menu
+        immediately instead of lingering until an unrelated click dismisses it.
+        chatOpen + the chat's own message history persist via sessionStorage so
+        navigating between pages does not reset the conversation. */}
     <div className="fixed bottom-5 right-5 sm:bottom-6 sm:right-6 z-50 flex flex-col items-end gap-3">
       {chatOpen && (
         <HelpChat persona={isAdmin ? "admin" : "resident"} currentView={currentViewLabel} onClose={() => setChatOpen(false)} />
       )}
 
-      <Popover>
+      <Popover open={menuOpen} onOpenChange={setMenuOpen}>
         <PopoverTrigger asChild>
           <button
             type="button"
@@ -872,12 +1033,22 @@ export function PortalShell({
             <Button
               variant="ghost"
               className="justify-start gap-2 rounded-xl text-sm h-11"
-              onClick={() => window.open(isAdmin ? "/dashboard-user-guide-admin.html" : "/dashboard-user-guide-resident.html", "_blank", "noopener,noreferrer")}
+              onClick={() => {
+                setMenuOpen(false);
+                window.open(isAdmin ? "/dashboard-user-guide-admin.html" : "/dashboard-user-guide-resident.html", "_blank", "noopener,noreferrer");
+              }}
             >
               <FileText className="h-4 w-4 text-blue-500" />
               Read User Guide
             </Button>
-            <Button variant="ghost" className="justify-start gap-2 rounded-xl text-sm h-11" onClick={() => setChatOpen(true)}>
+            <Button
+              variant="ghost"
+              className="justify-start gap-2 rounded-xl text-sm h-11"
+              onClick={() => {
+                setMenuOpen(false);
+                setChatOpen(true);
+              }}
+            >
               <div className="relative">
                 <MessageSquare className="h-4 w-4 text-indigo-500" />
                 <Sparkles className="h-2 w-2 text-amber-400 absolute -top-1 -right-1" />
