@@ -19,6 +19,17 @@ export type JwtPayload = {
 const AUTH_ENABLED = (process.env.AUTH_ENABLED ?? "true").toLowerCase() !== "false";
 const SUPERADMIN_EMAIL = (process.env.SUPERADMIN_EMAIL || "admin@example.com").toLowerCase();
 
+// SECURITY: the cookie's Secure flag is now an EXPLICIT toggle, not tied to
+// NODE_ENV. Reason: NODE_ENV=production commonly gets set for perf/logging
+// reasons well before a real HTTPS domain is in place (exactly what
+// happened here -- production mode on a bare-IP HTTP deployment). If Secure
+// tracked NODE_ENV, the browser would silently discard the cookie on any
+// insecure origin, and every authenticated request 401s with no obvious
+// cause. Default is "false" so a fresh deploy isn't broken by default --
+// set COOKIE_SECURE=true in your environment the moment you're actually
+// serving over HTTPS, and leave it true from then on.
+const COOKIE_SECURE = (process.env.COOKIE_SECURE ?? "false").toLowerCase() === "true";
+
 // FIX (2026-08-15): removed. This used to force-inject "superadmin"+"admin"
 // onto any JWT whose email matched SUPERADMIN_EMAIL, on every request --
 // regardless of the database. That meant (a) that account's email was
@@ -95,7 +106,7 @@ export async function registerAuth(app: FastifyInstance) {
 export function setAuthCookie(reply: FastifyReply, token: string) {
   reply.setCookie("apf_token", token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: COOKIE_SECURE,
     sameSite: "strict",
     path: "/",
     maxAge: 12 * 60 * 60, // 12h -- keep in sync with the JWT's own expiresIn

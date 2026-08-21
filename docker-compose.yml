@@ -53,6 +53,8 @@ services:
       DATABASE_URL: postgres://apf:apf@db:5432/apartment_finance
       JWT_SECRET: ${JWT_SECRET}
       CORS_ORIGIN: ${CORS_ORIGIN}
+      # Once you have a real domain + TLS terminating at nginx, set COOKIE_SECURE=true in your .env and restart — otherwise the cookie stays sendable over HTTP too, which defeats part of the point of Secure once you actually have HTTPS available.
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
       # ── Email / OTP ────────────────────────────────────────────────────────
       # Choose provider: gmail (default), resend, or mailhog
       EMAIL_PROVIDER: gmail
