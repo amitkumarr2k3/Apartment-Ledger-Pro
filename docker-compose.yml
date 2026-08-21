@@ -51,7 +51,8 @@ services:
     restart: unless-stopped
     environment:
       DATABASE_URL: postgres://apf:apf@db:5432/apartment_finance
-      JWT_SECRET: dev-jwt-secret-change-me
+      JWT_SECRET: ${JWT_SECRET}
+      CORS_ORIGIN: ${CORS_ORIGIN}
       # ── Email / OTP ────────────────────────────────────────────────────────
       # Choose provider: gmail (default), resend, or mailhog
       EMAIL_PROVIDER: gmail

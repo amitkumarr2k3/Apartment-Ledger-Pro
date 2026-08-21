@@ -1,5 +1,7 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
+import helmet from "@fastify/helmet";
+import rateLimit from "@fastify/rate-limit";
 import multipart from "@fastify/multipart";
 import { registerAuth } from "./auth";
 import { routes as authRoutes } from "./routes/auth";
@@ -21,7 +23,31 @@ import { pool } from "./db";
 
 export async function buildApp() {
   const app = Fastify({ logger: { level: process.env.LOG_LEVEL || "info" } });
-  await app.register(cors, { origin: true, credentials: true });
+  const allowedOrigins = (process.env.CORS_ORIGIN || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  await app.register(cors, {
+    origin: allowedOrigins.length > 0 ? allowedOrigins : true,
+    credentials: true,
+  });
+
+  await app.register(helmet, {
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:", "blob:"],
+        connectSrc: ["'self'"],
+        frameAncestors: ["'none'"],
+      },
+    },
+    crossOriginEmbedderPolicy: false,
+  });
+
+  await app.register(rateLimit, { max: 200, timeWindow: "1 minute" });
+
   await app.register(multipart, { limits: { fileSize: 10 * 1024 * 1024 } });
   await registerAuth(app);
 

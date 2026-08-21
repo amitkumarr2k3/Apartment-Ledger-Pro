@@ -1,5 +1,6 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import fjwt from "@fastify/jwt";
+import fCookie from "@fastify/cookie";
 import { pool } from "./db";
 
 export type JwtPayload = {
@@ -12,7 +13,10 @@ export type JwtPayload = {
 // AUTH_ENABLED=false → prototype mode: skip JWT verify and inject the
 // SUPERADMIN identity so the UI (which also bypasses login when its own
 // AUTH_ENABLED flag is false) can call protected endpoints without a token.
-const AUTH_ENABLED = (process.env.AUTH_ENABLED ?? "false").toLowerCase() !== "false";
+// SECURITY: fail CLOSED, not open. A missing AUTH_ENABLED env var now
+// defaults to auth REQUIRED -- the old default of "false" meant a
+// missing env var silently disabled all authentication.
+const AUTH_ENABLED = (process.env.AUTH_ENABLED ?? "true").toLowerCase() !== "false";
 const SUPERADMIN_EMAIL = (process.env.SUPERADMIN_EMAIL || "admin@example.com").toLowerCase();
 
 // FIX (2026-08-15): removed. This used to force-inject "superadmin"+"admin"
@@ -45,7 +49,19 @@ async function getGuestIdentity(): Promise<JwtPayload | null> {
 }
 
 export async function registerAuth(app: FastifyInstance) {
-  await app.register(fjwt, { secret: process.env.JWT_SECRET || "dev-secret" });
+  // SECURITY: no fallback secret -- docker-compose.yml previously shipped
+  // the literal placeholder "dev-jwt-secret-change-me" as the real secret.
+  if (!process.env.JWT_SECRET) {
+    throw new Error(
+      "JWT_SECRET is not set. Refusing to start with an insecure default -- " +
+      "set JWT_SECRET in your environment (generate one with: openssl rand -hex 32).",
+    );
+  }
+  await app.register(fCookie);
+  await app.register(fjwt, {
+    secret: process.env.JWT_SECRET,
+    cookie: { cookieName: "apf_token", signed: false },
+  });
 
   app.decorate("auth", async (req: FastifyRequest, reply: FastifyReply) => {
     if (!AUTH_ENABLED) {
@@ -69,6 +85,20 @@ export async function registerAuth(app: FastifyInstance) {
         return reply.code(403).send({ error: "forbidden" });
       }
     };
+  });
+}
+
+// Shared cookie config for every place that issues or re-issues the auth
+// token: routes/auth.ts's /verify-otp and /login-password, and routes/me.ts's
+// re-issue after an email change. Keeping httpOnly/secure/sameSite/maxAge in
+// ONE place means they can't silently drift apart across call sites.
+export function setAuthCookie(reply: FastifyReply, token: string) {
+  reply.setCookie("apf_token", token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    path: "/",
+    maxAge: 12 * 60 * 60, // 12h -- keep in sync with the JWT's own expiresIn
   });
 }
 

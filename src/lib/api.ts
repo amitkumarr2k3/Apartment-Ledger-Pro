@@ -42,7 +42,9 @@ export async function verifyOtp(email: string, otp: string) {
   });
   if (!r.ok) throw new Error("verify failed");
   const j = await r.json();
-  if (typeof window !== "undefined") window.localStorage.setItem("apf.token", j.token);
+  // SECURITY: no longer written to localStorage -- the server now also sets
+  // an httpOnly cookie on this same response (see routes/auth.ts), which is
+  // what actually authenticates subsequent requests.
   return j;
 }
 // Deprecated aliases

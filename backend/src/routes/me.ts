@@ -2,6 +2,7 @@ import { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { pool, withTx } from "../db";
 import { audit } from "../audit";
+import { setAuthCookie } from "../auth";
 
 export async function routes(app: FastifyInstance) {
   app.get("/me", { preHandler: app.auth }, async (req) => {
@@ -92,6 +93,12 @@ export async function routes(app: FastifyInstance) {
       // audit logs, admin.residents.ts checks) reflects the new email
       // immediately -- no forced re-login needed after an email change.
       const token = await reply.jwtSign({ sub: p.sub, email: updated.email, roles: p.roles, cid: p.cid });
+
+      // SECURITY: refresh the cookie to match -- otherwise the browser would
+      // keep sending the OLD cookie (still valid until its 12h expiry, but
+      // carrying the stale pre-change email) instead of this newly-issued
+      // token, until the user's next full login.
+      setAuthCookie(reply, token);
 
       return {
         user: { id: updated.id, email: updated.email, name: updated.name, roles: p.roles, communityId: p.cid },

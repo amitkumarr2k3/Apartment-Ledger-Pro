@@ -236,7 +236,11 @@ function looksLikeBackendMonthly(rows: any[]): boolean {
 
 function authCacheKey() {
   if (typeof window === "undefined") return "ssr";
-  return window.localStorage.getItem("apf.token") ? "token" : "anon";
+  // FIX: apf.token is no longer written to localStorage now that auth lives
+  // in an httpOnly cookie -- this would always evaluate to "anon" after the
+  // migration, making every logged-in user share one cache key. Use
+  // apf.session (still written, non-secret) instead.
+  return window.localStorage.getItem("apf.session") ? "token" : "anon";
 }
 
 function hasStoredAuth(): boolean {

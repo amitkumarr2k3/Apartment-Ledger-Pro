@@ -30,7 +30,7 @@ import argon2 from "argon2";
 import nodemailer from "nodemailer";
 import { pool } from "../db";
 import { audit } from "../audit";
-import { loadUserByEmail } from "../auth";
+import { loadUserByEmail, setAuthCookie } from "../auth";
 
 // ── Mailer ────────────────────────────────────────────────────────────────────
 const EMAIL_PROVIDER = (process.env.EMAIL_PROVIDER ?? "gmail").toLowerCase();
@@ -173,7 +173,7 @@ export async function routes(app: FastifyInstance) {
   }
 
   // Canonical endpoint
-  app.post("/request-otp", async (req, reply) => {
+  app.post("/request-otp", { config: { rateLimit: { max: 5, timeWindow: "10 minutes" } } }, async (req, reply) => {
     const { email } = z.object({ email: z.string().email() }).parse(req.body);
     await issueOtp(app, email);
     return reply.send({ ok: true });
@@ -186,7 +186,7 @@ export async function routes(app: FastifyInstance) {
     return reply.send({ ok: true });
   });
 
-  app.post("/verify-otp", async (req, reply) => {
+  app.post("/verify-otp", { config: { rateLimit: { max: 10, timeWindow: "10 minutes" } } }, async (req, reply) => {
     const { email, otp } = z.object({
       email: z.string().email(),
       otp: z.string().length(6),
@@ -262,12 +262,14 @@ export async function routes(app: FastifyInstance) {
       ip: req.ip, userAgent: req.headers["user-agent"] ?? null,
     });
 
+    setAuthCookie(reply, token);
+
     return reply.send({ token, user: { email: user.email, name: user.name, roles: user.roles, flatCode: flat_code ?? null } });
   });
 
   // Password login — for the bootstrap superadmin (and any user with a
   // password_hash). Prefer OTP for regular residents.
-  app.post("/login-password", async (req, reply) => {
+  app.post("/login-password", { config: { rateLimit: { max: 10, timeWindow: "10 minutes" } } }, async (req, reply) => {
     const { email, password } = z.object({
       email: z.string().email(),
       password: z.string().min(1),
@@ -341,7 +343,14 @@ export async function routes(app: FastifyInstance) {
       ip: req.ip, userAgent: req.headers["user-agent"] ?? null,
     });
 
+    setAuthCookie(reply, token);
+
     return reply.send({ token, user: { email: user.email, name: user.name, roles: user.roles } });
+  });
+
+  app.post("/logout", async (_req, reply) => {
+    reply.clearCookie("apf_token", { path: "/" });
+    return reply.send({ ok: true });
   });
 
   // Legacy alias

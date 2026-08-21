@@ -99,7 +99,10 @@ export async function signInWithPassword(email: string, password: string):
     });
     if (!r.ok) return { ok: false, reason: r.status === 401 ? "invalid_credentials" : "server_error" };
     const j = await r.json();
-    window.localStorage.setItem("apf.token", j.token);
+    // SECURITY: token no longer written to localStorage -- it now arrives
+    // ONLY as an httpOnly cookie set by the server, unreadable by client JS
+    // (and therefore by any XSS). j.token is still present in the response
+    // during the migration but intentionally unused here.
     // FIX (2026-08-15): removed the hardcoded "admin@example.com" fallback.
     // The backend's user_roles table (seeded durably at bootstrap, see
     // seed.js) is the single source of truth -- trust `roles` as returned.
@@ -149,12 +152,14 @@ export async function updateMyProfile(patch: { email?: string; name?: string }):
   Promise<{ ok: boolean; session?: Session; reason?: string }> {
   if (!isBrowser()) return { ok: false, reason: "no_browser" };
   const API = (import.meta as any).env?.VITE_API_URL ?? "/api";
-  const token = window.localStorage.getItem("apf.token");
-  if (!token) return { ok: false, reason: "not_authenticated" };
+  // SECURITY: no longer gates on (or sends) apf.token -- auth now travels via
+  // the httpOnly cookie, attached automatically on this same-origin fetch.
+  // An unauthenticated caller now surfaces as a 401 below instead of a
+  // client-side pre-check.
   try {
     const r = await fetch(`${API}/me`, {
       method: "PATCH",
-      headers: { "content-type": "application/json", Authorization: `Bearer ${token}` },
+      headers: { "content-type": "application/json" },
       body: JSON.stringify(patch),
     });
     if (!r.ok) {
@@ -162,7 +167,10 @@ export async function updateMyProfile(patch: { email?: string; name?: string }):
       return { ok: false, reason: r.status === 401 ? "unauthorized" : "server_error" };
     }
     const j = await r.json();
-    window.localStorage.setItem("apf.token", j.token);
+    // NOTE: j.token is a freshly re-issued JWT reflecting the new email.
+    // backend/src/routes/me.ts needs the same reply.setCookie(...) treatment
+    // as the login routes so the refreshed cookie replaces the old one --
+    // flagged as a file still needed, not yet patched here.
     const current = getSession();
     const session: Session = {
       email: j.user.email,
@@ -235,8 +243,12 @@ export function isAdminOrAbove(role: "resident" | "admin" | "superadmin" | null 
 
 export function signOut() {
   if (!isBrowser()) return;
+  // Clears the httpOnly cookie server-side -- JS cannot delete an httpOnly
+  // cookie itself. Fire-and-forget: it clears regardless of whether the
+  // caller awaits this.
+  fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
   window.localStorage.removeItem(SESSION_KEY);
-  window.localStorage.removeItem("apf.token");
+  window.localStorage.removeItem("apf.token");          // legacy cleanup, harmless if already absent
   window.localStorage.removeItem("apf.lastActiveAt");   // legacy cleanup
   window.sessionStorage.removeItem(OTP_KEY);
   window.sessionStorage.removeItem("apf.lastActiveAt"); // clear idle clock for re-login
