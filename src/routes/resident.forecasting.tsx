@@ -374,7 +374,7 @@ function Inner() {
             <div className="space-y-1">
               <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Reference Window (mo)</label>
               <Input type="number" min={1} max={24} value={refWindow} onChange={(e) => setRefWindow(Number(e.target.value) || 12)} className="h-8 text-sm" />
-              <p className="text-[10px] text-muted-foreground">{historyMonthsAvailable} mo of real history available overall. Each category above only averages the months it actually has data for -- see "avg of N months" under each lever below.</p>
+              <p className="text-[10px] text-muted-foreground">As of today, {historyMonthsAvailable} mo of real history exist overall -- this grows by itself as each new month closes out, so expect it to be higher next time you check. Each category above only averages the months it actually has data for -- see "avg of N months" under each lever below.</p>
             </div>
             <div className="space-y-1">
               <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Inflation Combination</label>
@@ -585,7 +585,7 @@ function Inner() {
         <Info className="h-4 w-4" />
         <AlertDescription className="text-xs space-y-1.5">
           <div>This is a what-if simulator, not an official published budget -- nothing you change here is saved or shared with anyone.</div>
-          <div><span className="font-semibold text-foreground">Coverage:</span> {fyLabelFor(fyStart)} always shows all 12 months -- {actualMonthsCount} {actualMonthsCount === 1 ? "is" : "are"} already actual (real recorded data), {forecastMonthsCount} {forecastMonthsCount === 1 ? "is" : "are"} still forecast using the levers above.</div>
+          <div><span className="font-semibold text-foreground">Coverage:</span> {fyLabelFor(fyStart)} always shows all 12 months. As of today, {actualMonthsCount} {actualMonthsCount === 1 ? "is" : "are"} already actual (real recorded data) and {forecastMonthsCount} {forecastMonthsCount === 1 ? "is" : "are"} still forecast using the levers above -- this split updates on its own as each new month's real data comes in, so don't be surprised if these two numbers are different next time you check.</div>
           <div><span className="font-semibold text-foreground">Baselines:</span> each category's monthly baseline (shown as "avg of N months" under its lever) uses up to {refWindow} of that category's own real months only -- a month where that specific category had no recorded activity is skipped entirely, not treated as ₹0. {historyMonthsAvailable} months of real data exist for this community overall right now.</div>
           <div><span className="font-semibold text-foreground">Contingency Fund:</span> already shown as part of Closing Balance on the Opening &amp; Closing Balance page -- adjust its forecast assumption here using the Contingency Rate lever below.</div>
         </AlertDescription>
