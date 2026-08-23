@@ -62,7 +62,7 @@ function Page() {
 }
 
 type CategoryLever = { name: string; baseline: number; monthsUsed: number; pct: number };
-type MonthRow = { month: string; isActual: boolean; income: number; expense: number; net: number; closing: number };
+type MonthRow = { month: string; status: "actual" | "forecast" | "noData"; income: number; expense: number; net: number; closing: number };
 
 // Regex-based "special row" exclusion -- same pattern resident.balance.tsx
 // already uses (isOpeningBalanceReference / isContingencyRateReference).
@@ -136,8 +136,18 @@ function Inner() {
   // reused across the header, KPI tiles, the month table badge, the
   // Contingency Fund card, and the closing disclaimer so every card agrees
   // on the same two numbers.
-  const actualMonthsCount = lastCompletedIdx + 1;
-  const forecastMonthsCount = 12 - actualMonthsCount;
+  // FIX: lastCompletedIdx is the LAST index with actual data, not a count --
+  // treating "0..lastCompletedIdx" as all-actual is wrong whenever real data
+  // starts partway through the FY (e.g. record-keeping in this app only
+  // began in October, so Apr-Sep have no data even though Mar of THIS fy
+  // has already happened and is actual). actualMonthsCount now counts real
+  // actual months directly; forecastMonthsCount only counts months strictly
+  // after the last actual month (i.e. genuinely still ahead of us); anything
+  // left over is noDataMonthsCount -- months that already happened but have
+  // no record, which must never be forecast (see monthRows below).
+  const actualMonthsCount = actualByMonth.filter(Boolean).length;
+  const forecastMonthsCount = Math.max(0, 12 - lastCompletedIdx - 1);
+  const noDataMonthsCount = Math.max(0, 12 - actualMonthsCount - forecastMonthsCount);
 
   // Returns both the average AND how many actual months fed into it --
   // months with no recorded activity for that specific category are
@@ -236,15 +246,41 @@ function Inner() {
   // already represents "as of this FY's start". This is what makes the
   // forecast genuinely cumulative -- prior years roll into this one instead
   // of being silently dropped.
+  // TRUE OPENING BALANCE -- one-time anchor, mirrors resident.balance.tsx's
+  // identical fix. If an "Opening Balance Reference" row has been uploaded
+  // (the confirmed real starting balance for this ledger), its first
+  // non-zero value is used as the anchor instead of the derived all-time
+  // balanceStrip figure. This matters most for the very first tracked FY --
+  // e.g. real record-keeping began in October, so the confirmed October
+  // anchor IS the starting point for that whole FY; there is no reliable
+  // pre-October number to compute instead, so we don't try to invent one.
+  const isOpeningBalanceReference = (name: string) => /opening balance reference/i.test(name || "");
+  const openingBalanceCategory = (incomeTree as Category[]).find((c) => isOpeningBalanceReference(c.name));
+  const openingBalanceFullMonthly = openingBalanceCategory ? categoryMonthly(openingBalanceCategory) : [];
+  let trueOpeningAnchor: number | null = null;
+  for (let idx = 0; idx < openingBalanceFullMonthly.length; idx++) {
+    if (openingBalanceFullMonthly[idx]) { trueOpeningAnchor = openingBalanceFullMonthly[idx]; break; }
+  }
+  const hasTrueAnchor = trueOpeningAnchor !== null;
+
   const fyOpeningBalance = useMemo(() => {
     const firstMonthLabel = fyMonths[0]?.label;
     const idx = firstMonthLabel
       ? (monthlyTotals as any[]).findIndex((m) => m.month === firstMonthLabel)
       : -1;
-    const priorMonths = idx >= 0 ? (monthlyTotals as any[]).slice(0, idx) : (monthlyTotals as any[]);
+    // FIX: when this FY's first month isn't found in monthlyTotals at all
+    // (it predates the earliest month real data exists for), there is NO
+    // prior actual history -- not "all of monthlyTotals". The previous
+    // fallback here summed the ENTIRE monthlyTotals array whenever idx was
+    // -1, which double-counted real net movement (including months that
+    // are part of THIS fy, still to come below) straight into the opening
+    // balance. That was the root cause of a wildly inflated Opening figure
+    // for the first tracked FY.
+    const priorMonths = idx >= 0 ? (monthlyTotals as any[]).slice(0, idx) : [];
     const priorNet = priorMonths.reduce((s, m) => s + (m.collection ?? 0) - (m.expense ?? 0), 0);
-    return (balanceStrip.opening || 0) + priorNet;
-  }, [monthlyTotals, fyMonths, balanceStrip.opening]);
+    const anchor = hasTrueAnchor ? (trueOpeningAnchor as number) : (balanceStrip.opening || 0);
+    return anchor + priorNet;
+  }, [monthlyTotals, fyMonths, balanceStrip.opening, hasTrueAnchor, trueOpeningAnchor]);
 
   const { rows: monthRows, mixByCategory } = useMemo(() => {
     let opening = fyOpeningBalance;
@@ -254,10 +290,15 @@ function Inner() {
     fyMonths.forEach((fm, i) => {
       const actual: any = actualByMonth[i];
       let income: number, expense: number;
+      let status: MonthRow["status"];
       if (actual) {
+        status = "actual";
         income = actual.collection ?? 0;
         expense = actual.expense ?? 0;
-      } else {
+      } else if (i > lastCompletedIdx) {
+        // Genuinely still ahead of us (comes after the last month we have
+        // real data for) -- this is the only case a forecast belongs.
+        status = "forecast";
         const billed = maintenanceRate * TOTAL_SQFT;
         income = billed * (collectionPct / 100) + opening * (interestPct / 100);
         incomeLevers.forEach((lv) => {
@@ -271,10 +312,18 @@ function Inner() {
           mix[lv.name] = (mix[lv.name] ?? 0) + amt;
         });
         if (i === lastCompletedIdx + 1) expense += unknownExpense;
+      } else {
+        // No actual record AND already in the past relative to the data we
+        // have (e.g. before real record-keeping began) -- this has already
+        // happened, so forecasting it would be inventing history, not
+        // predicting the future. Show it as genuinely empty instead.
+        status = "noData";
+        income = 0;
+        expense = 0;
       }
       const net = income - expense;
       const closing = opening + net;
-      out.push({ month: fm.label, isActual: !!actual, income, expense, net, closing });
+      out.push({ month: fm.label, status, income, expense, net, closing });
       opening = closing;
     });
     return { rows: out, mixByCategory: mix };
@@ -486,7 +535,7 @@ function Inner() {
                 {tableOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                 <CardTitle className="text-sm">Month-by-Month Detail · {fyLabelFor(fyStart)}</CardTitle>
               </div>
-              <Badge variant="outline" className="text-[10px]">{actualMonthsCount} actual · {forecastMonthsCount} forecast</Badge>
+              <Badge variant="outline" className="text-[10px]">{actualMonthsCount} actual · {forecastMonthsCount} forecast{noDataMonthsCount > 0 ? " · " + noDataMonthsCount + " no data" : ""}</Badge>
             </div>
           </CardHeader>
           {tableOpen && (
@@ -507,8 +556,12 @@ function Inner() {
                     <TableRow key={r.month}>
                       <TableCell className="font-medium">{r.month}</TableCell>
                       <TableCell>
-                        <Badge variant="outline" className={r.isActual ? "border-blue-500/40 text-blue-600" : "border-dashed text-muted-foreground"}>
-                          {r.isActual ? "ACTUAL" : "FORECAST"}
+                        <Badge variant="outline" className={
+                          r.status === "actual" ? "border-blue-500/40 text-blue-600" :
+                          r.status === "forecast" ? "border-dashed text-muted-foreground" :
+                          "border-amber-500/40 text-amber-600 bg-amber-50"
+                        }>
+                          {r.status === "actual" ? "ACTUAL" : r.status === "forecast" ? "FORECAST" : "NO DATA"}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right font-mono text-emerald-600">{inr(r.income)}</TableCell>
@@ -547,10 +600,10 @@ function Inner() {
                       <Tooltip trigger={getTooltipTrigger()} content={<SmartTooltipContent labelPrefix="Month" valueFormatter={(v: number) => inr(v)} />} />
                       <Legend wrapperStyle={{ fontSize: 11 }} />
                       <Bar dataKey="income" name="Income" radius={[4, 4, 0, 0]}>
-                        {monthRows.map((r, i) => <Cell key={i} fill={r.isActual ? "#3b82f6" : "#93c5fd"} />)}
+                        {monthRows.map((r, i) => <Cell key={i} fill={r.status === "actual" ? "#3b82f6" : r.status === "forecast" ? "#93c5fd" : "#e2e8f0"} />)}
                       </Bar>
                       <Bar dataKey="expense" name="Expense" radius={[4, 4, 0, 0]}>
-                        {monthRows.map((r, i) => <Cell key={i} fill={r.isActual ? "#f87171" : "#fecaca"} />)}
+                        {monthRows.map((r, i) => <Cell key={i} fill={r.status === "actual" ? "#f87171" : r.status === "forecast" ? "#fecaca" : "#e2e8f0"} />)}
                       </Bar>
                       <Line type="monotone" dataKey="closing" name="Closing Balance" stroke="#1e293b" strokeWidth={2} dot={{ r: 3 }} />
                     </ComposedChart>
@@ -587,6 +640,9 @@ function Inner() {
           <div>This is a what-if simulator, not an official published budget -- nothing you change here is saved or shared with anyone.</div>
           <div><span className="font-semibold text-foreground">Coverage:</span> {fyLabelFor(fyStart)} always shows all 12 months. As of today, {actualMonthsCount} {actualMonthsCount === 1 ? "is" : "are"} already actual (real recorded data) and {forecastMonthsCount} {forecastMonthsCount === 1 ? "is" : "are"} still forecast using the levers above -- this split updates on its own as each new month's real data comes in, so don't be surprised if these two numbers are different next time you check.</div>
           <div><span className="font-semibold text-foreground">Baselines:</span> each category's monthly baseline (shown as "avg of N months" under its lever) uses up to {refWindow} of that category's own real months only -- a month where that specific category had no recorded activity is skipped entirely, not treated as ₹0. {historyMonthsAvailable} months of real data exist for this community overall right now.</div>
+          {noDataMonthsCount > 0 && (
+            <div><span className="font-semibold text-foreground">No-data months:</span> {noDataMonthsCount} month{noDataMonthsCount === 1 ? "" : "s"} earlier in this FY (before real record-keeping began here) show as NO DATA, not FORECAST -- we never invent numbers for months that have already happened.</div>
+          )}
           <div><span className="font-semibold text-foreground">Contingency Fund:</span> already shown as part of Closing Balance on the Opening &amp; Closing Balance page -- adjust its forecast assumption here using the Contingency Rate lever below.</div>
         </AlertDescription>
       </Alert>
