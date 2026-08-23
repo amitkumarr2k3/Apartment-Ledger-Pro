@@ -61,7 +61,7 @@ function Page() {
   );
 }
 
-type CategoryLever = { name: string; baseline: number; pct: number };
+type CategoryLever = { name: string; baseline: number; monthsUsed: number; pct: number };
 type MonthRow = { month: string; isActual: boolean; income: number; expense: number; net: number; closing: number };
 
 // Regex-based "special row" exclusion -- same pattern resident.balance.tsx
@@ -132,20 +132,30 @@ function Inner() {
     return idx;
   }, [actualByMonth]);
 
-  function computeBaseline(monthly: number[], window: number): number {
+  // How many of this FY's 12 months are real recorded data vs. forecast --
+  // reused across the header, KPI tiles, the month table badge, the
+  // Contingency Fund card, and the closing disclaimer so every card agrees
+  // on the same two numbers.
+  const actualMonthsCount = lastCompletedIdx + 1;
+  const forecastMonthsCount = 12 - actualMonthsCount;
+
+  // Returns both the average AND how many actual months fed into it --
+  // months with no recorded activity for that specific category are
+  // excluded from BOTH the sum and the denominator (point raised: a
+  // category billed in only 8 of 12 months must average over 8, not 12).
+  function computeBaseline(monthly: number[], window: number): { value: number; monthsUsed: number } {
     const nonZero = monthly.filter((v) => v > 0);
     const sample = nonZero.slice(-window);
-    if (sample.length === 0) return 0;
-    return sample.reduce((s, v) => s + v, 0) / sample.length;
+    if (sample.length === 0) return { value: 0, monthsUsed: 0 };
+    return { value: sample.reduce((s, v) => s + v, 0) / sample.length, monthsUsed: sample.length };
   }
 
   const expenseLevers: CategoryLever[] = useMemo(() => {
     return (expenseTree as Category[])
-      .map((cat) => ({
-        name: cat.name,
-        baseline: computeBaseline(categoryMonthly(cat), refWindow),
-        pct: expenseCategoryPct[cat.name] ?? 0,
-      }))
+      .map((cat) => {
+        const { value, monthsUsed } = computeBaseline(categoryMonthly(cat), refWindow);
+        return { name: cat.name, baseline: value, monthsUsed, pct: expenseCategoryPct[cat.name] ?? 0 };
+      })
       .filter((l) => l.baseline > 0)
       .sort((a, b) => b.baseline - a.baseline);
   }, [expenseTree, refWindow, expenseCategoryPct]);
@@ -153,11 +163,10 @@ function Inner() {
   const incomeLevers: CategoryLever[] = useMemo(() => {
     return (incomeTree as Category[])
       .filter((cat) => !isReferenceRow(cat.name) && !isMaintenanceRow(cat.name) && !isLiabilityRow(cat.name))
-      .map((cat) => ({
-        name: cat.name,
-        baseline: computeBaseline(categoryMonthly(cat), refWindow),
-        pct: incomeCategoryPct[cat.name] ?? 0,
-      }))
+      .map((cat) => {
+        const { value, monthsUsed } = computeBaseline(categoryMonthly(cat), refWindow);
+        return { name: cat.name, baseline: value, monthsUsed, pct: incomeCategoryPct[cat.name] ?? 0 };
+      })
       .filter((l) => l.baseline > 0)
       .sort((a, b) => b.baseline - a.baseline);
   }, [incomeTree, refWindow, incomeCategoryPct]);
@@ -203,22 +212,12 @@ function Inner() {
   const [contingencyRate, setContingencyRate] = useState<number | null>(null);
   const effectiveContingencyRate = contingencyRate ?? defaultContingencyRate;
 
-  // Contingency Fund: independent running total, actual months use the REAL
-  // recorded rate for that exact month (0 where it genuinely wasn't
-  // collected), forecast months use the adjustable rate above. This number
-  // is informational only -- it does NOT get subtracted from Total Income
-  // or Total Expense anywhere; it's a portion OF the closing balance you
-  // already computed, same "part of, not additional to" rule used on the
-  // Opening & Closing Balance page.
-  const contingencyFundTotal = useMemo(() => {
-    let total = 0;
-    fyMonths.forEach((fm, i) => {
-      const isActual = i <= lastCompletedIdx;
-      const rate = isActual ? (contingencyRateByMonth.get(fm.label) ?? 0) : effectiveContingencyRate;
-      total += rate * TOTAL_SQFT;
-    });
-    return total;
-  }, [fyMonths, lastCompletedIdx, contingencyRateByMonth, effectiveContingencyRate]);
+  // NOTE: the Contingency Fund total used to be summarized in its own card
+  // on this page. It's been removed here because the same figure (ring-
+  // fenced portion of Closing Balance) is already shown on the Opening &
+  // Closing Balance page -- this page only needs the Contingency Rate LEVER
+  // below so residents can still see/adjust the assumption feeding forecast
+  // months; it no longer computes or displays the aggregate total itself.
 
   function combinedFactor(pct: number): number {
     const inflation = inflationPct / 100;
@@ -316,7 +315,7 @@ function Inner() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <div>
           <h2 className="text-lg font-semibold">Financial Forecast</h2>
-          <p className="text-xs text-muted-foreground">Every lever is yours to explore -- local to your browser, never saved or shared.</p>
+          <p className="text-xs text-muted-foreground">Every lever is yours to explore -- local to your browser, never saved or shared. This view always covers all 12 months of {fyLabelFor(fyStart)}.</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <Select value={String(fyStart)} onValueChange={(v) => setFyStart(Number(v))}>
@@ -344,56 +343,24 @@ function Inner() {
           <div className="rounded-lg border p-3">
             <div className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground truncate">Opening · {fyLabelFor(fyStart)}</div>
             <div className="text-sm sm:text-lg font-black truncate">{inr(fyOpeningBalance)}</div>
+            <div className="text-[8px] text-muted-foreground mt-0.5 leading-tight">Carried forward from before this FY began</div>
           </div>
           <div className="rounded-lg p-3 bg-gradient-to-br from-[#0082c9] to-[#005f91] text-white">
             <div className="text-[9px] font-semibold uppercase tracking-wider text-blue-100 truncate">Closing · {fyLabelFor(fyStart)}</div>
             <div className="text-sm sm:text-lg font-black truncate">{inr(closing)}</div>
+            <div className="text-[8px] text-blue-100 mt-0.5 leading-tight">Opening + full-year Net Surplus</div>
           </div>
           <div className="rounded-lg border p-3">
             <div className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground truncate">Net Surplus</div>
             <div className={"text-sm sm:text-lg font-black truncate " + (fyNet < 0 ? "text-rose-600" : "")}>{inr(fyNet)}</div>
+            <div className="text-[8px] text-muted-foreground mt-0.5 leading-tight">Total income minus total expense, all 12 months</div>
           </div>
           <div className="rounded-lg border p-3">
             <div className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground truncate">Risk</div>
             <Badge variant="outline" className={"mt-0.5 text-[10px] " + riskClass}>{riskLabel}</Badge>
+            <div className="text-[8px] text-muted-foreground mt-1 leading-tight">Based on the lowest projected month-end balance this year</div>
           </div>
         </div>
-      )}
-
-      {/* Contingency Fund -- computed from the real per-sqft rate history,
-          same mechanism as the Opening & Closing Balance page. This is a
-          portion OF the Closing Balance above, not extra money on top of it. */}
-      {isWidgetVisible("forecasting.kpiTiles") && (
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between mb-2">
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Contingency Fund · {fyLabelFor(fyStart)}
-              </div>
-              <div className="text-sm font-black">{inr(contingencyFundTotal)}</div>
-            </div>
-            <div className="h-1.5 w-full rounded-full overflow-hidden flex bg-slate-100 dark:bg-slate-800">
-              <div
-                className="h-full bg-pink-400"
-                style={{ width: (closing > 0 ? Math.min(100, (contingencyFundTotal / closing) * 100) : 0) + "%" }}
-                title={"Contingency (ring-fenced): " + inr(contingencyFundTotal)}
-              />
-              <div
-                className="h-full bg-cyan-400"
-                style={{ width: (closing > 0 ? Math.max(0, 100 - (contingencyFundTotal / closing) * 100) : 100) + "%" }}
-                title={"Unrestricted: " + inr(Math.max(0, closing - contingencyFundTotal))}
-              />
-            </div>
-            <div className="flex items-center justify-between w-full mt-1 text-[9px] text-muted-foreground leading-tight">
-              <span>● <span className="text-pink-500 font-medium">Contingency</span> {inr(contingencyFundTotal)}</span>
-              <span><span className="text-cyan-600 font-medium">Unrestricted</span> {inr(Math.max(0, closing - contingencyFundTotal))} ●</span>
-            </div>
-            <p className="text-[10px] text-muted-foreground mt-2">
-              Collected via its own per-sqft rate, not a share of Net Surplus -- actual months use the real recorded
-              rate (which is genuinely ₹0 in some months), forecast months use the Contingency Rate lever below.
-            </p>
-          </CardContent>
-        </Card>
       )}
 
       {/* Configuration panel -- restored */}
@@ -407,7 +374,7 @@ function Inner() {
             <div className="space-y-1">
               <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Reference Window (mo)</label>
               <Input type="number" min={1} max={24} value={refWindow} onChange={(e) => setRefWindow(Number(e.target.value) || 12)} className="h-8 text-sm" />
-              <p className="text-[10px] text-muted-foreground">{historyMonthsAvailable} mo of real history available.</p>
+              <p className="text-[10px] text-muted-foreground">{historyMonthsAvailable} mo of real history available overall. Each category above only averages the months it actually has data for -- see "avg of N months" under each lever below.</p>
             </div>
             <div className="space-y-1">
               <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Inflation Combination</label>
@@ -470,7 +437,7 @@ function Inner() {
                   <LeverRow
                     key={lv.name}
                     label={lv.name}
-                    sub={"Baseline " + inr(lv.baseline) + "/mo"}
+                    sub={"Baseline " + inr(lv.baseline) + "/mo (avg of " + lv.monthsUsed + " month" + (lv.monthsUsed === 1 ? "" : "s") + " with data)"}
                     value={lv.pct}
                     onChange={(v) => setIncomeCategoryPct((p) => ({ ...p, [lv.name]: v }))}
                     min={-80} max={80} step={1} display={lv.pct + "%"}
@@ -494,7 +461,7 @@ function Inner() {
                   <LeverRow
                     key={lv.name}
                     label={lv.name}
-                    sub={"Baseline " + inr(lv.baseline) + "/mo"}
+                    sub={"Baseline " + inr(lv.baseline) + "/mo (avg of " + lv.monthsUsed + " month" + (lv.monthsUsed === 1 ? "" : "s") + " with data)"}
                     value={lv.pct}
                     onChange={(v) => setExpenseCategoryPct((p) => ({ ...p, [lv.name]: v }))}
                     min={-30} max={50} step={1} display={lv.pct + "%"}
@@ -519,7 +486,7 @@ function Inner() {
                 {tableOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                 <CardTitle className="text-sm">Month-by-Month Detail · {fyLabelFor(fyStart)}</CardTitle>
               </div>
-              <Badge variant="outline" className="text-[10px]">{lastCompletedIdx + 1} actual · {12 - lastCompletedIdx - 1} forecast</Badge>
+              <Badge variant="outline" className="text-[10px]">{actualMonthsCount} actual · {forecastMonthsCount} forecast</Badge>
             </div>
           </CardHeader>
           {tableOpen && (
@@ -613,6 +580,16 @@ function Inner() {
           </Tabs>
         </Card>
       )}
+
+      <Alert>
+        <Info className="h-4 w-4" />
+        <AlertDescription className="text-xs space-y-1.5">
+          <div>This is a what-if simulator, not an official published budget -- nothing you change here is saved or shared with anyone.</div>
+          <div><span className="font-semibold text-foreground">Coverage:</span> {fyLabelFor(fyStart)} always shows all 12 months -- {actualMonthsCount} {actualMonthsCount === 1 ? "is" : "are"} already actual (real recorded data), {forecastMonthsCount} {forecastMonthsCount === 1 ? "is" : "are"} still forecast using the levers above.</div>
+          <div><span className="font-semibold text-foreground">Baselines:</span> each category's monthly baseline (shown as "avg of N months" under its lever) uses up to {refWindow} of that category's own real months only -- a month where that specific category had no recorded activity is skipped entirely, not treated as ₹0. {historyMonthsAvailable} months of real data exist for this community overall right now.</div>
+          <div><span className="font-semibold text-foreground">Contingency Fund:</span> already shown as part of Closing Balance on the Opening &amp; Closing Balance page -- adjust its forecast assumption here using the Contingency Rate lever below.</div>
+        </AlertDescription>
+      </Alert>
     </div>
   );
 }
