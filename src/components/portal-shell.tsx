@@ -178,7 +178,7 @@ function getBotAnswer(rawQuery: string, persona: "resident" | "admin", currentVi
     return { text: "Go ahead, ask me anything about this dashboard -- e.g. \"what is vendor rank?\" or \"where can I find the per-sqft trend?\"" };
   }
   if (/^(hi|hello|hey)\b/.test(q)) {
-    return { text: `Hi! I'm your PulseLedger assistant (beta). You're currently on **${currentView}**. Ask me about any card, badge, or chart you see here, or ask "where can I find..." to be pointed to the right page.` };
+    return { text: `Hi! I'm Munshi, your PulseLedger assistant (beta). You're currently on **${currentView}**. Ask me about any card, badge, or chart you see here, or ask "where can I find..." to be pointed to the right page.` };
   }
 
   if (WHERE_INTENT.test(q)) {
@@ -218,7 +218,7 @@ function getBotAnswer(rawQuery: string, persona: "resident" | "admin", currentVi
   }
 
   return {
-    text: `I couldn't find an exact match for that yet (this assistant is still in beta). Try asking about specific terms you see on screen (e.g. "vendor rank", "period change", "All-Time badge"), or ask "where can I find..." followed by what you're looking for.`,
+    text: `I couldn't find an exact match for that yet (Munshi is still in beta). Try asking about specific terms you see on screen (e.g. "vendor rank", "period change", "All-Time badge"), or ask "where can I find..." followed by what you're looking for.`,
   };
 }
 
@@ -259,7 +259,7 @@ function HelpChat({ persona, currentView, onClose }: { persona: "resident" | "ad
     const stored = loadStoredMessages(persona);
     if (stored) return stored;
     return [
-      { role: "bot", text: `Hi! I'm your PulseLedger assistant. You're currently viewing **${currentView}**. Ask me anything about the cards, badges, or charts on this page -- or ask "where can I find..." something.` },
+      { role: "bot", text: `Hi! I'm Munshi, your PulseLedger assistant. You're currently viewing **${currentView}**. Ask me anything about the cards, badges, or charts on this page -- or ask "where can I find..." something.` },
     ];
   });
   const [input, setInput] = useState("");
@@ -321,7 +321,7 @@ function HelpChat({ persona, currentView, onClose }: { persona: "resident" | "ad
           </div>
           <div className="min-w-0">
             <div className="font-bold text-sm leading-tight flex items-center gap-1.5">
-              Pulse Assistant
+              Munshi
               <span className="text-[8px] font-bold uppercase tracking-wide bg-white/25 px-1.5 py-0.5 rounded-full shrink-0">Beta</span>
             </div>
             {!minimized && (
@@ -1138,7 +1138,7 @@ export function PortalShell({
                 <Sparkles className="h-2 w-2 text-amber-400 absolute -top-1 -right-1" />
               </div>
               <span className="flex items-center gap-1.5">
-                Chat with Assistant
+                Chat with Munshi
                 <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 leading-none border-amber-500/40 text-amber-600 dark:text-amber-400 font-semibold">
                   Beta
                 </Badge>
