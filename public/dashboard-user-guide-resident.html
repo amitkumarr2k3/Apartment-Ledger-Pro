@@ -113,6 +113,7 @@
     <li><a href="#income">Income Visibility</a></li>
     <li><a href="#balance">Opening &amp; Closing</a></li>
     <li><a href="#drilldown">Head Drill-down</a></li>
+    <li><a href="#forecasting">Forecasting</a></li>
     <li><a href="#faq">Common Questions</a></li>
   </ol>
 </nav>
@@ -339,6 +340,88 @@
 </section>
 
 <hr class="divider">
+
+<!-- ============ FORECASTING ============ -->
+<section class="page-section" id="forecasting">
+  <div class="page-title">🔮 Forecasting</div>
+  <p class="page-subtitle">A what-if explorer for the rest of this financial year -- built from your society's own real numbers, not guesses.</p>
+
+  <div class="card-explain neutral">
+    <h3>What this page is (and isn't)</h3>
+    <p>Forecasting shows the current fiscal year as two halves: the months that have already happened (<strong>Actual</strong> -- real recorded numbers, never estimated) and the months still ahead (<strong>Forecast</strong> -- projected using the assumptions you set below). Every slider on this page is <strong>yours to move</strong> -- residents and admins alike -- and nothing you change here is saved or shown to anyone else. Reload the page and it resets to the defaults. Think of it as a calculator, not an official budget.</p>
+  </div>
+
+  <div class="card-explain neutral">
+    <h3>Fiscal Year selector</h3>
+    <p>At the top right, choose which financial year to look at: the year before (closed, fully actual), the current year (a mix of actual and forecast months), or next year (fully forecast, with an extra year of inflation built in). The table and charts below update to match whichever year you pick.</p>
+  </div>
+
+  <div class="card-explain neutral">
+    <h3>Global Assumptions</h3>
+    <p>Six numbers that apply across the whole forecast:</p>
+    <ul>
+      <li><strong>Maintenance Rate</strong> -- the per-square-foot monthly rate used to calculate maintenance billing for forecast months. Actual months always use the real billed amount, never this slider.</li>
+      <li><strong>Maintenance Collection %</strong> -- what share of billed maintenance you expect to actually collect (100% would mean every rupee billed gets paid on time).</li>
+      <li><strong>Interest on Surplus %</strong> -- a small extra income assumption applied to whatever balance the society is carrying, e.g. from a savings/FD interest.</li>
+      <li><strong>Inflation (annual)</strong> -- a general cost-of-living increase applied on top of every expense category's own trend.</li>
+      <li><strong>Contingency Rate</strong> -- a per-square-foot monthly rate, calculated the same way as Maintenance Rate, used to project the Contingency Fund for forecast months. It defaults to whatever rate was most recently actually charged -- not a plain average -- since contingency genuinely isn't collected every month.</li>
+      <li><strong>Unknown Expense</strong> -- a one-time rupee amount for something unplanned (e.g. an emergency repair), added once, to the very first forecast month.</li>
+    </ul>
+  </div>
+
+  <div class="card-explain neutral">
+    <h3>Configuration (advanced)</h3>
+    <p>Tap "Config" to reveal three methodology settings -- these change <em>how</em> the forecast is calculated, not just its inputs:</p>
+    <ul>
+      <li><strong>Reference Window</strong> -- how many months of real history to average when calculating each category's starting point (its "baseline"). Default is 12; a newer community with less history will automatically use whatever months are actually available instead.</li>
+      <li><strong>Inflation Combination</strong> -- whether inflation and a category's own growth assumption <em>compound</em> together (the standard, slightly higher-impact way) or simply <em>add</em> together (simpler, slightly lower-impact).</li>
+      <li><strong>Apply Inflation To</strong> -- whether inflation affects expense categories only (the usual choice) or income categories too.</li>
+    </ul>
+  </div>
+
+  <div class="card-explain neutral">
+    <h3>Income Categories &amp; Expense Categories</h3>
+    <p>These lists are pulled directly from your society's real chart of accounts -- not a fixed list -- so if a category is ever renamed or a new one is added, it shows up here automatically without anyone needing to update this page. Each category shows a <strong>Baseline</strong> (its average monthly actual, from the Reference Window above) and a slider for how much you expect it to grow or shrink for the rest of the year.</p>
+    <p>To keep the page manageable, only the largest 5 income and 6 expense categories (by size) are shown by default -- use "+ N more categories" to reveal the rest. Categories you haven't expanded still count fully toward the forecast total at their default (0% change) assumption; hiding a slider never hides its money.</p>
+    <p>Maintenance income itself doesn't appear in this list -- it's already covered by the Maintenance Rate and Maintenance Collection % sliders in Global Assumptions above, so it isn't counted twice.</p>
+  </div>
+
+  <div class="card-explain neutral">
+    <h3>The result tiles</h3>
+    <ul>
+      <li><strong>Opening</strong> -- the real, actual balance the society was carrying at the very start of the fiscal year you've selected (not from the very beginning of the app's history -- specifically as of 1 April of that year).</li>
+      <li><strong>Closing</strong> -- Opening balance plus this year's full Net Surplus. This is the cumulative, running total -- it is <em>not</em> the same number as Net Surplus unless the Opening balance happens to be zero.</li>
+      <li><strong>Net Surplus</strong> -- this year's income minus this year's expense, on its own (before adding the Opening balance).</li>
+      <li><strong>Risk</strong> -- a quick traffic-light read on whether the projected balance stays healthy through the year (LOW), dips low at some point (MODERATE), or goes negative before year-end (HIGH), based on your current assumptions.</li>
+    </ul>
+  </div>
+
+  <div class="card-explain neutral">
+    <h3>Contingency Fund card</h3>
+    <p>This is <strong>not</strong> a share of Net Surplus. It's collected via its own monthly per-square-foot rate -- the same rate, and the same source, your Opening &amp; Closing Balance page already uses for its Contingency Cash figure. Actual months use the real recorded rate for that exact month (which is genuinely &#8377;0 in months contingency wasn't collected); forecast months use the Contingency Rate lever in Global Assumptions. The pink/cyan bar shows what portion of your projected Closing Balance is this earmarked reserve (pink) versus freely usable (cyan) -- exactly the same "part of, not additional to" idea used on the Opening &amp; Closing Balance page.</p>
+  </div>
+
+  <div class="card-explain neutral">
+    <h3>Month-by-Month Detail table</h3>
+    <p>Collapsed by default -- tap the row to expand it. Each month is tagged <strong>ACTUAL</strong> (real recorded figures) or <strong>FORECAST</strong> (projected from your assumptions), and the Closing column rolls forward month by month, starting from the true Opening balance above -- so by March, Closing reflects everything from the start of the year, not just the forecast months on their own.</p>
+  </div>
+
+  <div class="card-explain neutral">
+    <h3>Forecast Dashboard (chart)</h3>
+    <p>Two tabs:</p>
+    <ul>
+      <li><strong>Trend</strong> -- a bar-and-line chart of Income, Expense, and Closing Balance for all 12 months. Actual months are shown in solid colour; forecast months are shown lighter, so you can see at a glance where real data ends and projection begins. If every category's growth assumption is left at 0%, forecast months will look identical to each other month-to-month -- that's expected, not a bug: with no growth assumption applied, the forecast simply carries the same average forward every month, so the Closing Balance line rises in a straight, constant step rather than a curve. Moving any category slider away from 0% will make that trend curve instead.</li>
+      <li><strong>Expense Mix</strong> -- a donut chart showing which categories make up the forecast (not actual) months' spending, so you can see at a glance where the bulk of upcoming expense is concentrated.</li>
+    </ul>
+  </div>
+
+  <div class="card-explain neutral">
+    <h3>Worked example: how the Contingency Fund is calculated</h3>
+    <p>Say the Contingency Rate was last actually charged at &#8377;0.50/sqft in a real month, and your community is 7,01,591 sqft. For any forecast month using that rate: &#8377;0.50 &times; 7,01,591 = &#8377;3,50,796 added to the Contingency Fund that month. Actual months instead use whatever the real recorded rate was for that specific month -- including &#8377;0 for months it wasn't charged at all. The Contingency Fund total shown is the sum of this across all 12 months of the selected year, and it is a <em>portion of</em> the Closing Balance above, not extra money added on top of it.</p>
+  </div>
+
+  <a class="back-to-top" href="#top">↑ Back to top</a>
+</section>
 
 <!-- ============ FAQ ============ -->
 <section class="page-section" id="faq">

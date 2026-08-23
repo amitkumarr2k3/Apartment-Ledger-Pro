@@ -14,7 +14,7 @@ import {
   PieChart, Pie, Cell,
 } from "recharts";
 import { SmartTooltipContent, getTooltipTrigger } from "@/components/smart-tooltip";
-import { inr, categoryMonthly, type Category } from "@/lib/finance-mock";
+import { inr, categoryMonthly, months12, type Category } from "@/lib/finance-mock";
 import { useBalanceStrip, useMonthlyTotals, useIncomeTree, useExpenseTree, useWidgetVisibility } from "@/lib/hooks";
 import { Info, Settings2, ChevronDown, ChevronUp, RotateCcw } from "lucide-react";
 
@@ -73,6 +73,12 @@ type MonthRow = { month: string; isActual: boolean; income: number; expense: num
 const isReferenceRow = (name: string) => /reference/i.test(name || "");
 const isMaintenanceRow = (name: string) => /maintenance\s*(collection|outstanding|dues)/i.test(name || "");
 const isLiabilityRow = (name: string) => /liability/i.test(name || "");
+// Same "Contingency Rate Reference" row resident.balance.tsx already reads --
+// this stores a PER-SQFT RATE per month (encoded x100, like Maintenance
+// Rate), not a rupee amount, and the rate is genuinely 0 in some months
+// (contingency isn't collected every month) -- it must NOT be treated as a
+// normal income category, and it must NOT be modelled as "a % of surplus".
+const isContingencyRateReference = (name: string) => /contingency\s*rate\s*reference/i.test(name || "");
 
 function Inner() {
   const { isWidgetVisible } = useWidgetVisibility("resident.forecasting");
@@ -92,7 +98,6 @@ function Inner() {
   const [collectionPct, setCollectionPct] = useState(90);
   const [interestPct, setInterestPct] = useState(0);
   const [inflationPct, setInflationPct] = useState(6);
-  const [contingency, setContingency] = useState(0.25); // fraction 0..1
   const [unknownExpense, setUnknownExpense] = useState(0);
   const [incomeCategoryPct, setIncomeCategoryPct] = useState<Record<string, number>>({});
   const [expenseCategoryPct, setExpenseCategoryPct] = useState<Record<string, number>>({});
@@ -167,6 +172,54 @@ function Inner() {
     return counts.length ? Math.max(...counts) : 0;
   }, [expenseTree]);
 
+  // Contingency: pull the REAL per-sqft rate history from the same
+  // "Contingency Rate Reference" row resident.balance.tsx already reads.
+  // This is NOT a normal income category (excluded from incomeLevers above
+  // via isContingencyRateReference) and it is NOT derived from Net Surplus --
+  // it's its own independent monthly rate, aligned to months12 the same way
+  // every other category tree is.
+  const contingencyRateByMonth = useMemo(() => {
+    const cat = (incomeTree as Category[]).find((c) => isContingencyRateReference(c.name));
+    const map = new Map<string, number>();
+    if (!cat) return map;
+    const monthly = categoryMonthly(cat); // raw encoded rate (x100), aligned to months12
+    months12.forEach((label: string, i: number) => map.set(label, (monthly[i] ?? 0) / 100));
+    return map;
+  }, [incomeTree]);
+
+  // Default the forecast-months rate to the most recently recorded ACTUAL
+  // rate that wasn't zero (rather than a plain average), since the real
+  // pattern is "collected in some months, not others" -- averaging in the
+  // zero months would understate the rate actually being charged when it
+  // IS collected.
+  const defaultContingencyRate = useMemo(() => {
+    for (let i = lastCompletedIdx; i >= 0; i--) {
+      const rate = contingencyRateByMonth.get(fyMonths[i]?.label) ?? 0;
+      if (rate > 0) return rate;
+    }
+    return 0;
+  }, [contingencyRateByMonth, fyMonths, lastCompletedIdx]);
+
+  const [contingencyRate, setContingencyRate] = useState<number | null>(null);
+  const effectiveContingencyRate = contingencyRate ?? defaultContingencyRate;
+
+  // Contingency Fund: independent running total, actual months use the REAL
+  // recorded rate for that exact month (0 where it genuinely wasn't
+  // collected), forecast months use the adjustable rate above. This number
+  // is informational only -- it does NOT get subtracted from Total Income
+  // or Total Expense anywhere; it's a portion OF the closing balance you
+  // already computed, same "part of, not additional to" rule used on the
+  // Opening & Closing Balance page.
+  const contingencyFundTotal = useMemo(() => {
+    let total = 0;
+    fyMonths.forEach((fm, i) => {
+      const isActual = i <= lastCompletedIdx;
+      const rate = isActual ? (contingencyRateByMonth.get(fm.label) ?? 0) : effectiveContingencyRate;
+      total += rate * TOTAL_SQFT;
+    });
+    return total;
+  }, [fyMonths, lastCompletedIdx, contingencyRateByMonth, effectiveContingencyRate]);
+
   function combinedFactor(pct: number): number {
     const inflation = inflationPct / 100;
     const cat = pct / 100;
@@ -174,8 +227,28 @@ function Inner() {
   }
   const forwardInflationMultiplier = Math.pow(1 + inflationPct / 100, yearsForward);
 
+  // True opening balance for the SELECTED FY -- all-time opening balance
+  // plus the net of every month that comes before this FY's first month.
+  // Same approach as resident.balance.tsx's "TRUE OPENING BALANCE" logic:
+  // find where the FY actually starts in the real data and sum everything
+  // strictly before it, rather than assuming the all-time opening balance
+  // (from /balance-strip, which is "ORDER BY month ASC LIMIT 1" -- i.e. the
+  // balance as of the very FIRST month ever recorded, not this FY's start)
+  // already represents "as of this FY's start". This is what makes the
+  // forecast genuinely cumulative -- prior years roll into this one instead
+  // of being silently dropped.
+  const fyOpeningBalance = useMemo(() => {
+    const firstMonthLabel = fyMonths[0]?.label;
+    const idx = firstMonthLabel
+      ? (monthlyTotals as any[]).findIndex((m) => m.month === firstMonthLabel)
+      : -1;
+    const priorMonths = idx >= 0 ? (monthlyTotals as any[]).slice(0, idx) : (monthlyTotals as any[]);
+    const priorNet = priorMonths.reduce((s, m) => s + (m.collection ?? 0) - (m.expense ?? 0), 0);
+    return (balanceStrip.opening || 0) + priorNet;
+  }, [monthlyTotals, fyMonths, balanceStrip.opening]);
+
   const { rows: monthRows, mixByCategory } = useMemo(() => {
-    let opening = balanceStrip.opening || 0;
+    let opening = fyOpeningBalance;
     const out: MonthRow[] = [];
     const mix: Record<string, number> = {};
 
@@ -208,7 +281,7 @@ function Inner() {
     return { rows: out, mixByCategory: mix };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    fyMonths, actualByMonth, balanceStrip.opening, maintenanceRate, collectionPct, interestPct,
+    fyMonths, actualByMonth, fyOpeningBalance, maintenanceRate, collectionPct, interestPct,
     incomeLevers, expenseLevers, inflationScope, forwardInflationMultiplier, unknownExpense,
     lastCompletedIdx, combineMode, inflationPct,
   ]);
@@ -217,10 +290,9 @@ function Inner() {
   const fyExpense = monthRows.reduce((s, r) => s + r.expense, 0);
   const fyNet = fyIncome - fyExpense;
   const closing = monthRows[11]?.closing ?? 0;
-  const contingencyAmount = Math.max(0, fyNet * contingency);
   const worst = monthRows.length ? Math.min(...monthRows.map((r) => r.closing)) : 0;
   const risk: "high" | "moderate" | "low" =
-    worst < 0 ? "high" : worst < (balanceStrip.opening || 1) * 0.3 ? "moderate" : "low";
+    worst < 0 ? "high" : worst < (fyOpeningBalance || 1) * 0.3 ? "moderate" : "low";
 
   const mixData = Object.entries(mixByCategory).map(([name, value], i) => ({
     name, value, color: CHART_COLORS[i % CHART_COLORS.length],
@@ -228,7 +300,7 @@ function Inner() {
 
   function resetAll() {
     setMaintenanceRate(4); setCollectionPct(90); setInterestPct(0); setInflationPct(6);
-    setContingency(0.25); setUnknownExpense(0); setIncomeCategoryPct({}); setExpenseCategoryPct({});
+    setContingencyRate(null); setUnknownExpense(0); setIncomeCategoryPct({}); setExpenseCategoryPct({});
     setRefWindow(12); setCombineMode("compound"); setInflationScope("expense");
     setShowAllIncome(false); setShowAllExpense(false);
   }
@@ -238,12 +310,6 @@ function Inner() {
     risk === "high" ? "border-rose-500/40 text-rose-600" :
     risk === "moderate" ? "border-amber-500/40 text-amber-600" :
     "border-emerald-500/40 text-emerald-600";
-
-  // Contingency label as the RAW FRACTION (0.05, 0.1, 0.15 ... 1), not a
-  // percentage. Rounded to 2dp first to avoid floating-point artifacts
-  // (e.g. 0.30000000000000004); JS's default number-to-string then drops
-  // trailing zeros naturally (0.1, not 0.10).
-  const contingencyDisplay = String(Math.round(contingency * 100) / 100);
 
   return (
     <div className="space-y-4">
@@ -274,7 +340,11 @@ function Inner() {
 
       {/* KPI 3-tile row -- restored */}
       {isWidgetVisible("forecasting.kpiTiles") && (
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <div className="rounded-lg border p-3">
+            <div className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground truncate">Opening · {fyLabelFor(fyStart)}</div>
+            <div className="text-sm sm:text-lg font-black truncate">{inr(fyOpeningBalance)}</div>
+          </div>
           <div className="rounded-lg p-3 bg-gradient-to-br from-[#0082c9] to-[#005f91] text-white">
             <div className="text-[9px] font-semibold uppercase tracking-wider text-blue-100 truncate">Closing · {fyLabelFor(fyStart)}</div>
             <div className="text-sm sm:text-lg font-black truncate">{inr(closing)}</div>
@@ -288,6 +358,42 @@ function Inner() {
             <Badge variant="outline" className={"mt-0.5 text-[10px] " + riskClass}>{riskLabel}</Badge>
           </div>
         </div>
+      )}
+
+      {/* Contingency Fund -- computed from the real per-sqft rate history,
+          same mechanism as the Opening & Closing Balance page. This is a
+          portion OF the Closing Balance above, not extra money on top of it. */}
+      {isWidgetVisible("forecasting.kpiTiles") && (
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Contingency Fund · {fyLabelFor(fyStart)}
+              </div>
+              <div className="text-sm font-black">{inr(contingencyFundTotal)}</div>
+            </div>
+            <div className="h-1.5 w-full rounded-full overflow-hidden flex bg-slate-100 dark:bg-slate-800">
+              <div
+                className="h-full bg-pink-400"
+                style={{ width: (closing > 0 ? Math.min(100, (contingencyFundTotal / closing) * 100) : 0) + "%" }}
+                title={"Contingency (ring-fenced): " + inr(contingencyFundTotal)}
+              />
+              <div
+                className="h-full bg-cyan-400"
+                style={{ width: (closing > 0 ? Math.max(0, 100 - (contingencyFundTotal / closing) * 100) : 100) + "%" }}
+                title={"Unrestricted: " + inr(Math.max(0, closing - contingencyFundTotal))}
+              />
+            </div>
+            <div className="flex items-center justify-between w-full mt-1 text-[9px] text-muted-foreground leading-tight">
+              <span>● <span className="text-pink-500 font-medium">Contingency</span> {inr(contingencyFundTotal)}</span>
+              <span><span className="text-cyan-600 font-medium">Unrestricted</span> {inr(Math.max(0, closing - contingencyFundTotal))} ●</span>
+            </div>
+            <p className="text-[10px] text-muted-foreground mt-2">
+              Collected via its own per-sqft rate, not a share of Net Surplus -- actual months use the real recorded
+              rate (which is genuinely ₹0 in some months), forecast months use the Contingency Rate lever below.
+            </p>
+          </CardContent>
+        </Card>
       )}
 
       {/* Configuration panel -- restored */}
@@ -337,7 +443,14 @@ function Inner() {
               <LeverRow label="Maintenance Collection %" value={collectionPct} onChange={setCollectionPct} min={50} max={100} step={1} display={collectionPct + "%"} />
               <LeverRow label="Interest on Surplus %" value={interestPct} onChange={setInterestPct} min={0} max={10} step={0.5} display={interestPct + "%"} />
               <LeverRow label="Inflation (annual)" value={inflationPct} onChange={setInflationPct} min={0} max={15} step={0.5} display={inflationPct + "%"} />
-              <LeverRow label="Contingency Set-Aside" value={contingency} onChange={setContingency} min={0} max={1} step={0.05} display={contingencyDisplay} />
+              <LeverRow
+                label="Contingency Rate (₹/sqft/mo)"
+                value={effectiveContingencyRate}
+                onChange={setContingencyRate}
+                min={0} max={5} step={0.05}
+                display={"₹" + effectiveContingencyRate.toFixed(2)}
+                sub={contingencyRate === null ? "Defaulted from the last month it was actually collected" : "Forecast months only -- actuals use the real recorded rate"}
+              />
               <div className="space-y-1">
                 <label className="text-sm font-medium">Unknown Expense <span className="text-[10px] text-muted-foreground font-normal">(one-time, ₹)</span></label>
                 <Input type="number" value={unknownExpense} step={10000} onChange={(e) => setUnknownExpense(Number(e.target.value) || 0)} className="h-8 text-sm" />
@@ -500,15 +613,6 @@ function Inner() {
           </Tabs>
         </Card>
       )}
-
-      <Alert>
-        <Info className="h-4 w-4" />
-        <AlertDescription className="text-xs">
-          What-if explorer, not an official published budget -- nothing here is saved or shared. Category baselines
-          use the last {refWindow} months of actual activity ({historyMonthsAvailable} months currently available).
-          Contingency set-aside ({inr(contingencyAmount)}) is part of the closing balance, not additional funds.
-        </AlertDescription>
-      </Alert>
     </div>
   );
 }
