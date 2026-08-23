@@ -45,6 +45,19 @@ function fiscalStartYearFor(d: Date): number {
 function fyLabelFor(startYear: number): string {
   return "FY " + startYear + "-" + String(startYear + 1).slice(-2);
 }
+// Inverse of fmtMonthLabel -- turns a "MMM 'YY" label (the same format
+// monthlyTotals/actualByMonth already use) back into a real Date, so we can
+// compare months chronologically across FY boundaries instead of only by
+// exact label match. Needed to bridge a gap of several forecast months when
+// jumping two or more FYs ahead of the last real data (see fyOpeningBalance).
+function parseMonthLabel(label: string): Date | null {
+  const parts = (label || "").trim().split(" '");
+  if (parts.length !== 2) return null;
+  const monIdx = MONTH_ABBRS.indexOf(parts[0]);
+  const yy = parseInt(parts[1], 10);
+  if (monIdx === -1 || Number.isNaN(yy)) return null;
+  return new Date(2000 + yy, monIdx, 1);
+}
 
 const CHART_COLORS = ["#0082c9", "#06b6d4", "#f59e0b", "#22c55e", "#a855f7", "#ef4444", "#ec4899", "#6366f1", "#14b8a6", "#f97316"];
 
@@ -236,16 +249,6 @@ function Inner() {
   }
   const forwardInflationMultiplier = Math.pow(1 + inflationPct / 100, yearsForward);
 
-  // True opening balance for the SELECTED FY -- all-time opening balance
-  // plus the net of every month that comes before this FY's first month.
-  // Same approach as resident.balance.tsx's "TRUE OPENING BALANCE" logic:
-  // find where the FY actually starts in the real data and sum everything
-  // strictly before it, rather than assuming the all-time opening balance
-  // (from /balance-strip, which is "ORDER BY month ASC LIMIT 1" -- i.e. the
-  // balance as of the very FIRST month ever recorded, not this FY's start)
-  // already represents "as of this FY's start". This is what makes the
-  // forecast genuinely cumulative -- prior years roll into this one instead
-  // of being silently dropped.
   // TRUE OPENING BALANCE -- one-time anchor, mirrors resident.balance.tsx's
   // identical fix. If an "Opening Balance Reference" row has been uploaded
   // (the confirmed real starting balance for this ledger), its first
@@ -263,24 +266,84 @@ function Inner() {
   }
   const hasTrueAnchor = trueOpeningAnchor !== null;
 
+  // Standalone forecast-month formula, deliberately kept separate from the
+  // monthRows loop below (small duplication, on purpose) so that fixing
+  // multi-year chaining here can never change what's already shown/verified
+  // correct for the currently selected FY's own forecast months. Excludes
+  // the one-time "Unknown Expense" input and expense-mix tracking, since
+  // those are specific to the single FY currently on screen, not to
+  // bridging an earlier, already-passed FY in the background.
+  function computeForecastMonth(openingForInterest: number, yearsForwardHere: number) {
+    const fMultiplier = Math.pow(1 + inflationPct / 100, yearsForwardHere);
+    const billed = maintenanceRate * TOTAL_SQFT;
+    let income = billed * (collectionPct / 100) + openingForInterest * (interestPct / 100);
+    incomeLevers.forEach((lv) => {
+      const factor = inflationScope === "both" ? combinedFactor(lv.pct) : 1 + lv.pct / 100;
+      income += lv.baseline * factor * fMultiplier;
+    });
+    let expense = 0;
+    expenseLevers.forEach((lv) => {
+      expense += lv.baseline * combinedFactor(lv.pct) * fMultiplier;
+    });
+    return { income, expense };
+  }
+
+  // True opening balance for the SELECTED FY. Three cases:
+  //  (a) This FY starts before any real data exists at all (the very first
+  //      tracked FY) -- use the confirmed True Opening Balance directly;
+  //      there is nothing reliable to sum before it.
+  //  (b) This FY starts within/before the real-data range we already have
+  //      (the common case) -- sum real actual net for every month strictly
+  //      before this FY's start, same as before.
+  //  (c) This FY starts AFTER the last month we have real data for (e.g.
+  //      viewing two or more FYs ahead) -- bridge the gap between the last
+  //      real month and this FY's start using the SAME forecast formula as
+  //      the rest of this page, so a later FY's opening always equals the
+  //      (possibly still-forecast) closing balance of the FY right before
+  //      it, instead of silently resetting to the anchor. This is what was
+  //      missing: FY N+1's opening correctly picked up FY N's real closing,
+  //      but FY N+2's opening skipped straight back to the anchor because
+  //      the bridge only ever looked at REAL monthlyTotals rows, and FY N's
+  //      own tail end (still forecast) never appears there.
   const fyOpeningBalance = useMemo(() => {
-    const firstMonthLabel = fyMonths[0]?.label;
-    const idx = firstMonthLabel
-      ? (monthlyTotals as any[]).findIndex((m) => m.month === firstMonthLabel)
-      : -1;
-    // FIX: when this FY's first month isn't found in monthlyTotals at all
-    // (it predates the earliest month real data exists for), there is NO
-    // prior actual history -- not "all of monthlyTotals". The previous
-    // fallback here summed the ENTIRE monthlyTotals array whenever idx was
-    // -1, which double-counted real net movement (including months that
-    // are part of THIS fy, still to come below) straight into the opening
-    // balance. That was the root cause of a wildly inflated Opening figure
-    // for the first tracked FY.
-    const priorMonths = idx >= 0 ? (monthlyTotals as any[]).slice(0, idx) : [];
-    const priorNet = priorMonths.reduce((s, m) => s + (m.collection ?? 0) - (m.expense ?? 0), 0);
     const anchor = hasTrueAnchor ? (trueOpeningAnchor as number) : (balanceStrip.opening || 0);
-    return anchor + priorNet;
-  }, [monthlyTotals, fyMonths, balanceStrip.opening, hasTrueAnchor, trueOpeningAnchor]);
+    const fyStartDate = fyMonths[0]?.date;
+    if (!fyStartDate) return anchor;
+
+    const parsedActuals = (monthlyTotals as any[])
+      .map((m) => ({ m, d: parseMonthLabel(m.month) }))
+      .filter((x): x is { m: any; d: Date } => x.d !== null)
+      .sort((a, b) => a.d.getTime() - b.d.getTime());
+
+    if (parsedActuals.length === 0) return anchor;
+
+    const earliestDate = parsedActuals[0].d;
+    const latestDate = parsedActuals[parsedActuals.length - 1].d;
+
+    if (fyStartDate.getTime() <= earliestDate.getTime()) return anchor; // case (a)
+
+    const realNet = parsedActuals
+      .filter((x) => x.d.getTime() < fyStartDate.getTime())
+      .reduce((s, x) => s + (x.m.collection ?? 0) - (x.m.expense ?? 0), 0);
+
+    let bridgeNet = 0;
+    let running = anchor + realNet;
+    let cursor = new Date(latestDate.getFullYear(), latestDate.getMonth() + 1, 1);
+    while (cursor.getTime() < fyStartDate.getTime()) {
+      const yearsForwardHere = fiscalStartYearFor(cursor) - defaultFyStart;
+      const { income, expense } = computeForecastMonth(running, yearsForwardHere);
+      const net = income - expense;
+      bridgeNet += net;
+      running += net;
+      cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
+    }
+
+    return anchor + realNet + bridgeNet; // case (b) when bridgeNet ends up 0, case (c) otherwise
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    monthlyTotals, fyMonths, balanceStrip.opening, hasTrueAnchor, trueOpeningAnchor, defaultFyStart,
+    maintenanceRate, collectionPct, interestPct, inflationPct, incomeLevers, expenseLevers, combineMode, inflationScope,
+  ]);
 
   const { rows: monthRows, mixByCategory } = useMemo(() => {
     let opening = fyOpeningBalance;

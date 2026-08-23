@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Bar, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend } from "recharts";
 import { SmartTooltipContent, getTooltipTrigger } from "@/components/smart-tooltip";
-import { inr, categoryMonthly } from "@/lib/finance-mock";
+import { inr, categoryMonthly, months12 } from "@/lib/finance-mock";
 import { useBalanceStrip, useMonthlyTotals, useIncomeTree, useWidgetVisibility } from "@/lib/hooks";
 import { Info } from "lucide-react";
 
@@ -100,10 +100,28 @@ function Inner() {
     (sum, storedVal) => sum + ((storedVal || 0) / 100) * TOTAL_SQFT,
     0,
   );
-  const contingencyMonthlySliced = contingencyCategory ? sliceMonthly(categoryMonthly(contingencyCategory)) : [];
+  // FIX: previously used sliceMonthly(categoryMonthly(...))[i] and matched
+  // it to rows[i] purely by ARRAY POSITION. categoryMonthly()'s output is
+  // always aligned to the full months12 window, while rows/period come from
+  // sliceMonthly(monthlyTotals) -- a potentially shorter or differently-
+  // windowed array once real data doesn't cover the whole months12 range
+  // (e.g. real record-keeping only starting partway through it). Slicing
+  // both independently and then zipping them by index silently shifts one
+  // series against the other, which is exactly what produced contingency
+  // bars showing up under the wrong months (and all-zero when the selected
+  // period's own indices don't overlap the shifted range at all).
+  //
+  // Fix: look up each row's contingency amount by its actual month LABEL
+  // instead of by array position -- this can never misalign regardless of
+  // which months are actually present in either array.
+  const contingencyByMonth = new Map<string, number>();
+  if (contingencyCategory) {
+    const contingencyFull = categoryMonthly(contingencyCategory); // aligned to months12
+    months12.forEach((label, i) => contingencyByMonth.set(label, contingencyFull[i] ?? 0));
+  }
   let runningContingency = 0;
-  const contingencyRows = rows.map((r, i) => {
-    const contingencyThisMonth = ((contingencyMonthlySliced[i] ?? 0) / 100) * TOTAL_SQFT;
+  const contingencyRows = rows.map((r) => {
+    const contingencyThisMonth = ((contingencyByMonth.get(r.month) ?? 0) / 100) * TOTAL_SQFT;
     runningContingency += contingencyThisMonth;
     return { month: r.month, contingency_fund: contingencyThisMonth, cumulative_contingency: runningContingency };
   });
