@@ -88,6 +88,18 @@ const DASHBOARD_DEFS: DashboardDef[] = [
       { id: "balance.contingencyChart", label: "Monthly contingency fund collection chart" },
     ],
   },
+  {
+    key: "resident.forecasting",
+    label: "Resident · Forecasting",
+    widgets: [
+      { id: "forecasting.kpiTiles", label: "Closing Balance / Net Surplus / Risk tiles" },
+      { id: "forecasting.monthTable", label: "Month-by-month detail table" },
+      { id: "forecasting.charts", label: "Income, Expense & Closing Balance chart" },
+      { id: "forecasting.mix", label: "Forecast expense mix (donut)" },
+      { id: "forecasting.assumptions", label: "Income & Expense assumption sliders" },
+      { id: "forecasting.configPanel", label: "Advanced configuration (reference window, inflation method)" },
+    ],
+  },
 ];
 
 function Page() {

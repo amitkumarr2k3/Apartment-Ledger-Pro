@@ -731,12 +731,16 @@ export function PortalShell({
   persona,
   children,
   showViewToggle = true,
+  showPeriodSelector = true,
 }: {
   title: string;
   reqIds: string;
   persona: "resident" | "admin";
   children: ReactNode;
   showViewToggle?: boolean;
+  // FIX: added for resident.forecasting.tsx -- that page owns its own FY
+  // selector and must not respond to (or display) the shared period filter.
+  showPeriodSelector?: boolean;
 }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
@@ -938,14 +942,16 @@ export function PortalShell({
                 </div>
               )}
               <div className="flex items-center gap-1.5 rounded-xl border border-border/70 bg-muted/40 p-1 shadow-sm">
-                <Select value={period} onValueChange={(v) => setPeriod(v as PeriodValue)}>
-                  <SelectTrigger className="w-[130px] sm:w-[180px] border-none bg-background shadow-none focus:ring-1 focus:ring-primary/40"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {(Object.keys(periodConfig) as PeriodValue[]).map((k) => (
-                      <SelectItem key={k} value={k}>{periodConfig[k].label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {showPeriodSelector && (
+                  <Select value={period} onValueChange={(v) => setPeriod(v as PeriodValue)}>
+                    <SelectTrigger className="w-[130px] sm:w-[180px] border-none bg-background shadow-none focus:ring-1 focus:ring-primary/40"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {(Object.keys(periodConfig) as PeriodValue[]).map((k) => (
+                        <SelectItem key={k} value={k}>{periodConfig[k].label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
                 {showViewToggle && (
                   <ToggleGroup type="single" value={view} onValueChange={(v) => v && setView(v as "chart" | "number")} className="bg-background rounded-lg">
                     <ToggleGroupItem value="chart" size="sm" aria-label="Chart view" className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground transition-colors">

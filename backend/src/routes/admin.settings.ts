@@ -5,6 +5,7 @@ import { audit } from "../audit";
 
 export const DASHBOARD_KEYS = [
   "resident.overview","resident.drilldown","resident.cashflow","resident.income","resident.balance",
+  "resident.forecasting",
 ] as const;
 
 export async function routes(app: FastifyInstance) {
