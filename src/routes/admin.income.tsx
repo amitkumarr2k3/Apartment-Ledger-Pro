@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid } from "recharts";
 import { SmartTooltipContent, getTooltipTrigger } from "@/components/smart-tooltip";
-import { inr, sumMonthly, total } from "@/lib/finance-mock";
+import { inr, sumMonthly, total, months12 } from "@/lib/finance-mock";
 import { useIncomeTree, useMonthlyTotals } from "@/lib/hooks";
 import { filterReportableIncomeCategories } from "@/lib/income-utils";
 import { Lightbulb } from "lucide-react";
@@ -57,18 +57,41 @@ function Inner() {
   // AD-31: expense-to-income ratio per month.
   // Income is derived from income sources (already ex-tax), while expense
   // continues to use monthly totals.
-  const monthlyIncome = sliceMonthly(
-    sumMonthly(
+  //
+  // FIX: previously called sliceMonthly() on TWO independently-aligned
+  // arrays (income, which sumMonthly() always aligns to the full months12
+  // window, and monthlyTotals, which only covers real recorded months) and
+  // then zipped them together purely by ARRAY POSITION (monthlyIncome[i]
+  // next to slicedTotals[i]). Whenever those two arrays don't share the
+  // exact same native length/window -- e.g. income data reaches further
+  // than monthlyTotals's real coverage, or vice versa -- that silently
+  // shifts one series against the other. Once income read as 0 for a
+  // month it didn't actually belong to, the ratio for that month collapsed
+  // to 0% (see the `monthlyIncome[i] > 0 ? ... : 0` fallback below), which
+  // is exactly the sudden cliff seen in the chart. Same root cause already
+  // fixed on the Opening & Closing Balance page's contingency chart.
+  //
+  // Fix: look up both income and expense by their actual month LABEL
+  // instead of by array position -- this can never misalign regardless of
+  // how many months either underlying array actually covers.
+  const monthlyIncomeByLabel = new Map<string, number>();
+  {
+    const fullMonthlyIncome = sumMonthly(
       reportableIncomeTree.flatMap((c) =>
         c.vendors.flatMap((v) => v.items.map((it) => it.monthly)),
       ),
-    ),
-  );
-  const slicedTotals = sliceMonthly(monthlyTotals);
-  const coverage = labels.map((month, i) => ({
-    month,
-    ratio: monthlyIncome[i] > 0 ? Math.round((Number(slicedTotals[i]?.expense ?? 0) / monthlyIncome[i]) * 100) : 0,
-  }));
+    ); // aligned to months12
+    months12.forEach((label, i) => monthlyIncomeByLabel.set(label, fullMonthlyIncome[i] ?? 0));
+  }
+  const expenseByLabel = new Map<string, number>();
+  (monthlyTotals as any[]).forEach((m) => {
+    if (m?.month) expenseByLabel.set(m.month, Number(m.expense ?? 0));
+  });
+  const coverage = labels.map((month) => {
+    const income = monthlyIncomeByLabel.get(month) ?? 0;
+    const expense = expenseByLabel.get(month) ?? 0;
+    return { month, ratio: income > 0 ? Math.round((expense / income) * 100) : 0 };
+  });
 
   const irregular = rows.filter((r) => r.irregular || r.dropped);
 
