@@ -416,6 +416,23 @@ function Inner() {
     setShowAllIncome(false); setShowAllExpense(false);
   }
 
+  // UX: a single at-a-glance count of every lever currently sitting away
+  // from its standard value -- shown next to Reset so it's obvious BEFORE
+  // reading any number below whether you're looking at the standard
+  // projection or a scenario you've been experimenting with.
+  const changedLeverCount = useMemo(() => {
+    let n = 0;
+    if (maintenanceRate !== 4) n++;
+    if (collectionPct !== 90) n++;
+    if (interestPct !== 0) n++;
+    if (inflationPct !== 6) n++;
+    if (contingencyRate !== null) n++;
+    if (unknownExpense !== 0) n++;
+    n += Object.values(incomeCategoryPct).filter((v) => v !== 0).length;
+    n += Object.values(expenseCategoryPct).filter((v) => v !== 0).length;
+    return n;
+  }, [maintenanceRate, collectionPct, interestPct, inflationPct, contingencyRate, unknownExpense, incomeCategoryPct, expenseCategoryPct]);
+
   const riskLabel = risk === "high" ? "HIGH RISK" : risk === "moderate" ? "MODERATE RISK" : "LOW RISK";
   const riskClass =
     risk === "high" ? "border-rose-500/40 text-rose-600" :
@@ -440,6 +457,16 @@ function Inner() {
               ))}
             </SelectContent>
           </Select>
+          {changedLeverCount > 0 && (
+            <Badge
+              variant="outline"
+              className="h-9 px-2.5 text-[11px] border-amber-400/60 text-amber-700 bg-amber-50 flex items-center gap-1.5"
+              title="Levers currently different from their standard value -- see the amber &quot;Changed&quot; tags below"
+            >
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+              {changedLeverCount} lever{changedLeverCount === 1 ? "" : "s"} changed
+            </Badge>
+          )}
           <Button variant="outline" size="sm" className="h-9" onClick={() => setConfigOpen((v) => !v)}>
             <Settings2 className="h-3.5 w-3.5 mr-1" /> Config
           </Button>
@@ -518,20 +545,29 @@ function Inner() {
           <Card>
             <CardHeader className="py-3"><CardTitle className="text-sm">Global Assumptions</CardTitle></CardHeader>
             <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 pb-4">
-              <LeverRow label="Maintenance Rate (₹/sqft/mo)" value={maintenanceRate} onChange={setMaintenanceRate} min={2} max={10} step={0.25} display={"₹" + maintenanceRate.toFixed(2)} />
-              <LeverRow label="Maintenance Collection %" value={collectionPct} onChange={setCollectionPct} min={50} max={100} step={1} display={collectionPct + "%"} />
-              <LeverRow label="Interest on Surplus %" value={interestPct} onChange={setInterestPct} min={0} max={10} step={0.5} display={interestPct + "%"} />
-              <LeverRow label="Inflation (annual)" value={inflationPct} onChange={setInflationPct} min={0} max={15} step={0.5} display={inflationPct + "%"} />
+              <LeverRow label="Maintenance Rate (₹/sqft/mo)" value={maintenanceRate} onChange={setMaintenanceRate} min={3} max={5} step={0.05} display={"₹" + maintenanceRate.toFixed(2)} defaultValue={4} formatValue={(v) => "₹" + v.toFixed(2)} />
+              <LeverRow label="Maintenance Collection %" value={collectionPct} onChange={setCollectionPct} min={50} max={100} step={1} display={collectionPct + "%"} defaultValue={90} formatValue={(v) => v + "%"} />
+              <LeverRow label="Interest on Surplus %" value={interestPct} onChange={setInterestPct} min={0} max={10} step={0.5} display={interestPct + "%"} defaultValue={0} formatValue={(v) => v + "%"} />
+              <LeverRow label="Inflation (annual)" value={inflationPct} onChange={setInflationPct} min={0} max={15} step={0.5} display={inflationPct + "%"} defaultValue={6} formatValue={(v) => v + "%"} />
               <LeverRow
                 label="Contingency Rate (₹/sqft/mo)"
                 value={effectiveContingencyRate}
                 onChange={setContingencyRate}
                 min={0} max={5} step={0.05}
                 display={"₹" + effectiveContingencyRate.toFixed(2)}
+                defaultValue={defaultContingencyRate}
+                formatValue={(v) => "₹" + v.toFixed(2)}
                 sub={contingencyRate === null ? "Defaulted from the last month it was actually collected" : "Forecast months only -- actuals use the real recorded rate"}
               />
               <div className="space-y-1">
-                <label className="text-sm font-medium">Unknown Expense <span className="text-[10px] text-muted-foreground font-normal">(one-time, ₹)</span></label>
+                <label className="text-sm font-medium flex items-center gap-1.5">
+                  Unknown Expense <span className="text-[10px] text-muted-foreground font-normal">(one-time, ₹)</span>
+                  {unknownExpense !== 0 && (
+                    <span className="inline-flex items-center gap-1 text-[9px] font-semibold text-amber-700 bg-amber-50 border border-amber-300 rounded-full px-1.5 py-0.5" title="Standard value is ₹0">
+                      <span className="h-1.5 w-1.5 rounded-full bg-amber-500" /> Changed
+                    </span>
+                  )}
+                </label>
                 <Input type="number" value={unknownExpense} step={10000} onChange={(e) => setUnknownExpense(Number(e.target.value) || 0)} className="h-8 text-sm" />
               </div>
             </CardContent>
@@ -553,6 +589,7 @@ function Inner() {
                     value={lv.pct}
                     onChange={(v) => setIncomeCategoryPct((p) => ({ ...p, [lv.name]: v }))}
                     min={-80} max={80} step={1} display={lv.pct + "%"}
+                    defaultValue={0} formatValue={(v) => v + "%"}
                   />
                 ))}
                 {incomeLevers.length > TOP_INCOME_COUNT && (
@@ -577,6 +614,7 @@ function Inner() {
                     value={lv.pct}
                     onChange={(v) => setExpenseCategoryPct((p) => ({ ...p, [lv.name]: v }))}
                     min={-30} max={50} step={1} display={lv.pct + "%"}
+                    defaultValue={0} formatValue={(v) => v + "%"}
                   />
                 ))}
                 {expenseLevers.length > TOP_EXPENSE_COUNT && (
@@ -707,34 +745,73 @@ function Inner() {
             <div><span className="font-semibold text-foreground">No-data months:</span> {noDataMonthsCount} month{noDataMonthsCount === 1 ? "" : "s"} earlier in this FY (before real record-keeping began here) show as NO DATA, not FORECAST -- we never invent numbers for months that have already happened.</div>
           )}
           <div><span className="font-semibold text-foreground">Contingency Fund:</span> already shown as part of Closing Balance on the Opening &amp; Closing Balance page -- adjust its forecast assumption here using the Contingency Rate lever below.</div>
+          <div><span className="font-semibold text-foreground">Changed levers:</span> any lever showing an amber "Changed" tag (and the "N levers changed" badge up top) is sitting away from its standard value -- the small tick mark on its slider shows exactly where standard sits, so a surprising number is always traceable back to what you moved.</div>
         </AlertDescription>
       </Alert>
     </div>
   );
 }
 
+// UX: every lever can silently drift far from a sane value while exploring
+// this page (that's the whole point of a what-if tool) -- but nothing told
+// you WHICH levers you'd actually touched, so a debatable number (e.g. an
+// unrealistically low Income) was hard to trace back to its cause. Passing
+// defaultValue (+ optionally formatValue, for proper units) now makes every
+// lever self-report when it's been moved away from its standard value:
+// a "Changed" tag next to the label, a tick mark on the track showing
+// exactly where standard sits, and a caption spelling out the gap.
 function LeverRow({
-  label, sub, value, onChange, min, max, step, display,
+  label, sub, value, onChange, min, max, step, display, defaultValue, formatValue,
 }: {
   label: string; sub?: string; value: number; onChange: (v: number) => void;
   min: number; max: number; step: number; display: string;
+  defaultValue?: number; formatValue?: (v: number) => string;
 }) {
+  const hasDefault = defaultValue !== undefined && Number.isFinite(defaultValue);
+  const isChanged = hasDefault && Math.abs(value - (defaultValue as number)) > 1e-9;
+  const defaultPct = hasDefault ? Math.min(100, Math.max(0, ((defaultValue as number) - min) / (max - min) * 100)) : null;
+  const fmt = (v: number) => (formatValue ? formatValue(v) : String(v));
+  const delta = hasDefault ? value - (defaultValue as number) : 0;
   return (
     <div>
-      <div className="flex justify-between items-center">
-        <label className="text-sm font-medium">{label}</label>
-        <span className={"font-bold text-sm " + (value < 0 ? "text-rose-600" : value > 0 ? "text-emerald-600" : "")}>{display}</span>
+      <div className="flex justify-between items-center gap-2">
+        <label className="text-sm font-medium flex items-center gap-1.5 min-w-0">
+          <span className="truncate">{label}</span>
+          {isChanged && (
+            <span
+              className="shrink-0 inline-flex items-center gap-1 text-[9px] font-semibold text-amber-700 bg-amber-50 border border-amber-300 rounded-full px-1.5 py-0.5"
+              title={"Standard value is " + fmt(defaultValue as number)}
+            >
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-500" /> Changed
+            </span>
+          )}
+        </label>
+        <span className={"font-bold text-sm shrink-0 " + (value < 0 ? "text-rose-600" : value > 0 ? "text-emerald-600" : "")}>{display}</span>
       </div>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full h-1.5 mt-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-[#0082c9]"
-      />
+      <div className="relative mt-1.5">
+        <input
+          type="range"
+          min={min}
+          max={max}
+          step={step}
+          value={value}
+          onChange={(e) => onChange(Number(e.target.value))}
+          className="relative z-10 w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-[#0082c9]"
+        />
+        {defaultPct !== null && (
+          <div
+            className="absolute top-1/2 -translate-y-1/2 h-2.5 w-[3px] rounded-full bg-slate-500/70 dark:bg-slate-300/70 pointer-events-none"
+            style={{ left: "calc(" + defaultPct + "% - 1.5px)" }}
+            title={"Standard: " + fmt(defaultValue as number)}
+          />
+        )}
+      </div>
       {sub && <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold mt-1">{sub}</p>}
+      {isChanged && (
+        <p className="text-[10px] text-amber-700 mt-0.5">
+          Standard value is {fmt(defaultValue as number)} -- you're {delta > 0 ? fmt(Math.abs(delta)) + " above" : fmt(Math.abs(delta)) + " below"} that.
+        </p>
+      )}
     </div>
   );
 }
