@@ -12,8 +12,28 @@ function tokenHeader(): HeadersInit {
   return t ? { Authorization: `Bearer ${t}` } : {};
 }
 
+// Fires once per expired/invalid session. Several queries can hit 401 at the
+// same moment a cookie lapses (every widget on a page refetches together) --
+// only the first should actually redirect. Clears the local "signed in"
+// markers and sends the user to a real login screen with a reason the login
+// page shows as a message, instead of every dashboard silently rendering
+// empty/zero data as though there's just no data in the database yet.
+let sessionExpiredHandled = false;
+export function handleUnauthorized() {
+  if (typeof window === "undefined" || sessionExpiredHandled) return;
+  sessionExpiredHandled = true;
+  try {
+    window.localStorage.removeItem("apf.token");
+    window.localStorage.removeItem("apf.session");
+  } catch {}
+  if (!window.location.pathname.startsWith("/login")) {
+    window.location.href = "/login?reason=expired";
+  }
+}
+
 async function get<T>(path: string): Promise<T> {
   const r = await fetch(`${API}${path}`, { headers: tokenHeader() });
+  if (r.status === 401) handleUnauthorized();
   if (!r.ok) throw new Error(`${r.status} ${path}`);
   return r.json();
 }

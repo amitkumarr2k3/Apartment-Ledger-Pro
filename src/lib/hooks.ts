@@ -27,6 +27,7 @@ export function useDashboardSettings() {
     queryFn: async (): Promise<DashboardSettingRow[]> => {
       try {
         const r = await fetch("/api/admin/settings/dashboards", authHeaders());
+        if (r.status === 401) api.handleUnauthorized();
         if (!r.ok) return [];
         const rows = await r.json();
         return Array.isArray(rows) ? rows : [];
@@ -56,6 +57,7 @@ export async function saveDashboardSettings(rows: DashboardSettingRow[]): Promis
       headers: { "Content-Type": "application/json", ...(auth.headers ?? {}) },
       body: JSON.stringify(rows),
     });
+    if (r.status === 401) api.handleUnauthorized();
     return r.ok;
   } catch {
     return false;
@@ -118,6 +120,7 @@ export function useAuditedReports() {
     queryFn: async (): Promise<AuditedReport[]> => {
       try {
         const r = await fetch("/api/reports", authHeaders());
+        if (r.status === 401) api.handleUnauthorized();
         if (!r.ok) return [];
         const j = await r.json();
         return Array.isArray(j.rows) ? j.rows : [];
@@ -141,6 +144,7 @@ export async function uploadAuditedReport(fiscalYear: string, file: File): Promi
       headers: { ...(auth.headers ?? {}) },
       body: fd,
     });
+    if (r.status === 401) api.handleUnauthorized();
     return r.ok;
   } catch {
     return false;
@@ -154,6 +158,7 @@ export async function deleteAuditedReport(id: string): Promise<boolean> {
       method: "DELETE",
       headers: { ...(auth.headers ?? {}) },
     });
+    if (r.status === 401) api.handleUnauthorized();
     return r.ok;
   } catch {
     return false;
@@ -170,6 +175,7 @@ export async function fetchAuditedReportFileUrl(id: string): Promise<string | nu
   try {
     const auth = authHeaders();
     const r = await fetch(`/api/reports/${id}/file`, { headers: { ...(auth.headers ?? {}) } });
+    if (r.status === 401) api.handleUnauthorized();
     if (!r.ok) return null;
     const blob = await r.blob();
     return URL.createObjectURL(blob);
@@ -332,6 +338,7 @@ export function useIncomeTree() {
     queryFn: async () => {
       try {
         const r = await fetch("/api/income/tree", authHeaders());
+        if (r.status === 401) api.handleUnauthorized();
         if (!r.ok) return [];
         const rows: any[] = await r.json();
         return Array.isArray(rows) ? buildTree(rows) : [];
@@ -352,6 +359,7 @@ export function useExpenseTree() {
     queryFn: async () => {
       try {
         const r = await fetch("/api/expenses/tree", authHeaders());
+        if (r.status === 401) api.handleUnauthorized();
         if (!r.ok) return [];
         const rows: any[] = await r.json();
         return Array.isArray(rows) ? buildTree(rows) : [];
@@ -393,6 +401,7 @@ export function useAdminTransactions() {
         let total = Infinity;
         while (all.length < total && page <= 50) { // safety cap: 50 pages = 10,000 rows
           const r = await fetch(`/api/admin/transactions?pageSize=${pageSize}&page=${page}`, authHeaders());
+          if (r.status === 401) api.handleUnauthorized();
           if (!r.ok) throw new Error(String(r.status));
           const j = await r.json();
           const rows: any[] = Array.isArray(j.rows) ? j.rows : [];

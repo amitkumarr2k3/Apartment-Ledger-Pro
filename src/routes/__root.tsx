@@ -8,6 +8,7 @@ import {
   useNavigate,
   HeadContent,
   Scripts,
+  redirect,
 } from "@tanstack/react-router";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
@@ -179,6 +180,43 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
 }
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
+  // FIX: this is the actual fix for the "briefly see the old/protected page
+  // before bouncing to /login" flash. The auth check used to live ONLY in
+  // RouteGuard's useEffect below, which by definition cannot run until
+  // AFTER the matched route's component has already mounted and painted --
+  // so typing a protected URL directly always rendered a frame (or more) of
+  // that page's real content first. beforeLoad runs during route matching,
+  // before any component for the matched route is mounted, so a redirect
+  // thrown here means the protected page's component is never rendered on
+  // the client at all -- nothing to flash.
+  //
+  // Client-only, deliberately: getSession() reads localStorage and returns
+  // null on the server (see lib/session.ts's isBrowser() guard), so running
+  // this unguarded would make beforeLoad treat every SSR render as logged
+  // out -- including for genuinely authenticated users -- and redirect the
+  // server-rendered output to /login every time. Skipping entirely when
+  // `window` doesn't exist leaves SSR output exactly as it is today; the
+  // client-side pass (which runs immediately after, as part of hydration/
+  // routing, still well before RouteGuard's effect would have fired) is
+  // what actually prevents the flash.
+  beforeLoad: ({ location }) => {
+    if (typeof window === "undefined") return;
+    if (!AUTH_ENABLED) return;
+
+    const session = getSession();
+    const pathname = location.pathname;
+
+    if (session && pathname === "/") {
+      throw redirect({ to: session.role === "admin" ? "/admin/actions" : "/resident/overview", replace: true });
+    }
+    if (PUBLIC_PATHS.has(pathname)) return;
+    if (!session) {
+      throw redirect({ to: "/login", search: { redirect: pathname } as never, replace: true });
+    }
+    if (!canAccess(pathname, session.role)) {
+      throw redirect({ to: "/resident/overview", replace: true });
+    }
+  },
   head: () => ({
     meta: [
       { charSet: "utf-8" },

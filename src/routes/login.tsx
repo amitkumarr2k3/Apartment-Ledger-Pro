@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { z } from "zod";
 import { fallback, zodValidator } from "@tanstack/zod-adapter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,6 +15,7 @@ import { KeyRound, Mail, MailQuestion, ShieldCheck, RefreshCw, Lock, Loader2, Bu
 
 const searchSchema = z.object({
   redirect: fallback(z.string().optional(), undefined),
+  reason: fallback(z.string().optional(), undefined),
 });
 
 export const Route = createFileRoute("/login")({
@@ -101,7 +102,17 @@ function OtpBoxes({
 
 function LoginPage() {
   const navigate = useNavigate();
-  const { redirect } = useSearch({ from: "/login" });
+  const { redirect, reason } = useSearch({ from: "/login" });
+  // Shown once when an expired/invalid session bounced someone here (see
+  // handleUnauthorized() in lib/api.ts) -- previously there was no forced
+  // logout at all, so an expired session just left every dashboard the user
+  // was on silently rendering empty/zero data.
+  useEffect(() => {
+    if (reason === "expired") {
+      toast.error("Your session expired -- please sign in again.");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [mode, setMode] = useState<"password" | "otp">("otp");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
