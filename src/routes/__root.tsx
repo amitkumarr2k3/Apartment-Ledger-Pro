@@ -148,6 +148,13 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
     reportLovableError(error, { boundary: "tanstack_root_error_component" });
   }, [error]);
 
+  // A failed dynamic import of a route's JS chunk (stale build, see the
+  // vite:preloadError handler in RootComponent) surfaces here as a plain
+  // Error whose message names the missing module. router.invalidate() alone
+  // cannot fix this -- it re-runs data loaders, not the JS module fetch --
+  // so "Try again" would otherwise fail forever until a real reload happens.
+  const isStaleChunkError = /failed to fetch dynamically imported module|error loading dynamically imported module|importing a module script failed/i.test(error?.message || "");
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
@@ -155,11 +162,17 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
           This page didn't load
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Something went wrong on our end. You can try refreshing or head back home.
+          {isStaleChunkError
+            ? "A newer version of this app was just deployed. Reloading will fix this."
+            : "Something went wrong on our end. You can try refreshing or head back home."}
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
             onClick={() => {
+              if (isStaleChunkError) {
+                window.location.reload();
+                return;
+              }
               router.invalidate();
               reset();
             }}
@@ -263,6 +276,23 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+
+  // FIX: "Page did not load" / a 404 on /assets/<route>-<hash>.js is a
+  // stale-deploy artifact, not an app bug -- it happens whenever a browser
+  // tab is left open across a new deploy (every rebuild gives JS chunks new
+  // content hashes, so the tab's in-memory reference to e.g.
+  // "login-DGbGF36r.js" stops existing on the server the moment a newer
+  // build replaces it with a different hash). Vite fires "vite:preloadError"
+  // on exactly this failure; reloading picks up the current build's correct
+  // filenames and the navigation the user was already trying to make
+  // completes normally on its own -- no visible error for most users.
+  useEffect(() => {
+    const onPreloadError = () => {
+      window.location.reload();
+    };
+    window.addEventListener("vite:preloadError", onPreloadError);
+    return () => window.removeEventListener("vite:preloadError", onPreloadError);
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>
