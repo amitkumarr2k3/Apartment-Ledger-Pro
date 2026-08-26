@@ -245,28 +245,64 @@ for file in Path(INPUT_DIR).glob("*.xls*"):
             fy
         )
 
-        if not m:
-            print(
-                f"Skipping {file.name}: could not find 'Financial Year' header"
+        if m:
+            start_year = int(m.group(1))
+            end_year = int(m.group(2))
+        else:
+            # FIX: some report exports (e.g. the FY2025-26 ones) start
+            # directly at the ledger/month header row with no "Financial
+            # Year" title block above it at all -- there is nothing in the
+            # sheet content to find. Fall back to parsing the fiscal year
+            # straight out of the FILENAME instead, which consistently
+            # follows the "FY<yyyy>-<yy>" convention across every report
+            # (e.g. "FY2025-26 Expense Report.xls").
+            fname_m = re.search(
+                r"FY\s*(\d{4})[\s\-]+(\d{2,4})",
+                file.name,
+                re.IGNORECASE,
             )
-            continue
 
-        start_year = int(m.group(1))
-        end_year = int(m.group(2))
+            if fname_m:
+                start_year = int(fname_m.group(1))
+                end_part = fname_m.group(2)
+                end_year = (
+                    int(end_part)
+                    if len(end_part) == 4
+                    else int(str(start_year)[:2] + end_part)
+                )
+            else:
+                print(
+                    f"Skipping {file.name}: could not find 'Financial Year' "
+                    f"header in the sheet, or parse an FY<yyyy>-<yy> pattern "
+                    f"from the filename"
+                )
+                continue
+
+        # FIX: previously only recognised a header row that literally
+        # contained "April" -- i.e. assumed every report always starts its
+        # column headers at the beginning of the fiscal year. That's wrong
+        # for a partial-year report like FY2025-26, where real record-
+        # keeping only began in October -- its header row is
+        # "Ledgers, October, November, ..., March" and never contains
+        # "April" at all, so it was being skipped entirely even though it's
+        # perfectly valid data. Detect the header row by matching ANY of the
+        # 12 month names instead, so it works no matter which month the
+        # columns actually start from.
+        month_names = set(months.keys())
 
         hdr = next(
             (
                 i
                 for i, r in raw.iterrows()
-                if "April"
-                in [str(x) for x in r.values]
+                if month_names & {str(x) for x in r.values}
             ),
             None
         )
 
         if hdr is None:
             print(
-                f"Skipping {file.name}: could not find header row containing 'April'"
+                f"Skipping {file.name}: could not find a header row "
+                f"containing any recognised month name"
             )
             continue
 

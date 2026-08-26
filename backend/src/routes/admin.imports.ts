@@ -17,7 +17,12 @@ export async function routes(app: FastifyInstance) {
     const { rows } = await pool.query(
       `SELECT b.id, b.filename, b.kind, b.uploaded_by, b.row_count, b.status, b.created_at,
               u.email AS uploader_email,
-              (SELECT COUNT(*)::int FROM import_staging s WHERE s.batch_id=b.id AND s.error IS NULL) AS committed
+              (SELECT COUNT(*)::int FROM import_staging s WHERE s.batch_id=b.id AND s.error IS NULL) AS committed,
+              -- Rows that were correctly recognised as duplicates (ON CONFLICT
+              -- DO NOTHING) and explicitly flagged as such -- see commitTransactionRow.
+              -- Without this, "Committed" alone can't be told apart from "rows
+              -- that silently didn't insert because they already existed."
+              (SELECT COUNT(*)::int FROM import_staging s WHERE s.batch_id=b.id AND s.error LIKE 'DUPLICATE:%') AS duplicate_count
        FROM import_batches b
        LEFT JOIN users u ON u.id = b.uploaded_by
        WHERE b.community_id=$1
@@ -43,7 +48,7 @@ export async function routes(app: FastifyInstance) {
       [p.cid, file.filename, kind, p.sub, rows.length],
     );
     const batchId = batch.rows[0].id;
-    let inserted = 0, failed = 0;
+    let inserted = 0, duplicate = 0, failed = 0;
     await withTx(async (c) => {
       for (let i = 0; i < rows.length; i++) {
         const raw = rows[i];
@@ -55,8 +60,9 @@ export async function routes(app: FastifyInstance) {
             `INSERT INTO import_staging (batch_id, row_no, raw_json) VALUES ($1,$2,$3)`,
             [batchId, i + 1, raw],
           );
+          let dupInfo: { inserted: boolean; sourceRef: string } | null = null;
           if (kind === "transactions") {
-            await commitTransactionRow(c, p.cid, raw);
+            dupInfo = await commitTransactionRow(c, p.cid, raw);
           } else if (kind === "vendors") {
             await c.query(
               `INSERT INTO vendors (community_id, name, kind) VALUES ($1,$2,COALESCE($3::vendor_kind,'company'::vendor_kind))
@@ -70,8 +76,22 @@ export async function routes(app: FastifyInstance) {
               [String(raw.email).toLowerCase(), p.cid, raw.name ?? null, p.email],
             );
           }
+          if (dupInfo && !dupInfo.inserted) {
+            // Genuinely a duplicate, not a failure -- but previously this
+            // was indistinguishable from a real insert (no error, no log).
+            // Recording it explicitly here is what makes "Committed" in the
+            // history list finally mean "actually inserted," and gives you
+            // something to search for when a count looks off, instead of
+            // nothing at all.
+            duplicate++;
+            await c.query(
+              `UPDATE import_staging SET error=$1 WHERE batch_id=$2 AND row_no=$3`,
+              [`DUPLICATE: identical transaction already exists (source_ref=${dupInfo.sourceRef})`, batchId, i + 1],
+            );
+          } else {
+            inserted++;
+          }
           await c.query("RELEASE SAVEPOINT row_sp");
-          inserted++;
         } catch (e: any) {
           failed++;
           await c.query("ROLLBACK TO SAVEPOINT row_sp");
@@ -101,12 +121,12 @@ export async function routes(app: FastifyInstance) {
       await audit({
         communityId: p.cid, actorUserId: p.sub, actorEmail: p.email,
         entity: "import_batch", entityId: batchId, action: "import",
-        after: { kind, filename: file.filename, rows: rows.length, inserted, failed },
+        after: { kind, filename: file.filename, rows: rows.length, inserted, duplicate, failed },
         ip: req.ip, userAgent: req.headers["user-agent"] ?? null,
       }, c);
     });
     if (kind === "transactions") await refreshRollups();
-    return reply.send({ batchId, rows: rows.length, inserted, failed });
+    return reply.send({ batchId, rows: rows.length, inserted, duplicate, failed });
   });
 
 
@@ -130,12 +150,13 @@ export async function routes(app: FastifyInstance) {
       `SELECT row_no, raw_json FROM import_staging WHERE batch_id=$1 ORDER BY row_no`, [batchId],
     );
 
-    let inserted = 0, failed = 0;
+    let inserted = 0, duplicate = 0, failed = 0;
     await withTx(async (c) => {
       for (const s of staged.rows) {
         try {
+          let dupInfo: { inserted: boolean; sourceRef: string } | null = null;
           if (kind === "transactions") {
-            await commitTransactionRow(c, p.cid, s.raw_json);
+            dupInfo = await commitTransactionRow(c, p.cid, s.raw_json);
           } else if (kind === "vendors") {
             await c.query(
               `INSERT INTO vendors (community_id, name, kind) VALUES ($1,$2,COALESCE($3::vendor_kind,'company'::vendor_kind))
@@ -149,7 +170,17 @@ export async function routes(app: FastifyInstance) {
               [String(s.raw_json.email).toLowerCase(), p.cid, s.raw_json.name ?? null, p.email],
             );
           }
-          inserted++;
+          if (dupInfo && !dupInfo.inserted) {
+            // Same fix as the /:kind upload path above: ON CONFLICT DO
+            // NOTHING is silent, so without this the "Committed" count
+            // would again include rows that never actually landed in
+            // transactions.
+            duplicate++;
+            await c.query(`UPDATE import_staging SET error=$1 WHERE batch_id=$2 AND row_no=$3`,
+              [`DUPLICATE: identical transaction already exists (source_ref=${dupInfo.sourceRef})`, batchId, s.row_no]);
+          } else {
+            inserted++;
+          }
         } catch (e: any) {
           failed++;
           await c.query(`UPDATE import_staging SET error=$1 WHERE batch_id=$2 AND row_no=$3`,
@@ -159,10 +190,10 @@ export async function routes(app: FastifyInstance) {
       await c.query(`UPDATE import_batches SET status='committed' WHERE id=$1`, [batchId]);
       await audit({ communityId: p.cid, actorUserId: p.sub, actorEmail: p.email,
         entity: "import_batch", entityId: batchId, action: "import",
-        after: { kind, inserted, failed } }, c);
+        after: { kind, inserted, duplicate, failed } }, c);
     });
     if (kind === "transactions") await refreshRollups();
-    return { inserted, failed };
+    return { inserted, duplicate, failed };
   });
 }
 
@@ -201,15 +232,22 @@ async function commitTransactionRow(c: any, communityId: string, r: any) {
     flatId = f.rows[0]?.id ?? null;
   }
   const amountPaise = Math.round(Number(r.amount) * 100);
-  await c.query(
+  const sourceRef = r.source_ref || `${r.date}|${r.category}|${r.vendor||""}|${r.line_item||""}|${amountPaise}`;
+  // FIX: ON CONFLICT DO NOTHING silently no-ops on a duplicate source_ref --
+  // that's correct behaviour (idempotent re-import), but the caller used to
+  // have no way to tell "genuinely inserted" apart from "already existed,
+  // skipped" -- both looked like success, since neither throws. Checking
+  // rowCount is the only way to know which one actually happened.
+  const insertResult = await c.query(
     `INSERT INTO transactions
      (community_id, txn_date, period_month, head_id, category_id, vendor_id, line_item_id,
       flat_id, amount_paise, direction, source, source_ref)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'csv',$11)
      ON CONFLICT (source, source_ref) DO NOTHING`,
     [communityId, r.date, period, head, cat, vendorId, lineItemId,
-     flatId, amountPaise, r.direction, r.source_ref || `${r.date}|${r.category}|${r.vendor||""}|${r.line_item||""}|${amountPaise}`],
+     flatId, amountPaise, r.direction, sourceRef],
   );
+  return { inserted: (insertResult.rowCount ?? 0) > 0, sourceRef };
 }
 
 async function upsert(c: any, sql: string, params: any[]): Promise<string> {

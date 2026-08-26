@@ -136,6 +136,7 @@ async function fetchImportHistory(): Promise<ImportBatch[]> {
     uploadedAt: String(b.created_at).replace("T", " ").slice(0, 16),
     rows: Number(b.row_count ?? 0),
     committed: Number(b.committed ?? 0),
+    duplicate: Number(b.duplicate_count ?? 0),
     status: (b.status ?? "staged") as ImportBatch["status"],
   }));
 }
@@ -227,7 +228,8 @@ function Page() {
       const j = await r.json();
       toast.success(
         `Imported ${j.inserted}/${j.rows} row${j.rows === 1 ? "" : "s"}` +
-        (j.failed ? ` (${j.failed} skipped)` : ""),
+        (j.duplicate ? ` -- ${j.duplicate} already existed (skipped, not duplicated)` : "") +
+        (j.failed ? ` -- ${j.failed} failed` : ""),
       );
       setStep("upload"); setFile(""); setPickedFile(null); setRawRows([]); setMapping({});
       await qc.invalidateQueries({ queryKey: ["import-history"] });
@@ -434,6 +436,7 @@ function Page() {
                       <TableHead>When</TableHead>
                       <TableHead className="text-right">Rows</TableHead>
                       <TableHead className="text-right">Committed</TableHead>
+                      <TableHead className="text-right">Duplicate</TableHead>
                       <TableHead>Status</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -447,6 +450,7 @@ function Page() {
                         <TableCell className="text-xs">{b.uploadedAt}</TableCell>
                         <TableCell className="text-right font-mono">{b.rows}</TableCell>
                         <TableCell className="text-right font-mono">{b.committed}</TableCell>
+                        <TableCell className="text-right font-mono text-muted-foreground">{b.duplicate || "—"}</TableCell>
                         <TableCell>
                           <Badge variant="outline" className={statusColor[b.status]}>
                             {b.status === "failed" && <AlertTriangle className="h-3 w-3 mr-1" />}

@@ -56,6 +56,7 @@ expense_categories:
     - HK Materials
     - Repair Work
     - Tank Cleaning Charges
+    - MST Salary
 
   Housekeeping:
     - Garbage removal
@@ -71,8 +72,9 @@ expense_categories:
 
   Office Supplies:
     - Amazon Purchase
-    - Tools & Stationary
-    - One Time Operational Procurement
+
+  Software & Subscriptions:
+    - Claude Subscription
 
   Professional Services:
     - Chartered Accountant
@@ -86,8 +88,8 @@ expense_categories:
     - Petty Cash - Electricals
     - Petty Cash - Hardware
     - Petty Cash - Office Supplies
-
-  Events:
+    - Tools & Stationary
+    - One Time Operational Procurement
     - Petty Cash - Cultural Event
 
 
@@ -108,6 +110,9 @@ income_categories:
 
   Advertisement:
     - Lift Advertisement
+    - Digital Display
+    - Standees
+    - Umbrella or Kiosk
 
   Penalties:
     - Late Payment Fine
@@ -166,6 +171,7 @@ vendor_groups:
     - HK Materials
     - Repair Work
     - Tank Cleaning Charges
+    - MST Salary
 
 
 vendors:
@@ -286,6 +292,10 @@ vendors:
     vendor: System Adjustment
     vendor_kind: system
 
+  Claude Subscription:
+    vendor: Anthropic
+    vendor_kind: company
+
 
   # -------------------
   # Income Vendors
@@ -308,6 +318,18 @@ vendors:
     vendor_kind: internal
 
   Lift Advertisement:
+    vendor: Advertising Revenue
+    vendor_kind: income_stream
+
+  Digital Display:
+    vendor: Advertising Revenue
+    vendor_kind: income_stream
+
+  Standees:
+    vendor: Advertising Revenue
+    vendor_kind: income_stream
+
+  Umbrella or Kiosk:
     vendor: Advertising Revenue
     vendor_kind: income_stream
 

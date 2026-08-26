@@ -439,12 +439,17 @@ export type ImportBatch = {
   uploadedAt: string;
   rows: number;
   committed: number;
+  // FIX: "committed" alone can't distinguish "genuinely inserted" from "row
+  // was a duplicate, correctly skipped via ON CONFLICT DO NOTHING, but that
+  // silence used to leave zero trace." This is now tracked and shown
+  // separately in the Import History table.
+  duplicate: number;
   status: "staged" | "committed" | "failed" | "partial";
 };
 
 export const seedImports: ImportBatch[] = [
-  { id: "IMP-91", filename: "tally-export-jul26.csv", kind: "transactions", uploadedBy: "rahul.mehta@example.com",   uploadedAt: "2026-07-13 10:45", rows: 214, committed: 208, status: "partial"   },
-  { id: "IMP-90", filename: "vendors-master.csv",     kind: "vendors",      uploadedBy: "system",                     uploadedAt: "2026-07-09 11:03", rows:  12, committed:  12, status: "committed" },
-  { id: "IMP-89", filename: "residents-2026.csv",     kind: "residents",    uploadedBy: "rahul.mehta@example.com",   uploadedAt: "2026-06-30 17:20", rows:  84, committed:  84, status: "committed" },
-  { id: "IMP-88", filename: "collections-may26.xlsx.csv", kind: "transactions", uploadedBy: "anita.kulkarni@example.com", uploadedAt: "2026-06-05 09:12", rows: 128, committed: 0,   status: "failed"    },
+  { id: "IMP-91", filename: "tally-export-jul26.csv", kind: "transactions", uploadedBy: "rahul.mehta@example.com",   uploadedAt: "2026-07-13 10:45", rows: 214, committed: 208, duplicate: 0, status: "partial"   },
+  { id: "IMP-90", filename: "vendors-master.csv",     kind: "vendors",      uploadedBy: "system",                     uploadedAt: "2026-07-09 11:03", rows:  12, committed:  12, duplicate: 0, status: "committed" },
+  { id: "IMP-89", filename: "residents-2026.csv",     kind: "residents",    uploadedBy: "rahul.mehta@example.com",   uploadedAt: "2026-06-30 17:20", rows:  84, committed:  84, duplicate: 0, status: "committed" },
+  { id: "IMP-88", filename: "collections-may26.xlsx.csv", kind: "transactions", uploadedBy: "anita.kulkarni@example.com", uploadedAt: "2026-06-05 09:12", rows: 128, committed: 0,   duplicate: 0, status: "failed"    },
 ];
