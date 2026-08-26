@@ -55,6 +55,11 @@ services:
       CORS_ORIGIN: ${CORS_ORIGIN}
       # Once you have a real domain + TLS terminating at nginx, set COOKIE_SECURE=true in your .env and restart — otherwise the cookie stays sendable over HTTP too, which defeats part of the point of Secure once you actually have HTTPS available.
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      # -- AI Assistant ("Munshi") --
+      # Free key: https://aistudio.google.com/apikey -- set the real value in
+      # your .env file (same pattern as SMTP_USER/SMTP_PASS below), never
+      # commit it directly into this file.
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
       # ── Email / OTP ────────────────────────────────────────────────────────
       # Choose provider: gmail (default), resend, or mailhog
       EMAIL_PROVIDER: gmail

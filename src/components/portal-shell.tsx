@@ -17,210 +17,34 @@ import { Home, BarChart3, Table2, Menu, ChevronLeft, LogOut, UserCircle2, HelpCi
 // ─── Period context ──────────────────────────────────────────────────────
 
 // —————————————————————————————————————————————————————————————————————————————————————
-// Help Chat (BETA)
-// Answer priority, highest first: ROUTE_MAP ("where can I find X"), then CURATED
-// (page-aware exact UI terms), then HELP_* (generic, auto-derived from the guides).
-// Matching uses normalizeWords()+stem() so plurals/typos still hit, instead of
-// brittle raw substring checks.
+// Help Chat (BETA) -- "Munshi"
+// Answers now come from a real backend call (POST /api/assistant/ask), which
+// grounds a Gemini call in the actual user manual content for whatever page
+// the visitor is currently on. Previously this was a fully local, hand-
+// written keyword-matching engine (kept working, but could only answer
+// questions whose exact phrasing had been anticipated, and could confidently
+// return a WRONG answer if an unrelated FAQ entry shared one common word
+// with the question).
 // Persistence: chat history, open state, and minimized state live in sessionStorage
 // so they survive a route change -- PortalShell fully remounts on navigation.
 // History is explicitly cleared when the user clicks X to close -- persists until
 // closed, not forever.
 // —————————————————————————————————————————————————————————————————————————————————————
-type HelpEntry = { keywords: string[]; answer: string };
-type CuratedEntry = { keywords: string[]; answer: string; contexts?: string[] };
-type RouteEntry = { keywords: string[]; page: string; to: string; description: string };
+// FIX: replaced the entire hand-written keyword-matching engine (HELP_*,
+// CURATED, ROUTE_MAP, tokenScore, getBotAnswer, ~25KB of it) with a real
+// backend call to /api/assistant/ask, which uses Gemini plus the actual
+// user manual content as grounding. The old approach could only ever answer
+// questions whose exact phrasing had been anticipated in advance, and could
+// silently return a confidently WRONG answer when an unrelated FAQ entry
+// happened to share one common word with the question. See handleSend()
+// below for the new client-side call.
+//
+// ChatLink/ChatMessage are kept -- the message-bubble UI still supports an
+// optional "Go to <page> ->" link on a bot reply, in case the backend ever
+// wants to suggest one alongside its answer (it doesn't yet; /api/assistant/
+// ask currently only returns { answer }, so link is always undefined today).
 type ChatLink = { to: string; label: string };
 type ChatMessage = { role: "bot" | "user"; text: string; link?: ChatLink };
-
-const HELP_COMMON: HelpEntry[] = [
-  { keywords: ["all", "time", "badge", "dashed"], answer: "The 'All-Time' badge (dashed border, light grey background) means that card always shows the complete picture from day one until today. Changing the date filter at the top will NOT change these numbers -- every other card responds to whatever date range you've picked." },
-  { keywords: ["arrow", "blue", "corner", "clickable"], answer: "The small blue arrow in the corner of a card means it's clickable -- tap or click it to jump into a detailed, line-by-line breakdown of that number." },
-  { keywords: ["filter", "date", "period", "range"], answer: "Use the period dropdown at the top of the page to change the reporting range (e.g. Last 3 months, current fiscal year). Most charts, tables and cards update automatically -- except any card marked 'All-Time'." },
-  { keywords: ["export", "print", "pdf"], answer: "Most dashboard pages support printing/exporting via your browser's print dialog (Ctrl/Cmd+P) -- the layout switches to a clean print-friendly header automatically." },
-  { keywords: ["otp", "login", "password"], answer: "Residents sign in with a one-time code (OTP) emailed to their registered address. Only the Super Admin account uses a traditional email + password login." },
-  { keywords: ["superadmin", "admin", "role", "roles"], answer: "There are three roles: Resident (view-only, own flat data), Admin (sees all Admin Dashboards but not Controls), and Super Admin (full access including Transactions CRUD, Residents & Whitelist, Dashboard Controls, and Audit Trail)." },
-];
-
-// Precise, page-aware answers for concrete UI terms. `contexts`, when present,
-// restricts the entry to specific currentView labels so the same word, such as
-// "preview", can mean different things on different pages without colliding.
-const CURATED: CuratedEntry[] = [
-  { keywords: ["vendor", "rank", "ranking"], contexts: ["Vendor Insights"],
-     answer: "Vendor ranking lists every vendor sorted by total spend for the selected period. The 'Period change' column shows how much that vendor's spend moved versus the prior period -- rows are flagged when it's more than +20%. Click Preview for a quick chart without leaving the page, or Drill to open the full category to vendor to line-item breakdown." },
-  { keywords: ["top", "vendors", "concentration"], contexts: ["Vendor Insights"],
-     answer: "This callout shows how concentrated your spend is -- e.g. 'Top 3 vendors make up 85% of total spend' means most of the budget flows through just a handful of vendors, useful to know for negotiation leverage or over-reliance risk." },
-  { keywords: ["preview"], contexts: ["Vendor Insights", "Cost Alerts & Trends", "Action Needed"],
-     answer: "Preview opens a quick chart or detail panel for that specific row right on this page -- no navigation needed. Use Drill instead if you want the full breakdown on the Head Drill-down page." },
-  { keywords: ["preview"], contexts: ["CSV Imports"],
-     answer: "During a CSV import, Preview shows exactly what will be written before anything is saved -- your file is read and checked entirely in your browser; nothing touches the database until you explicitly click Commit." },
-  { keywords: ["drill"], contexts: ["Vendor Insights", "Cost Alerts & Trends", "Action Needed"],
-     answer: "Drill takes you straight to the Head Drill-down page, pre-filtered to that category or vendor, so you can see every underlying line item." },
-  { keywords: ["monthly", "trend", "steady", "rise", "pattern"], contexts: ["Vendor Insights"],
-     answer: "A vendor's monthly trend chart plots that vendor's spend month by month, so you can visually spot a steady rise, a one-off spike, or a seasonal pattern rather than just reading a single total-spend number." },
-  { keywords: ["line", "items", "breakdown"], contexts: ["Vendor Insights"],
-     answer: "Line items lists every individual expense entry that makes up a vendor's total spend -- e.g. Security Guards Salary, Housekeeping, Management Fee -- so you can see exactly what you're paying that vendor for." },
-  { keywords: ["period", "change"],
-     answer: "Period change is the percentage difference between this period's value and the prior period for that same row -- rows are flagged when the increase exceeds the threshold (usually +20%)." },
-  { keywords: ["flagged", "flag"],
-     answer: "Flagged rows are ones whose spend changed by more than the threshold (usually +20%) compared to the prior period -- worth a closer look before approving next month's budget." },
-  { keywords: ["cumulative", "movement"], contexts: ["Collections"],
-     answer: "Cumulative net movement is a running total of collections minus expenses across the whole period, so you can see whether the society's overall cash position is trending up or down -- not just a single month's number." },
-  { keywords: ["quarterly", "pattern"], contexts: ["Collections"],
-     answer: "Quarterly pattern groups the monthly figures into quarters, which makes seasonal pressure, such as spikes around certain months, easier to spot than scrolling through 12 separate months." },
-  { keywords: ["actual", "expected", "monthly", "collection"], contexts: ["Collections"],
-     answer: "This chart compares Actual Collection (green) against Expense (orange) each month, with a dashed line marking Expected Collection -- the target derived from the per-sqft maintenance rate. If the green bar falls short of the dashed line, that month collected less than expected." },
-  { keywords: ["collection", "performance", "target"],
-     answer: "Collection performance vs target compares what was actually collected against the expected amount, which is calculated from the per-sqft maintenance rate. A negative percentage means the society collected less than expected for that period." },
-  { keywords: ["expected", "collection"],
-     answer: "Expected Collection is the target amount the society should collect for the period, calculated from the per-sqft maintenance rate multiplied by the total billable area." },
-  { keywords: ["steady", "irregular", "dropped"],
-     answer: "These badges describe how consistently an income source is received: Steady = recorded every month in range, Irregular = present in some months but not others, Dropped = zero for the last 3 consecutive months after being active before." },
-  { keywords: ["outstanding", "dues"],
-     answer: "Outstanding Dues is an All-Time figure -- the total maintenance still owed by residents across the entire history of the society, not just the selected period." },
-  { keywords: ["audited", "report"],
-     answer: "The Audited Report card links to the society's official, professionally audited financial statement for the year -- a PDF prepared and signed off by an independent chartered accountant." },
-  { keywords: ["collected", "maintenance"],
-     answer: "Collected Maintenance shows how much maintenance money has actually been received from residents so far for the selected period, as opposed to Expected Collection which is the target." },
-  { keywords: ["other", "income"],
-     answer: "Other Income covers everything besides maintenance dues -- e.g. clubhouse rent, parking charges, event income -- kept separate so you can see how reliant the society is on maintenance alone." },
-  { keywords: ["total", "income"],
-     answer: "Total Income is Maintenance Collections plus Other Income combined for the selected period." },
-  { keywords: ["net", "surplus", "deficit", "operating"],
-     answer: "Net Operating Surplus/Deficit is Total Income minus Total Expense for the period -- shown in green as 'Positive' when the society saved money, or in red as a deficit when expenses exceeded income." },
-  { keywords: ["commit", "import", "csv", "template", "mapping", "step"], contexts: ["CSV Imports"],
-     answer: "CSV import is a 4-step, cautious process: choose what you're importing, Transactions, Residents, or Vendors, each with its own required column format, choose your file and map columns if needed, Preview -- checked entirely in your browser, nothing saved yet, then explicitly click Commit to write it to the database. You can back out at any step before Commit." },
-  { keywords: ["etl", "session", "provider"], contexts: ["ETL Integration"],
-     answer: "ETL Integration tracks automated data-sync sessions from connected external providers, separate from manual CSV uploads -- useful for auditing when and how data last refreshed automatically." },
-];
-
-const HELP_RESIDENT: HelpEntry[] = [
-  { keywords: ["collected", "maintenance", "unpaid", "maintenance", "recovery", "rate", "months", "dues"], answer: "Four headline figures for the selected period, giving you the summary before you look at the month-by-month detail in the two charts below. 📊 Collected vs unpaid maintenance Shows, month by month: how much maintenance was collected (green bars), how much remained unpaid (red bars), and the Expected Collection target (dashed line) — a clean, currency-only view of whether the society is hitting its per-square-foot…" },
-  { keywords: ["little", "blue", "arrow", "corner", "card"], answer: "If you see a small circular arrow tucked into the corner of a card, that card is clickable — tap or click it to jump straight into a detailed, line-by-line breakdown of that number. 🏠 Overview Your one-page summary — if you only ever look at one screen, make it this one. 📄 Audited Report The society's official, professionally audited financial report for the year, prepared by an independent chartered accountant." },
-  { keywords: ["surplus", "months", "deficit", "months"], answer: "Out of all the months in your selected range, how many months did the society end up saving money (Surplus), and how many months did it spend more than it earned (Deficit)? Collection performance vs target Compares actual maintenance collected against the Expected Collection target, shown as a percentage difference. A number like \"−7.9%\" means collection came in just under 8% short of the target for that period." },
-  { keywords: ["closing", "balance"], answer: "Opening Balance plus Net Movement — the society's cash position at the end of your selected period. This becomes next period's Opening Balance. Months of expense covered A simple \"safety cushion\" indicator: if the society stopped collecting any income today, how many months could it keep paying its regular expenses using only the money it currently has? A higher number means a stronger financial safety net." },
-  { keywords: ["monthly", "contingency", "fund", "collection"], answer: "Tracks how much was added to the emergency reserve each month (bars) and the running total built up over time (line) — the same reserve referenced in the Contingency Cash card on Overview. 🔍 Head Drill-down The \"zoom in\" page — follow any number all the way down to the smallest transaction. How to use this page Start by choosing Expense or Income . From there, simply keep clicking to go deeper: Category." },
-  { keywords: ["expense", "income", "ratio"], answer: "What percentage of income has been spent, for your selected period. A colored bar and label (Healthy / Caution / Over Budget) give you an instant read on whether spending is under control. 📊 Top 5 charts (expense categories, income sources, vendors) Three quick-glance charts showing the society's biggest expense categories, its top income sources (excluding maintenance), and the vendors paid the most." },
-  { keywords: ["opening", "balance"], answer: "How this is calculated: the starting amount recorded when the society first began tracking finances digitally, plus every rupee saved (income minus expenses) from that date up to the start of whichever period you're viewing. A small badge next to this figure tells you whether it's a real, confirmed starting figure or our best estimate (see the note just below the balance strip for details)." },
-  { keywords: ["expense", "income"], answer: "A compact summary card showing total income, total expense, and whether the period ended in Surplus or Deficit — the same calculation used everywhere else on the dashboard. Collected Maintenance / Unpaid Maintenance / Recovery Rate / Months with Dues Four headline figures for the selected period, giving you the summary before you look at the month-by-month detail in the two charts below." },
-  { keywords: ["contingency", "reserve", "within", "closing", "balance"], answer: "Just like on the Overview page, this shows what portion of the Closing Balance is the ring-fenced emergency reserve versus money that's freely available for regular society operations. 📋 Month-by-month continuity table A transparent, line-by-line ledger: for every month, Opening + Income − Expense = Closing, and that Closing amount automatically becomes the next month's Opening." },
-  { keywords: ["use", "page"], answer: "Start by choosing Expense or Income . From there, simply keep clicking to go deeper: Category (e.g. \"Utilities\") → Vendor (e.g. \"BESCOM\") → Line Item (the individual transaction). Every list is sorted from largest amount to smallest, so the biggest numbers are always at the top, easiest to spot. Use the breadcrumb trail at the top of the page to jump back up a level at any time." },
-  { keywords: ["corpus", "interest", "accumulated", "all", "time"], answer: "All-Time The society's long-term savings fund (sometimes called a \"sinking fund\") — money set aside over the years for major future repairs, like repainting the building or replacing lifts. Contingency Cash All-Time Click for trend A small portion of every resident's maintenance payment is deliberately set aside as an emergency reserve, separate from day-to-day operating funds." },
-  { keywords: ["total", "expense"], answer: "Click for details Everything the society spent during the period — staff salaries, electricity, water, housekeeping, repairs, and more. Click to see the full breakdown. Net Operating Surplus Total Income minus Total Expense. Shown in green with \"Positive\" when the society saved money during the period; shown in red as \"Net Operating Deficit\" if it spent more than it earned." },
-  { keywords: ["contingency", "cash", "all", "time", "trend"], answer: "All-Time Click for trend A small portion of every resident's maintenance payment is deliberately set aside as an emergency reserve, separate from day-to-day operating funds. Important: this money is not extra cash on top of the Bank Balance — it's already included inside it, just ring-fenced for emergencies. Click this card to see how the reserve has grown month by month." },
-  { keywords: ["recovery", "rate", "trend"], answer: "Shown as its own dedicated chart, right next to the collection chart: what percentage of due maintenance was actually recovered, month by month, compared against a 90% \"healthy\" benchmark line. Keeping this separate from the currency chart above makes both easier to read at a glance. 🏦 Opening & Closing Balance Think of this page as the society's running bank passbook." },
-];
-
-const HELP_ADMIN: HelpEntry[] = [
-  { keywords: ["category", "trend", "dropdown", "pick", "any", "category"], answer: "Pick any expense category from the dropdown to see its full monthly spend history as bars, with a smooth 3-month moving-average line overlaid — useful for telling apart \"one unusual month\" from \"a genuine upward trend.\" Month-over-month change table Every expense category, colour-coded at a glance: green means spend went down since last period, amber means it moved within ±15%, and red flags a rise of more than 15%." },
-  { keywords: ["upload", "map", "preview", "commit"], answer: "A deliberately cautious, four-step process. Your file is read and checked entirely in your browser — nothing is written to the database until you explicitly click Commit on the final step, so you can always back out if something looks wrong. Step 1 — What are you importing? Choose Transactions (Expense + Income + Reference), Residents, or Vendors — each has its own required column format. Then choose your CSV file." },
-  { keywords: ["preview", "resident", "save", "changes"], answer: "Click Preview as resident on any dashboard card to see exactly what a resident would see with your current toggle settings, before committing to anything. Changes only take effect the next time a resident loads the app — someone already viewing the dashboard in another tab won't see things disappear live. Don't forget to click Save changes at the top — toggling switches alone doesn't persist anything until you do." },
-  { keywords: ["collected", "maintenance", "unpaid", "maintenance", "recovery", "rate", "months", "dues"], answer: "Four headline figures for the selected period, giving you the summary before you look at the month-by-month detail in the two charts below. 📊 Collected vs unpaid maintenance Shows, month by month: how much maintenance was collected (green bars), how much remained unpaid (red bars), and the Expected Collection target (dashed line) — a clean, currency-only view of whether the society is hitting its per-square-foot…" },
-  { keywords: ["surplus", "months", "deficit", "months"], answer: "Out of all the months in your selected range, how many months did the society end up saving money (Surplus), and how many months did it spend more than it earned (Deficit)? Collection performance vs target Compares actual maintenance collected against the Expected Collection target, shown as a percentage difference. A number like \"−7.9%\" means collection came in just under 8% short of the target for that period." },
-  { keywords: ["why", "head", "drill", "down", "has", "whole", "page", "toggle"], answer: "That page is one continuous flow (Category → Vendor → Line item, each screen replacing the last), so individual sections can't be hidden without breaking the navigation itself — it's an all-or-nothing page by design. \"Preview as resident\" and \"Save changes\" Click Preview as resident on any dashboard card to see exactly what a resident would see with your current toggle settings, before committing to anything." },
-  { keywords: ["closing", "balance"], answer: "Opening Balance plus Net Movement — the society's cash position at the end of your selected period. This becomes next period's Opening Balance. Months of expense covered A simple \"safety cushion\" indicator: if the society stopped collecting any income today, how many months could it keep paying its regular expenses using only the money it currently has? A higher number means a stronger financial safety net." },
-  { keywords: ["expense", "income", "ratio", "trend"], answer: "What percentage of income was spent on expenses, tracked month by month as a line chart. A lower line is healthier; a climbing line over several months is worth investigating before it becomes a real problem. Irregular sources A focused list of exactly which income sources are inconsistent — present in some months, absent in others — along with how many of the last 12 months each one was actually active in." },
-  { keywords: ["total", "emails", "active", "pending", "invites", "admins"], answer: "A snapshot of your access list: how many people are whitelisted in total, how many have an active account, how many have been invited but haven't logged in yet, and how many hold admin-level access. Residents table & the three roles Each row shows an email, name, flat number, role, status, and when they were invited. The three roles, from least to most access: resident — sees only the Resident dashboards." },
-  { keywords: ["monthly", "contingency", "fund", "collection"], answer: "Tracks how much was added to the emergency reserve each month (bars) and the running total built up over time (line) — the same reserve referenced in the Contingency Cash card on Overview. 🔍 Head Drill-down The \"zoom in\" page — follow any number all the way down to the smallest transaction. How to use this page Start by choosing Expense or Income . From there, simply keep clicking to go deeper: Category." },
-  { keywords: ["cost", "alerts"], answer: "Lists every expense category whose spend increased by more than 15% compared to the prior period. If nothing qualifies, you'll see a reassuring \"No categories exceed the 15% threshold this period\" message instead of an empty table. Sudden spike anomalies Flags a category when its most recent month's spend is dramatically higher than its own trailing 3-month average — shown as a multiplier (e.g. \"1.9×\")." },
-  { keywords: ["above", "average", "spend", "month"], answer: "Categories currently spending noticeably more than their own historical average for the selected range — shown as a multiplier (e.g. \"1.6× avg\"). This is intentionally a softer signal than the red \"Top 5\" alerts above: worth keeping an eye on, not necessarily a red flag on its own. 📈 Cost Alerts & Trends Requirement IDs AD-01 → AD-05 · The full expense-side deep-dive behind the alerts on Action Needed." },
-  { keywords: ["expense", "income", "ratio"], answer: "What percentage of income has been spent, for your selected period. A colored bar and label (Healthy / Caution / Over Budget) give you an instant read on whether spending is under control. 📊 Top 5 charts (expense categories, income sources, vendors) Three quick-glance charts showing the society's biggest expense categories, its top income sources (excluding maintenance), and the vendors paid the most." },
-  { keywords: ["concentration", "risk", "callout"], answer: "A one-line summary like \"Top 3 vendors make up 84% of total spend\" — this answers a genuine risk-management question: are you dangerously dependent on a handful of vendors, where losing one relationship (or one contract renegotiation going badly) could seriously disrupt operations? Vendor ranking table Every vendor, sorted by total spend (or total collected, on the Income tab) with the highest first." },
-];
-
-const ROUTE_MAP: RouteEntry[] = [
-  { keywords: ["sqft", "squarefoot", "persqft", "rate"], page: "Collections", to: "/admin/collections", description: "the per-sqft collection rate and the 'Collection performance vs target' trend" },
-  { keywords: ["vendor", "vendors", "ranking", "rank"], page: "Vendor Insights", to: "/admin/vendors", description: "vendor ranking, spend by vendor, and vendor monthly trends" },
-  { keywords: ["cashflow", "cash", "flow"], page: "Cashflow Health", to: "/resident/cashflow", description: "community cashflow health, income vs expense over time" },
-  { keywords: ["income", "sources", "maintenance"], page: "Income Visibility", to: "/resident/income", description: "income sources and maintenance collection breakdown" },
-  { keywords: ["balance", "opening", "closing", "corpus", "contingency", "bank"], page: "Opening & Closing Balance", to: "/resident/balance", description: "opening/closing balance, bank balance, corpus and contingency cash" },
-  { keywords: ["drilldown", "drill", "lineitem", "category"], page: "Head Drill-down", to: "/resident/drilldown", description: "the full category to vendor to line-item drill-down" },
-  { keywords: ["action", "needed"], page: "Action Needed", to: "/admin/actions", description: "flagged items that need committee attention" },
-  { keywords: ["alert", "alerts", "anomaly", "spike"], page: "Cost Alerts & Trends", to: "/admin/alerts", description: "cost alerts and month-over-month spend trends" },
-  { keywords: ["optimisation", "optimization", "steady", "irregular", "dropped"], page: "Income Optimisation", to: "/admin/income", description: "income consistency status, Steady, Irregular, or Dropped" },
-  { keywords: ["transaction", "transactions", "crud"], page: "Transactions (CRUD)", to: "/admin/transactions", description: "creating, editing or deleting individual transactions" },
-  { keywords: ["resident", "residents", "whitelist"], page: "Residents & Whitelist", to: "/admin/residents", description: "managing resident accounts and the login whitelist" },
-  { keywords: ["widget", "dashboardcontrol", "settings"], page: "Dashboard Controls", to: "/admin/settings", description: "toggling which widgets/dashboards residents can see" },
-  { keywords: ["audit", "trail", "log"], page: "Audit Trail", to: "/admin/audit", description: "a log of every create, update, delete and import action taken in the system" },
-  { keywords: ["import", "csv", "upload", "bulk"], page: "CSV Imports", to: "/admin/imports", description: "bulk-importing transactions, residents or vendors via CSV" },
-  { keywords: ["etl", "integration"], page: "ETL Integration", to: "/admin/etl", description: "automated data integration / ETL sessions" },
-];
-
-const WHERE_INTENT = /\b(where|which page|find|navigate|locate|show me)\b/;
-
-function normalizeWords(s: string): string[] {
-  return s
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, " ")
-    .split(/\s+/)
-    .filter(Boolean);
-}
-
-function stem(w: string): string {
-  return w.replace(/(ings|ing)$/, "").replace(/(es|s)$/, "").replace(/ed$/, "");
-}
-
-function tokenScore(query: string, keywords: string[]): number {
-  const qWords = new Set(normalizeWords(query).map(stem));
-  const qLower = query.toLowerCase();
-  let score = 0;
-  for (const k of keywords) {
-    const kl = k.toLowerCase();
-    if (qWords.has(stem(kl))) score += Math.max(2, kl.length);
-    else if (qLower.includes(kl)) score += 1;
-  }
-  return score;
-}
-
-function getBotAnswer(rawQuery: string, persona: "resident" | "admin", currentView: string): { text: string; link?: ChatLink } {
-  const q = rawQuery.toLowerCase().trim();
-  if (!q) {
-    return { text: "Go ahead, ask me anything about this dashboard -- e.g. \"what is vendor rank?\" or \"where can I find the per-sqft trend?\"" };
-  }
-  if (/^(hi|hello|hey)\b/.test(q)) {
-    return { text: `Hi! I'm Munshi, your PulseLedger assistant (beta). You're currently on **${currentView}**. Ask me about any card, badge, or chart you see here, or ask "where can I find..." to be pointed to the right page.` };
-  }
-
-  if (WHERE_INTENT.test(q)) {
-    const routeMatches = ROUTE_MAP.map((r) => ({ r, score: tokenScore(q, r.keywords) }))
-      .filter((s) => s.score > 0)
-      .sort((a, b) => b.score - a.score);
-    if (routeMatches.length > 0) {
-      const best = routeMatches[0].r;
-      return { text: `You'll find ${best.description} on the **${best.page}** page.`, link: { to: best.to, label: best.page } };
-    }
-  }
-
-  const curatedPool = CURATED.filter((c) => !c.contexts || c.contexts.includes(currentView));
-  const curatedScored = curatedPool
-    .map((c) => ({ c, score: tokenScore(q, c.keywords) * 3 }))
-    .filter((s) => s.score > 0)
-    .sort((a, b) => b.score - a.score);
-  if (curatedScored.length > 0) {
-    return { text: curatedScored[0].c.answer };
-  }
-
-  const pool = [...HELP_COMMON, ...(persona === "admin" ? HELP_ADMIN : HELP_RESIDENT)];
-  const scored = pool
-    .map((entry) => ({ entry, score: tokenScore(q, entry.keywords) }))
-    .filter((s) => s.score > 0)
-    .sort((a, b) => b.score - a.score);
-  if (scored.length > 0) {
-    return { text: scored[0].entry.answer };
-  }
-
-  const looseRoute = ROUTE_MAP.map((r) => ({ r, score: tokenScore(q, r.keywords) }))
-    .filter((s) => s.score > 0)
-    .sort((a, b) => b.score - a.score);
-  if (looseRoute.length > 0) {
-    const best = looseRoute[0].r;
-    return { text: `I'm not fully sure what you meant, but that sounds related to the **${best.page}** page -- ${best.description}. Want to head there?`, link: { to: best.to, label: best.page } };
-  }
-
-  return {
-    text: `I couldn't find an exact match for that yet (Munshi is still in beta). Try asking about specific terms you see on screen (e.g. "vendor rank", "period change", "All-Time badge"), or ask "where can I find..." followed by what you're looking for.`,
-  };
-}
 
 const CHAT_STORAGE_PREFIX = "pulseledger-help-chat";
 
@@ -291,17 +115,31 @@ function HelpChat({ persona, currentView, onClose }: { persona: "resident" | "ad
     }
   }, [persona, minimized]);
 
-  function handleSend() {
+  async function handleSend() {
     const text = input.trim();
     if (!text) return;
     setInput("");
     setMessages((prev) => [...prev, { role: "user", text }]);
     setTyping(true);
-    window.setTimeout(() => {
-      const answer = getBotAnswer(text, persona, currentView);
-      setMessages((prev) => [...prev, { role: "bot", text: answer.text, link: answer.link }]);
+    try {
+      const r = await fetch("/api/assistant/ask", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        credentials: "include", // sends the httpOnly session cookie, same as every other API call
+        body: JSON.stringify({ question: text, currentView }),
+      });
+      const data = await r.json().catch(() => null as any);
+      const answerText = (data && typeof data.answer === "string" && data.answer.trim())
+        || "Sorry, I couldn't come up with an answer for that -- please try again.";
+      setMessages((prev) => [...prev, { role: "bot", text: answerText, link: data?.link }]);
+    } catch {
+      setMessages((prev) => [...prev, {
+        role: "bot",
+        text: "Sorry, I'm having trouble reaching the assistant right now -- please try again in a moment.",
+      }]);
+    } finally {
       setTyping(false);
-    }, 500 + Math.random() * 400);
+    }
   }
 
   function handleClose() {
