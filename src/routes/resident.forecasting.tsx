@@ -345,6 +345,30 @@ function Inner() {
     maintenanceRate, collectionPct, interestPct, inflationPct, incomeLevers, expenseLevers, combineMode, inflationScope,
   ]);
 
+  // TODAY'S REAL POSITION -- deliberately independent of the FY dropdown
+  // above. "Opening" and "Closing" on this page are scoped to whichever FY
+  // is selected (which could be a future or closed year); this always shows
+  // the actual, real, all-time position as of the most recent month there
+  // is real data for, so residents/admins have a fixed reference point no
+  // matter which FY they're browsing.
+  const todaySnapshot = useMemo(() => {
+    const anchor = hasTrueAnchor ? (trueOpeningAnchor as number) : (balanceStrip.opening || 0);
+    const parsedActuals = (monthlyTotals as any[])
+      .map((m) => ({ m, d: parseMonthLabel(m.month) }))
+      .filter((x): x is { m: any; d: Date } => x.d !== null)
+      .sort((a, b) => a.d.getTime() - b.d.getTime());
+    if (parsedActuals.length === 0) {
+      return { netOperatingSurplus: 0, bankBalance: anchor, asOfLabel: null as string | null };
+    }
+    const realNet = parsedActuals.reduce((s, x) => s + (x.m.collection ?? 0) - (x.m.expense ?? 0), 0);
+    const lastActual = parsedActuals[parsedActuals.length - 1];
+    return {
+      netOperatingSurplus: realNet,
+      bankBalance: anchor + realNet,
+      asOfLabel: lastActual.m.month as string,
+    };
+  }, [monthlyTotals, hasTrueAnchor, trueOpeningAnchor, balanceStrip.opening]);
+
   const { rows: monthRows, mixByCategory } = useMemo(() => {
     let opening = fyOpeningBalance;
     const out: MonthRow[] = [];
@@ -498,6 +522,32 @@ function Inner() {
             <div className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground truncate">Risk</div>
             <Badge variant="outline" className={"mt-0.5 text-[10px] " + riskClass}>{riskLabel}</Badge>
             <div className="text-[8px] text-muted-foreground mt-1 leading-tight">Based on the lowest projected month-end balance this year</div>
+          </div>
+        </div>
+      )}
+
+      {/* As of Today -- real, all-time position, independent of the FY
+          dropdown above (per feedback: shown alongside the FY-scoped
+          Opening/Closing tiles, not merged into them). */}
+      {isWidgetVisible("forecasting.kpiTiles") && todaySnapshot.asOfLabel && (
+        <div className="rounded-lg border p-3 bg-muted/20">
+          <div className="flex items-center justify-between mb-2 flex-wrap gap-1">
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              As of Today -- real position, not filtered by the FY selector above
+            </div>
+            <Badge variant="outline" className="text-[9px] border-dashed">All-Time · as of {todaySnapshot.asOfLabel}</Badge>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <div className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">Net Operating Surplus</div>
+              <div className={"text-lg font-black truncate " + (todaySnapshot.netOperatingSurplus < 0 ? "text-rose-600" : "")}>{inr(todaySnapshot.netOperatingSurplus)}</div>
+              <div className="text-[8px] text-muted-foreground mt-0.5 leading-tight">All real income minus all real expense, since day one</div>
+            </div>
+            <div>
+              <div className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">Bank Balance</div>
+              <div className="text-lg font-black truncate">{inr(todaySnapshot.bankBalance)}</div>
+              <div className="text-[8px] text-muted-foreground mt-0.5 leading-tight">True Opening Balance + Net Operating Surplus above</div>
+            </div>
           </div>
         </div>
       )}

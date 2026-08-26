@@ -190,7 +190,7 @@ function Inner() {
               <div className="text-xl font-mono">{inr(totalMaintenanceCollected)}</div>
             </div>
             <div className="rounded-md border border-border p-3">
-              <div className="text-xs text-muted-foreground uppercase tracking-wider">Unpaid maintenance</div>
+              <div className="text-xs text-muted-foreground uppercase tracking-wider">Outstanding receivables</div>
               <div className="text-xl font-mono">{inr(totalOutstanding)}</div>
             </div>
             <div className="rounded-md border border-border p-3">
@@ -207,7 +207,7 @@ function Inner() {
             <div className="grid gap-4 lg:grid-cols-2">
               {/* Left: pure rupee comparison -- collected vs unpaid vs target, one axis, 3 legends */}
               <div>
-                <div className="text-sm font-medium mb-1">Collected vs unpaid maintenance</div>
+                <div className="text-sm font-medium mb-1">Collected vs Outstanding Receivables</div>
                 <div className="text-xs text-muted-foreground mb-2">Are we hitting the per-sqft target, and how big is the unpaid gap?</div>
                 <ResponsiveContainer width="100%" height={260}>
                   <ComposedChart data={monthlyMaintenanceData}>
@@ -217,7 +217,7 @@ function Inner() {
                     <Tooltip trigger={getTooltipTrigger()} cursor={{ fill: "var(--color-muted)", opacity: 0.35 }} content={<SmartTooltipContent labelPrefix="Month" valueFormatter={(v) => inr(v)} />} />
                     <Legend />
                     <Bar dataKey="collected" name="Collected Maintenance" fill="var(--color-chart-2)" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="outstanding" name="Unpaid Maintenance" fill="var(--color-chart-1)" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="outstanding" name="Outstanding Receivables" fill="var(--color-chart-1)" radius={[4, 4, 0, 0]} />
                     <Line type="monotone" dataKey="expectedCollection" name="Expected Collection" stroke="var(--color-chart-4, #a855f7)" strokeWidth={2} strokeDasharray="4 2" dot={false} />
                   </ComposedChart>
                 </ResponsiveContainer>
@@ -251,7 +251,7 @@ function Inner() {
                       <th className="text-left p-2">Month</th>
                       <th className="text-right p-2">Collected Maintenance</th>
                       <th className="text-right p-2">Expected Collection</th>
-                      <th className="text-right p-2">Unpaid Maintenance</th>
+                      <th className="text-right p-2">Outstanding Receivables</th>
                       <th className="text-right p-2">Recovery Rate</th>
                     </tr>
                   </thead>

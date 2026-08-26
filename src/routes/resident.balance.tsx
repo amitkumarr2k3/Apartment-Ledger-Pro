@@ -148,7 +148,7 @@ function Inner() {
             <StripCell label="Opening balance" value={hasOpeningGap ? "N/A" : inr(rangeOpening)} muted note="RD-42" />
             <StripCell label="Total income" value={inr(totalIncome)} tone="emerald" />
             <StripCell label="Total expense" value={inr(totalExpense)} tone="rose" />
-            <StripCell label="Net movement" value={inr(net)} tone={net >= 0 ? "emerald" : "rose"} />
+            <StripCell label={net >= 0 ? "Net Operating Surplus" : "Net Operating Deficit"} value={inr(net)} tone={net >= 0 ? "emerald" : "rose"} />
             <StripCell label="Closing balance" value={inr(closingBal)} tone="cyan" />
           </div>
 

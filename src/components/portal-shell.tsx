@@ -284,10 +284,10 @@ const PREV_FY_START_YEAR = FY_START_YEAR - 1;
 const PREV_FY_LABEL = `FY ${PREV_FY_START_YEAR}-${String(PREV_FY_START_YEAR + 1).slice(-2)}`;
 
 type PeriodMeta = { label: string; count: number };
+// Simplified per feedback -- was 6 options (month-only, 3/6/12-month
+// rolling windows, current FY, prior FY); now just the 3 that are actually
+// wanted: last 12 months, and the two named fiscal years.
 const periodConfig: Record<PeriodValue, PeriodMeta> = {
-  "month-prev": { label: `${PREV_LABEL} only`, count: 1 },
-  "range-3m": { label: "Last 3 months", count: 3 },
-  "range-6m": { label: "Last 6 months", count: 6 },
   "range-12m": { label: "Last 12 months", count: 12 },
   "fy": { label: FY_LABEL, count: 12 },
   "fy-prev": { label: PREV_FY_LABEL, count: 12 },

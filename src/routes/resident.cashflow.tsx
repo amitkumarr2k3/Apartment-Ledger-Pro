@@ -134,6 +134,12 @@ function Inner() {
     // const expectedCollectionThisMonth = ((rateMonthly[i] ?? 0) / 100) * TOTAL_SQFT; // OLD
     return {
       month,
+      // FIX: a month with no real row in monthlyTotals at all (e.g. before
+      // record-keeping began) previously defaulted expense/income to 0 and
+      // was still eligible to "win" Best/Worst Month -- a genuinely empty
+      // pre-history month looked like a real Rs0-net month. hasData marks
+      // that distinction so Best/Worst Month below can exclude it.
+      hasData: !!monthlyTotal,
       actual_collection: actualCollection,
       expected_collection: expectedCollectionThisMonth,
       other_income: otherIncome,
@@ -164,8 +170,9 @@ function Inner() {
     : ((totalActualClean - totalExpectedClean) / totalExpectedClean) * 100;
 
   // NEW INSIGHT: best / worst month by net (total income - expense)
-  const bestMonth = monthlyTrend.length ? monthlyTrend.reduce((a, b) => (b.net > a.net ? b : a)) : null;
-  const worstMonth = monthlyTrend.length ? monthlyTrend.reduce((a, b) => (b.net < a.net ? b : a)) : null;
+  const monthsWithData = monthlyTrend.filter((m) => m.hasData);
+  const bestMonth = monthsWithData.length ? monthsWithData.reduce((a, b) => (b.net > a.net ? b : a)) : null;
+  const worstMonth = monthsWithData.length ? monthsWithData.reduce((a, b) => (b.net < a.net ? b : a)) : null;
 
   return (
     <>

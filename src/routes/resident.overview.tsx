@@ -322,7 +322,7 @@ function Inner() {
             icon={<CheckCircle2 className="h-5 w-5 text-green-500" />}
           />
           <MetricCard 
-            label="OUTSTANDING DUES" 
+            label="OUTSTANDING RECEIVABLES" 
             value={inr(cumulativeOutstandingDue)} 
             subText="CUMULATIVE DEFAULT · NOT FILTER-DEPENDENT" 
             icon={<AlertTriangle className="h-5 w-5 text-red-500" />}
@@ -471,6 +471,61 @@ function Inner() {
       )}
 
       <div className="grid gap-4 lg:grid-cols-3">
+        {/* RD-05 community income */}
+        {isWidgetVisible("overview.top5Income") && (
+        <Card className={topCardsClass}>
+          <CardHeader>
+            <CardTitle className="text-base">Top 5 income sources (excluding maintenance paid from residents)</CardTitle>
+            <CardDescription>RD-05 · Click any income category to drill down</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4 flex-1 overflow-hidden">
+            {top5Income.length === 0 ? (
+              <div className="text-sm text-muted-foreground">
+                {`No community income recorded for ${periodLabel}.`}
+              </div>
+            ) : view === "chart" ? (
+              <ResponsiveContainer width="100%" height={chartHeight}>
+                <BarChart data={top5Income} layout="vertical" margin={{ left: 20 }}>
+                  <CartesianGrid horizontal={false} strokeDasharray="3 3" opacity={0.3} />
+                  <XAxis type="number" tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} fontSize={11} />
+                  <YAxis type="category" dataKey="name" width={110} fontSize={12} />
+                  <Tooltip trigger={getTooltipTrigger()} cursor={{ fill: "var(--color-muted)", opacity: 0.35 }} content={<SmartTooltipContent labelPrefix="Income" valueFormatter={(v) => inr(v)} />} />
+                  <Bar dataKey="total" radius={[0, 4, 4, 0]} className="cursor-pointer">
+                    {top5Income.map((income) => (
+                      <Cell key={income.name} fill="var(--color-chart-2)"
+                        onClick={() => {
+                          window.location.href = `/resident/drilldown?head=income&category=${encodeURIComponent(income.name)}`;
+                        }} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <ul className="divide-y divide-border max-h-[240px] overflow-y-auto">
+                {top5Income.map((income) => (
+                  <li key={income.name}>
+                    <Link
+                      to="/resident/drilldown"
+                      search={(((prev: any) => ({ ...prev, head: "income", category: income.name, vendor: undefined, line: undefined })) as any)}
+                      className="flex items-center justify-between py-3 -mx-4 px-4 hover:bg-accent/40 rounded transition-colors"
+                    >
+                      <div>
+                        <div className="font-medium">{income.name}</div>
+                        <div className="text-xs text-muted-foreground">{((income.total / (top5IncomeTotal || 1)) * 100).toFixed(1)}% of top 5</div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-mono">{inr(income.total)}</span>
+                        <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+        )}
+
         {/* RD-02 top 5 — drill-through */}
         {isWidgetVisible("overview.top5Expenses") && (
         <Card className={topCardsClass}>
@@ -515,61 +570,6 @@ function Inner() {
                       </div>
                       <div className="flex items-center gap-3">
                         <span className="text-sm font-mono">{inr(c.total)}</span>
-                        <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
-        )}
-
-        {/* RD-05 community income */}
-        {isWidgetVisible("overview.top5Income") && (
-        <Card className={topCardsClass}>
-          <CardHeader>
-            <CardTitle className="text-base">Top 5 income sources (excluding maintenance)</CardTitle>
-            <CardDescription>RD-05 · Click any income category to drill down</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4 flex-1 overflow-hidden">
-            {top5Income.length === 0 ? (
-              <div className="text-sm text-muted-foreground">
-                {`No community income recorded for ${periodLabel}.`}
-              </div>
-            ) : view === "chart" ? (
-              <ResponsiveContainer width="100%" height={chartHeight}>
-                <BarChart data={top5Income} layout="vertical" margin={{ left: 20 }}>
-                  <CartesianGrid horizontal={false} strokeDasharray="3 3" opacity={0.3} />
-                  <XAxis type="number" tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} fontSize={11} />
-                  <YAxis type="category" dataKey="name" width={110} fontSize={12} />
-                  <Tooltip trigger={getTooltipTrigger()} cursor={{ fill: "var(--color-muted)", opacity: 0.35 }} content={<SmartTooltipContent labelPrefix="Income" valueFormatter={(v) => inr(v)} />} />
-                  <Bar dataKey="total" radius={[0, 4, 4, 0]} className="cursor-pointer">
-                    {top5Income.map((income) => (
-                      <Cell key={income.name} fill="var(--color-chart-2)"
-                        onClick={() => {
-                          window.location.href = `/resident/drilldown?head=income&category=${encodeURIComponent(income.name)}`;
-                        }} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <ul className="divide-y divide-border max-h-[240px] overflow-y-auto">
-                {top5Income.map((income) => (
-                  <li key={income.name}>
-                    <Link
-                      to="/resident/drilldown"
-                      search={(((prev: any) => ({ ...prev, head: "income", category: income.name, vendor: undefined, line: undefined })) as any)}
-                      className="flex items-center justify-between py-3 -mx-4 px-4 hover:bg-accent/40 rounded transition-colors"
-                    >
-                      <div>
-                        <div className="font-medium">{income.name}</div>
-                        <div className="text-xs text-muted-foreground">{((income.total / (top5IncomeTotal || 1)) * 100).toFixed(1)}% of top 5</div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-sm font-mono">{inr(income.total)}</span>
                         <ArrowRight className="h-4 w-4 text-muted-foreground" />
                       </div>
                     </Link>
@@ -658,7 +658,7 @@ function AuditedReportCard() {
   const recentFYs = [fiscalYearLabel(0), fiscalYearLabel(1)];
   const availableFYs = Array.from(new Set([...recentFYs, ...reports.map((r) => r.fiscal_year)])).sort().reverse();
 
-  const [selectedFY, setSelectedFY] = useState(fiscalYearLabel(0));
+  const [selectedFY, setSelectedFY] = useState(fiscalYearLabel(1)); // default to FY 2025-26 per feedback
   const [viewOpen, setViewOpen] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [uploadFY, setUploadFY] = useState(fiscalYearLabel(0));

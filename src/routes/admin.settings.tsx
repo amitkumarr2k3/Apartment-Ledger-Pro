@@ -69,7 +69,7 @@ const DASHBOARD_DEFS: DashboardDef[] = [
     widgets: [
       { id: "income.sourcesBreakdown", label: "Income sources (maintenance + other income breakdown)" },
       { id: "income.expenseRatio", label: "Expense / Income ratio card" },
-      { id: "income.collectedVsUnpaid", label: "Collected vs unpaid maintenance chart (bars + expected collection target)" },
+      { id: "income.collectedVsUnpaid", label: "Collected vs Outstanding Receivables chart (bars + expected collection target)" },
       { id: "income.recoveryRateTrend", label: "Recovery rate trend chart (with 90% healthy benchmark line)" },
     ],
   },
