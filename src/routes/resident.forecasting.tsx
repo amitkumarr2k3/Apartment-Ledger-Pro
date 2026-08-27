@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Bar, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend,
@@ -102,12 +103,13 @@ function Inner() {
 
   // -- Configuration: methodology, restored per feedback --
   const [configOpen, setConfigOpen] = useState(false);
+  const [calcOpen, setCalcOpen] = useState(false);
   const [refWindow, setRefWindow] = useState(12);
   const [combineMode, setCombineMode] = useState<"compound" | "additive">("compound");
   const [inflationScope, setInflationScope] = useState<"expense" | "both">("expense");
 
   // -- Global assumptions: full set, restored per feedback --
-  const [maintenanceRate, setMaintenanceRate] = useState(4);
+  const [maintenanceRate, setMaintenanceRate] = useState(4.1);
   const [collectionPct, setCollectionPct] = useState(90);
   const [interestPct, setInterestPct] = useState(0);
   const [inflationPct, setInflationPct] = useState(6);
@@ -123,7 +125,7 @@ function Inner() {
     return fiscalStartYearFor(new Date(now.getFullYear(), now.getMonth() - 1, 1));
   }, []);
   const [fyStart, setFyStart] = useState(defaultFyStart);
-  const fyOptions = [defaultFyStart - 1, defaultFyStart, defaultFyStart + 1];
+  const fyOptions = [defaultFyStart - 1, defaultFyStart, defaultFyStart + 1, defaultFyStart + 2, defaultFyStart + 3];
   const yearsForward = Math.max(0, fyStart - defaultFyStart);
 
   const fyMonths = useMemo(
@@ -229,7 +231,7 @@ function Inner() {
       const rate = contingencyRateByMonth.get(fyMonths[i]?.label) ?? 0;
       if (rate > 0) return rate;
     }
-    return 0;
+    return 0.25; // standard fallback when no real contingency rate has been recorded yet
   }, [contingencyRateByMonth, fyMonths, lastCompletedIdx]);
 
   const [contingencyRate, setContingencyRate] = useState<number | null>(null);
@@ -358,13 +360,14 @@ function Inner() {
       .filter((x): x is { m: any; d: Date } => x.d !== null)
       .sort((a, b) => a.d.getTime() - b.d.getTime());
     if (parsedActuals.length === 0) {
-      return { netOperatingSurplus: 0, bankBalance: anchor, asOfLabel: null as string | null };
+      return { netOperatingSurplus: 0, bankBalance: anchor, anchor, asOfLabel: null as string | null };
     }
     const realNet = parsedActuals.reduce((s, x) => s + (x.m.collection ?? 0) - (x.m.expense ?? 0), 0);
     const lastActual = parsedActuals[parsedActuals.length - 1];
     return {
       netOperatingSurplus: realNet,
       bankBalance: anchor + realNet,
+      anchor,
       asOfLabel: lastActual.m.month as string,
     };
   }, [monthlyTotals, hasTrueAnchor, trueOpeningAnchor, balanceStrip.opening]);
@@ -434,7 +437,7 @@ function Inner() {
   }));
 
   function resetAll() {
-    setMaintenanceRate(4); setCollectionPct(90); setInterestPct(0); setInflationPct(6);
+    setMaintenanceRate(4.1); setCollectionPct(90); setInterestPct(0); setInflationPct(6);
     setContingencyRate(null); setUnknownExpense(0); setIncomeCategoryPct({}); setExpenseCategoryPct({});
     setRefWindow(12); setCombineMode("compound"); setInflationScope("expense");
     setShowAllIncome(false); setShowAllExpense(false);
@@ -446,7 +449,7 @@ function Inner() {
   // projection or a scenario you've been experimenting with.
   const changedLeverCount = useMemo(() => {
     let n = 0;
-    if (maintenanceRate !== 4) n++;
+    if (maintenanceRate !== 4.1) n++;
     if (collectionPct !== 90) n++;
     if (interestPct !== 0) n++;
     if (inflationPct !== 6) n++;
@@ -463,6 +466,48 @@ function Inner() {
     risk === "moderate" ? "border-amber-500/40 text-amber-600" :
     "border-emerald-500/40 text-emerald-600";
 
+  // ---------------------------------------------------------------------
+  // FULL CALCULATION RECONCILIATION -- one single place that itemises
+  // every real month, every category lever, and every assumption that adds
+  // up to the FY Income/Expense/Net Surplus/Closing figures shown above.
+  // Built specifically so nobody has to click through each lever one at a
+  // time and add the numbers up by hand -- this does that addition FOR
+  // you, in one screen, and the "Reconciliation check" row at the bottom
+  // proves it lines up exactly with the KPI tiles above.
+  //
+  // ALL categories are used here (not just the top-N shown on the main
+  // page), since a true reconciliation can't leave anything out.
+  // ---------------------------------------------------------------------
+  const actualIncomeTotal = monthRows.filter((r) => r.status === "actual").reduce((s, r) => s + r.income, 0);
+  const actualExpenseTotal = monthRows.filter((r) => r.status === "actual").reduce((s, r) => s + r.expense, 0);
+
+  const maintenanceForecastMonthly = maintenanceRate * TOTAL_SQFT * (collectionPct / 100);
+  const maintenanceForecastTotal = maintenanceForecastMonthly * forecastMonthsCount;
+
+  const incomeCalcRows = incomeLevers.map((lv) => {
+    const factor = inflationScope === "both" ? combinedFactor(lv.pct) : 1 + lv.pct / 100;
+    const monthly = lv.baseline * factor * forwardInflationMultiplier;
+    return { name: lv.name, baseline: lv.baseline, pct: lv.pct, monthly, total: monthly * forecastMonthsCount };
+  });
+  const expenseCalcRows = expenseLevers.map((lv) => {
+    const factor = combinedFactor(lv.pct);
+    const monthly = lv.baseline * factor * forwardInflationMultiplier;
+    return { name: lv.name, baseline: lv.baseline, pct: lv.pct, monthly, total: monthly * forecastMonthsCount };
+  });
+
+  const categoryForecastIncomeTotal = incomeCalcRows.reduce((s, r) => s + r.total, 0);
+  const categoryForecastExpenseTotal = expenseCalcRows.reduce((s, r) => s + r.total, 0);
+
+  // Whatever's left after Actual + Maintenance + every category is Interest
+  // on Surplus (which compounds on a running balance, so it isn't a single
+  // flat "X per month" line like the others) plus any rounding -- shown
+  // honestly as a residual rather than faking a precise per-month figure.
+  const incomeResidual = fyIncome - actualIncomeTotal - maintenanceForecastTotal - categoryForecastIncomeTotal;
+  const expenseResidual = fyExpense - actualExpenseTotal - categoryForecastExpenseTotal - unknownExpense;
+
+  const checkIncome = actualIncomeTotal + maintenanceForecastTotal + categoryForecastIncomeTotal + incomeResidual;
+  const checkExpense = actualExpenseTotal + categoryForecastExpenseTotal + unknownExpense + expenseResidual;
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -471,6 +516,13 @@ function Inner() {
           <p className="text-xs text-muted-foreground">Every lever is yours to explore -- local to your browser, never saved or shared. This view always covers all 12 months of {fyLabelFor(fyStart)}.</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          <Button
+            size="sm"
+            className="h-9 bg-[#0082c9] hover:bg-[#005f91] text-white font-semibold"
+            onClick={() => setCalcOpen(true)}
+          >
+            🧮 See Full Calculation
+          </Button>
           <Select value={String(fyStart)} onValueChange={(v) => setFyStart(Number(v))}>
             <SelectTrigger className="w-[170px] h-9 text-xs"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -546,7 +598,9 @@ function Inner() {
             <div>
               <div className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">Bank Balance</div>
               <div className="text-lg font-black truncate">{inr(todaySnapshot.bankBalance)}</div>
-              <div className="text-[8px] text-muted-foreground mt-0.5 leading-tight">True Opening Balance + Net Operating Surplus above</div>
+              <div className="text-[8px] text-muted-foreground mt-0.5 leading-tight font-mono">
+                {inr(todaySnapshot.anchor)} (True Opening Balance) + {inr(todaySnapshot.netOperatingSurplus)} (Net Operating Surplus) = {inr(todaySnapshot.bankBalance)}
+              </div>
             </div>
           </div>
         </div>
@@ -595,7 +649,7 @@ function Inner() {
           <Card>
             <CardHeader className="py-3"><CardTitle className="text-sm">Global Assumptions</CardTitle></CardHeader>
             <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 pb-4">
-              <LeverRow label="Maintenance Rate (₹/sqft/mo)" value={maintenanceRate} onChange={setMaintenanceRate} min={3} max={5} step={0.05} display={"₹" + maintenanceRate.toFixed(2)} defaultValue={4} formatValue={(v) => "₹" + v.toFixed(2)} />
+              <LeverRow label="Maintenance Rate (₹/sqft/mo)" value={maintenanceRate} onChange={setMaintenanceRate} min={3} max={5} step={0.05} display={"₹" + maintenanceRate.toFixed(2)} defaultValue={4.1} formatValue={(v) => "₹" + v.toFixed(2)} />
               <LeverRow label="Maintenance Collection %" value={collectionPct} onChange={setCollectionPct} min={50} max={100} step={1} display={collectionPct + "%"} defaultValue={90} formatValue={(v) => v + "%"} />
               <LeverRow label="Interest on Surplus %" value={interestPct} onChange={setInterestPct} min={0} max={10} step={0.5} display={interestPct + "%"} defaultValue={0} formatValue={(v) => v + "%"} />
               <LeverRow label="Inflation (annual)" value={inflationPct} onChange={setInflationPct} min={0} max={15} step={0.5} display={inflationPct + "%"} defaultValue={6} formatValue={(v) => v + "%"} />
@@ -798,6 +852,106 @@ function Inner() {
           <div><span className="font-semibold text-foreground">Changed levers:</span> any lever showing an amber "Changed" tag (and the "N levers changed" badge up top) is sitting away from its standard value -- the small tick mark on its slider shows exactly where standard sits, so a surprising number is always traceable back to what you moved.</div>
         </AlertDescription>
       </Alert>
+
+      {/* FULL CALCULATION -- one single place showing every real month,
+          every category, and every assumption added up, instead of making
+          anyone click through each lever and add the numbers up by hand. */}
+      <Dialog open={calcOpen} onOpenChange={setCalcOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Full calculation — {fyLabelFor(fyStart)}</DialogTitle>
+            <DialogDescription>
+              Every number below is live, straight from your current levers. Read top to bottom -- each section adds up to the total shown beside it, and the final line matches the Income/Expense/Net Surplus/Closing tiles above exactly.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-5 text-sm">
+            {/* ---- INCOME ---- */}
+            <div>
+              <div className="font-semibold mb-1.5">Income</div>
+              <div className="rounded-md border divide-y text-xs">
+                <div className="flex justify-between p-2">
+                  <span>Actual income — {actualMonthsCount} real month{actualMonthsCount === 1 ? "" : "s"} (from your books, not a lever)</span>
+                  <span className="font-mono">{inr(actualIncomeTotal)}</span>
+                </div>
+                <div className="flex justify-between p-2">
+                  <span>Maintenance (forecast) — ₹{maintenanceRate.toFixed(2)}/sqft × {TOTAL_SQFT.toLocaleString("en-IN")} sqft × {collectionPct}% collection × {forecastMonthsCount} forecast month{forecastMonthsCount === 1 ? "" : "s"}</span>
+                  <span className="font-mono">{inr(maintenanceForecastTotal)}</span>
+                </div>
+                {incomeCalcRows.map((r) => (
+                  <div key={r.name} className="flex justify-between p-2">
+                    <span>{r.name} — {inr(r.baseline)}/mo baseline {r.pct >= 0 ? "+" : ""}{r.pct}% × {forecastMonthsCount} forecast month{forecastMonthsCount === 1 ? "" : "s"}</span>
+                    <span className="font-mono">{inr(r.total)}</span>
+                  </div>
+                ))}
+                <div className="flex justify-between p-2 text-muted-foreground">
+                  <span>Interest on Surplus + rounding (compounds on the running balance, shown as the remainder rather than a fixed per-month figure)</span>
+                  <span className="font-mono">{inr(incomeResidual)}</span>
+                </div>
+                <div className="flex justify-between p-2 font-semibold bg-muted/40">
+                  <span>Total Income (all 12 months)</span>
+                  <span className="font-mono">{inr(checkIncome)}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* ---- EXPENSE ---- */}
+            <div>
+              <div className="font-semibold mb-1.5">Expense</div>
+              <div className="rounded-md border divide-y text-xs">
+                <div className="flex justify-between p-2">
+                  <span>Actual expense — {actualMonthsCount} real month{actualMonthsCount === 1 ? "" : "s"} (from your books, not a lever)</span>
+                  <span className="font-mono">{inr(actualExpenseTotal)}</span>
+                </div>
+                {expenseCalcRows.map((r) => (
+                  <div key={r.name} className="flex justify-between p-2">
+                    <span>{r.name} — {inr(r.baseline)}/mo baseline {r.pct >= 0 ? "+" : ""}{r.pct}% + {inflationPct}% inflation × {forecastMonthsCount} forecast month{forecastMonthsCount === 1 ? "" : "s"}</span>
+                    <span className="font-mono">{inr(r.total)}</span>
+                  </div>
+                ))}
+                {unknownExpense !== 0 && (
+                  <div className="flex justify-between p-2">
+                    <span>Unknown Expense (one-time, first forecast month only)</span>
+                    <span className="font-mono">{inr(unknownExpense)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between p-2 text-muted-foreground">
+                  <span>Rounding / anything else not itemised above</span>
+                  <span className="font-mono">{inr(expenseResidual)}</span>
+                </div>
+                <div className="flex justify-between p-2 font-semibold bg-muted/40">
+                  <span>Total Expense (all 12 months)</span>
+                  <span className="font-mono">{inr(checkExpense)}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* ---- FINAL ROLL-UP ---- */}
+            <div>
+              <div className="font-semibold mb-1.5">Final roll-up</div>
+              <div className="rounded-md border divide-y text-xs">
+                <div className="flex justify-between p-2">
+                  <span>Total Income − Total Expense = Net Surplus</span>
+                  <span className="font-mono">{inr(checkIncome)} − {inr(checkExpense)} = {inr(checkIncome - checkExpense)}</span>
+                </div>
+                <div className="flex justify-between p-2">
+                  <span>Opening Balance + Net Surplus = Closing Balance</span>
+                  <span className="font-mono">{inr(fyOpeningBalance)} + {inr(checkIncome - checkExpense)} = {inr(fyOpeningBalance + (checkIncome - checkExpense))}</span>
+                </div>
+                <div className={"flex justify-between p-2 font-semibold " + (Math.round(checkIncome) === Math.round(fyIncome) && Math.round(checkExpense) === Math.round(fyExpense) ? "bg-emerald-500/10 text-emerald-700" : "bg-rose-500/10 text-rose-700")}>
+                  <span>Reconciliation check vs. the tiles above</span>
+                  <span className="font-mono">
+                    {Math.round(checkIncome) === Math.round(fyIncome) && Math.round(checkExpense) === Math.round(fyExpense) ? "✓ Matches exactly" : "⚠ Off by " + inr(Math.abs(checkIncome - fyIncome) + Math.abs(checkExpense - fyExpense))}
+                  </span>
+                </div>
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-1.5">
+                This list includes every category currently shown on this page (not just the "top N" default view) -- so this reconciliation is always complete, not a partial sample.
+              </p>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

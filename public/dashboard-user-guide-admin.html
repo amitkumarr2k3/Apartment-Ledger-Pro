@@ -282,7 +282,7 @@
     <p>Four headline figures for the selected period, giving you the summary before you look at the month-by-month detail in the two charts below.</p>
   </div>
   <div class="card-explain neutral">
-    <h3>📊 Collected vs Outstanding Receivables</h3>
+    <h3>📊 Collected vs unpaid maintenance</h3>
     <p>Shows, month by month: how much maintenance was collected (green bars), how much remained unpaid (red bars), and the Expected Collection target (dashed line) &mdash; a clean, currency-only view of whether the society is hitting its per-square-foot collection target.</p>
   </div>
   <div class="card-explain neutral">
@@ -362,37 +362,49 @@
 
 <!-- ============ FORECASTING ============ -->
 <section class="page-section" id="forecasting">
-  <div class="page-title">🔮 Forecasting</div>
-  <p class="page-subtitle">A what-if explorer for the rest of this financial year -- built from your society's own real numbers, not guesses.</p>
+  <div class="page-title">\U0001f52e Forecasting</div>
+  <p class="page-subtitle">A what-if explorer built from your society's own real numbers -- and every single number on this page can be verified, not just trusted.</p>
 
   <div class="card-explain neutral">
     <h3>What this page is (and isn't)</h3>
-    <p>Forecasting shows the current fiscal year as two halves: the months that have already happened (<strong>Actual</strong> -- real recorded numbers, never estimated) and the months still ahead (<strong>Forecast</strong> -- projected using the assumptions you set below). Every slider on this page is <strong>yours to move</strong> -- residents and admins alike -- and nothing you change here is saved or shown to anyone else. Reload the page and it resets to the defaults. Think of it as a calculator, not an official budget.</p>
+    <p>Forecasting shows a full financial year as two kinds of months: the ones that have already happened (<strong>Actual</strong> -- real recorded numbers, never estimated) and the ones still ahead (<strong>Forecast</strong> -- projected using the assumptions you set below). Every slider on this page is <strong>yours to move</strong> -- residents and admins alike -- and nothing you change here is saved or shown to anyone else. Reload the page and it resets to the defaults. Think of it as a calculator, not an official budget.</p>
+  </div>
+
+  <div class="card-explain neutral">
+    <h3>\U0001f9ee See the exact live calculation behind any number</h3>
+    <p>Wherever you see a small circled <strong>"i"</strong> button next to a number or a lever, click it. A popup opens showing the <em>exact</em> formula behind that number -- using the real baseline, your current lever settings, and the actual result -- all live, all pulled from the same numbers driving the page. This exists specifically so nobody has to just take the forecast on faith: if a number looks surprising, click its "i" and see precisely how it was built, step by step.</p>
+    <p>This is available on: the <strong>Opening</strong>, <strong>Closing</strong>, and <strong>Net Surplus</strong> tiles, the <strong>Maintenance Rate</strong> and <strong>Contingency Rate</strong> sliders, and <strong>every individual income and expense category</strong> lever. If you ever want to double-check a specific category's forecasted contribution, its own "i" button shows exactly which baseline, which growth %, and which inflation multiplier produced that month's number.</p>
   </div>
 
   <div class="card-explain neutral">
     <h3>Fiscal Year selector</h3>
-    <p>At the top right, choose which financial year to look at: the year before (closed, fully actual), the current year (a mix of actual and forecast months), or next year (fully forecast, with an extra year of inflation built in). The table and charts below update to match whichever year you pick.</p>
+    <p>At the top right, choose which financial year to look at: a closed year (fully actual, nothing forecast), the current year (a mix of actual and forecast months), or a future year (fully forecast). The table and charts below update to match whichever year you pick.</p>
   </div>
 
   <div class="card-explain neutral">
     <h3>Global Assumptions</h3>
-    <p>Six numbers that apply across the whole forecast:</p>
+    <p>Six numbers that apply across the whole forecast -- click the "i" next to Maintenance Rate or Contingency Rate to see their exact formula live:</p>
     <ul>
-      <li><strong>Maintenance Rate</strong> -- the per-square-foot monthly rate used to calculate maintenance billing for forecast months. Actual months always use the real billed amount, never this slider.</li>
+      <li><strong>Maintenance Rate (&#8377;/sqft/mo)</strong> -- the per-square-foot monthly rate used to calculate maintenance billing for forecast months only. Formula: <code>Rate &times; total built-up area (sqft) &times; Collection %</code>. Actual months always use the real billed amount, never this slider. Range is deliberately narrowed to a realistic &#8377;3&ndash;&#8377;5/sqft band, in 0.05 steps, so it can't be dragged to an implausible value by accident.</li>
       <li><strong>Maintenance Collection %</strong> -- what share of billed maintenance you expect to actually collect (100% would mean every rupee billed gets paid on time).</li>
       <li><strong>Interest on Surplus %</strong> -- a small extra income assumption applied to whatever balance the society is carrying, e.g. from a savings/FD interest.</li>
-      <li><strong>Inflation (annual)</strong> -- a general cost-of-living increase applied on top of every expense category's own trend.</li>
-      <li><strong>Contingency Rate</strong> -- a per-square-foot monthly rate, calculated the same way as Maintenance Rate, used to project the Contingency Fund for forecast months. It defaults to whatever rate was most recently actually charged -- not a plain average -- since contingency genuinely isn't collected every month.</li>
+      <li><strong>Inflation (annual)</strong> -- a general cost-of-living increase applied on top of every expense category's own trend (and income too, if you switch "Apply Inflation To" in Config below).</li>
+      <li><strong>Contingency Rate (&#8377;/sqft/mo)</strong> -- a per-square-foot monthly rate, calculated the same way as Maintenance Rate, used to project the Contingency Fund for forecast months. It defaults to whatever rate was most recently actually charged -- not a plain average -- since contingency genuinely isn't collected every month. This is the <em>only</em> place Contingency appears on this page -- there's no separate Contingency card here anymore, since that would just repeat the figure already shown in full on the Opening &amp; Closing Balance page.</li>
       <li><strong>Unknown Expense</strong> -- a one-time rupee amount for something unplanned (e.g. an emergency repair), added once, to the very first forecast month.</li>
     </ul>
+  </div>
+
+  <div class="card-explain neutral">
+    <h3>"Changed" tags and the standard-value tick mark</h3>
+    <p>Every lever remembers its own standard/default value. The moment you move a slider away from that default, an amber <strong>"Changed"</strong> tag appears right next to its label, and a small caption spells out exactly how far off you are (e.g. "Standard value is &#8377;4.00 -- you're &#8377;0.50 below that"). Each slider's track also shows a small grey tick mark exactly where the standard value sits, so you can see the gap visually, not just numerically.</p>
+    <p>At the top of the page, next to the Config/Reset buttons, a badge reads <strong>"N levers changed"</strong> -- one glance tells you whether you're looking at the standard projection or a scenario you've been experimenting with, before you even read a single number below. If you haven't changed anything, this badge doesn't show at all.</p>
   </div>
 
   <div class="card-explain neutral">
     <h3>Configuration (advanced)</h3>
     <p>Tap "Config" to reveal three methodology settings -- these change <em>how</em> the forecast is calculated, not just its inputs:</p>
     <ul>
-      <li><strong>Reference Window</strong> -- how many months of real history to average when calculating each category's starting point (its "baseline"). Default is 12; a newer community with less history will automatically use whatever months are actually available instead.</li>
+      <li><strong>Reference Window</strong> -- how many months of real history to average when calculating each category's starting point (its "baseline"). Default is 12; a newer community with less history will automatically use whatever months are actually available instead. Each category's own lever shows exactly how many months of data its baseline is averaged over (e.g. "avg of 8 months with data") -- a month a category genuinely had no activity in is skipped entirely from its own average, never counted as a &#8377;0 month.</li>
       <li><strong>Inflation Combination</strong> -- whether inflation and a category's own growth assumption <em>compound</em> together (the standard, slightly higher-impact way) or simply <em>add</em> together (simpler, slightly lower-impact).</li>
       <li><strong>Apply Inflation To</strong> -- whether inflation affects expense categories only (the usual choice) or income categories too.</li>
     </ul>
@@ -400,7 +412,7 @@
 
   <div class="card-explain neutral">
     <h3>Income Categories &amp; Expense Categories</h3>
-    <p>These lists are pulled directly from your society's real chart of accounts -- not a fixed list -- so if a category is ever renamed or a new one is added, it shows up here automatically without anyone needing to update this page. Each category shows a <strong>Baseline</strong> (its average monthly actual, from the Reference Window above) and a slider for how much you expect it to grow or shrink for the rest of the year.</p>
+    <p>These lists are pulled directly from your society's real chart of accounts -- not a fixed list -- so if a category is ever renamed or a new one is added, it shows up here automatically without anyone needing to update this page. Each category shows a <strong>Baseline</strong> (its average monthly actual, from the Reference Window above, counting only the months it actually has data for) and a slider for how much you expect it to grow or shrink for the rest of the year. Click the "i" next to any category to see exactly how its baseline, your growth %, and inflation combine into its forecasted monthly amount.</p>
     <p>To keep the page manageable, only the largest 5 income and 6 expense categories (by size) are shown by default -- use "+ N more categories" to reveal the rest. Categories you haven't expanded still count fully toward the forecast total at their default (0% change) assumption; hiding a slider never hides its money.</p>
     <p>Maintenance income itself doesn't appear in this list -- it's already covered by the Maintenance Rate and Maintenance Collection % sliders in Global Assumptions above, so it isn't counted twice.</p>
   </div>
@@ -408,41 +420,57 @@
   <div class="card-explain neutral">
     <h3>The result tiles</h3>
     <ul>
-      <li><strong>Opening</strong> -- the real, actual balance the society was carrying at the very start of the fiscal year you've selected (not from the very beginning of the app's history -- specifically as of 1 April of that year).</li>
-      <li><strong>Closing</strong> -- Opening balance plus this year's full Net Surplus. This is the cumulative, running total -- it is <em>not</em> the same number as Net Surplus unless the Opening balance happens to be zero.</li>
-      <li><strong>Net Surplus</strong> -- this year's income minus this year's expense, on its own (before adding the Opening balance).</li>
-      <li><strong>Risk</strong> -- a quick traffic-light read on whether the projected balance stays healthy through the year (LOW), dips low at some point (MODERATE), or goes negative before year-end (HIGH), based on your current assumptions.</li>
+      <li><strong>Opening</strong> -- the real balance carried forward into the very start of the fiscal year you've selected. Click its "i" for the exact figure; for the technical detail, it's chained from the Closing Balance of the FY right before it, all the way back to the confirmed True Opening Balance anchor -- it is never re-guessed from scratch.</li>
+      <li><strong>Closing</strong> -- Opening balance plus this year's full Net Surplus. Click "i" to see <code>Opening + Net Surplus = Closing</code> spelled out with real numbers. This is the cumulative, running total -- it is <em>not</em> the same number as Net Surplus unless the Opening balance happens to be zero.</li>
+      <li><strong>Net Surplus</strong> -- this year's income minus this year's expense, on its own (before adding the Opening balance). Click "i" to see <code>Total Income &minus; Total Expense = Net Surplus</code>.</li>
+      <li><strong>Risk</strong> -- a quick traffic-light read on whether the projected balance stays healthy through the year (LOW), dips low at some point (MODERATE), or goes negative before year-end (HIGH), based on the lowest projected month-end balance under your current assumptions.</li>
     </ul>
   </div>
 
   <div class="card-explain neutral">
-    <h3>Contingency Rate lever (no separate card here anymore)</h3>
-    <p>Forecasting used to show its own Contingency Fund card, but that duplicated the Contingency Cash figure already shown on Overview and on the Opening &amp; Closing Balance page. It's been removed from this page -- the reserve is now only adjustable here, via the <strong>Contingency Rate</strong> slider in Global Assumptions, and its resulting total still flows into the Opening/Closing balance figures on this page and is fully broken down on the Opening &amp; Closing Balance page.</p>
-    <div class="screenshot-frame" style="min-height:160px; display:flex; align-items:center; justify-content:center; background:#f8fafc; border-style:dashed;">
-      <p style="color:#94a3b8; font-size:13px; margin:0;">&#128247; Paste an updated screenshot of the Forecasting page here (Contingency card removed, lever only)</p>
-    </div>
+    <h3>As of Today</h3>
+    <p>A separate section, deliberately <strong>independent of whichever FY you have selected above</strong>. "Opening" and "Closing" are scoped to the FY you're viewing (which could be a closed year, or a future one that hasn't started) -- this section instead always shows your real, all-time financial position through the most recent month there's actual data for, tagged with an "All-Time &middot; as of [Month 'YY]" badge:</p>
+    <ul>
+      <li><strong>Net Operating Surplus</strong> -- all real income minus all real expense, since day one. Not filtered by the FY selector, not a forecast -- purely what's actually happened.</li>
+      <li><strong>Bank Balance</strong> -- the confirmed True Opening Balance anchor plus that same Net Operating Surplus. This is your real cash position right now, independent of which year you're browsing in the forecast above.</li>
+    </ul>
+    <p>Use this section as your fixed reference point: no matter which FY you switch to above (closed, current, or years into the future), "As of Today" never moves -- it's always telling you where things really stand, today.</p>
+  </div>
+
+  <div class="card-explain neutral">
+    <h3>Why a month sometimes says "NO DATA" instead of ACTUAL or FORECAST</h3>
+    <p>This page will never invent numbers for a month that has already happened. If a month falls before your society's real record-keeping began (e.g. tracking started partway through a year), that month shows a <strong>NO DATA</strong> badge with &#8377;0, not a forecast -- forecasting is only ever applied to months that are still ahead of the most recent real data, never to the past. This keeps closed/historical years honest: a year with only 6 months of real data will correctly show those 6 months as ACTUAL and the other 6 as NO DATA, never quietly fabricated as FORECAST.</p>
   </div>
 
   <div class="card-explain neutral">
     <h3>Month-by-Month Detail table</h3>
-    <p>Collapsed by default -- tap the row to expand it. Each month is tagged <strong>ACTUAL</strong> (real recorded figures) or <strong>FORECAST</strong> (projected from your assumptions), and the Closing column rolls forward month by month, starting from the true Opening balance above -- so by March, Closing reflects everything from the start of the year, not just the forecast months on their own.</p>
+    <p>Collapsed by default -- tap the row to expand it. Each month is tagged <strong>ACTUAL</strong> (real recorded figures), <strong>FORECAST</strong> (projected from your assumptions), or <strong>NO DATA</strong> (already in the past, but no real record exists -- see above), and the Closing column rolls forward month by month, starting from the true Opening balance above -- so by the final month, Closing reflects everything from the start of the year, not just the forecast months on their own.</p>
   </div>
 
   <div class="card-explain neutral">
     <h3>Forecast Dashboard (chart)</h3>
     <p>Two tabs:</p>
     <ul>
-      <li><strong>Trend</strong> -- a bar-and-line chart of Income, Expense, and Closing Balance for all 12 months. Actual months are shown in solid colour; forecast months are shown lighter, so you can see at a glance where real data ends and projection begins. If every category's growth assumption is left at 0%, forecast months will look identical to each other month-to-month -- that's expected, not a bug: with no growth assumption applied, the forecast simply carries the same average forward every month, so the Closing Balance line rises in a straight, constant step rather than a curve. Moving any category slider away from 0% will make that trend curve instead.</li>
+      <li><strong>Trend</strong> -- a bar-and-line chart of Income, Expense, and Closing Balance for all 12 months. Actual months are shown in solid colour, forecast months lighter, and NO DATA months in flat grey, so you can see at a glance where real data ends, where genuine gaps sit, and where projection begins. If every category's growth assumption is left at 0%, forecast months will look identical to each other month-to-month -- that's expected, not a bug: with no growth assumption applied, the forecast simply carries the same average forward every month, so the Closing Balance line rises in a straight, constant step rather than a curve. Moving any category slider away from 0% will make that trend curve instead.</li>
       <li><strong>Expense Mix</strong> -- a donut chart showing which categories make up the forecast (not actual) months' spending, so you can see at a glance where the bulk of upcoming expense is concentrated.</li>
     </ul>
   </div>
 
   <div class="card-explain neutral">
     <h3>Worked example: how the Contingency Rate lever feeds the forecast</h3>
-    <p>Say the Contingency Rate was last actually charged at &#8377;0.50/sqft in a real month, and your community is 7,01,591 sqft. For any forecast month using that rate: &#8377;0.50 &times; 7,01,591 = &#8377;3,50,796 is added to the reserve that month. Actual months instead use whatever the real recorded rate was for that specific month -- including &#8377;0 for months it wasn't charged at all. Summed across all 12 months of the selected year, this is a <em>portion of</em> the Closing Balance shown above on this page, not extra money added on top of it -- and it's the same figure you'll see broken down in full on the Opening &amp; Closing Balance page.</p>
+    <p>Say the Contingency Rate was last actually charged at &#8377;0.50/sqft in a real month, and your community is 7,01,591 sqft. For any forecast month using that rate: &#8377;0.50 &times; 7,01,591 = &#8377;3,50,796 is added to the reserve that month. Actual months instead use whatever the real recorded rate was for that specific month -- including &#8377;0 for months it wasn't charged at all. Summed across all 12 months of the selected year, this is a <em>portion of</em> the Closing Balance shown above on this page, not extra money added on top of it -- and it's the same figure you'll see broken down in full on the Opening &amp; Closing Balance page. (You can also just click the Contingency Rate slider's own "i" button to see this exact math with your community's live numbers, instead of doing it by hand.)</p>
   </div>
 
-  <a class="back-to-top" href="#top">↑ Back to top</a>
+  <div class="card-explain neutral">
+    <h3>How a future year's Opening Balance is calculated (advanced)</h3>
+    <p>If you select a FY that's more than one year away (e.g. it's currently FY 2026-27 and you pick FY 2027-28), that year's Opening Balance isn't just guessed -- it's built by walking month-by-month through every month in between, using the exact same forecast formula shown throughout this page, starting from the last month with real data all the way to the selected year's start. In plain terms: a future year's Opening always equals the (possibly still-forecast) Closing Balance of the year right before it -- it never resets back to a fixed starting number. This also means: if you move a lever, every future year's Opening Balance downstream of today will shift too, since it's genuinely built from your current assumptions, not a cached snapshot.</p>
+  </div>
+
+  <div class="screenshot-frame" style="min-height:160px; display:flex; align-items:center; justify-content:center; background:#f8fafc; border-style:dashed;">
+    <p style="color:#94a3b8; font-size:13px; margin:0;">&#128247; Paste an updated screenshot of the Forecasting page here (showing the "i" calculation buttons, the "Changed" tags, and the As of Today section)</p>
+  </div>
+
+  <a class="back-to-top" href="#top">\u2191 Back to top</a>
 </section>
 
 <hr class="divider">
@@ -556,7 +584,7 @@
   </div>
   <div class="card-explain neutral">
     <h3>Monthly collection: Actual vs Expected</h3>
-    <p>Three things plotted together every month: <strong>Actual Collection</strong> (maintenance actually received, in green), <strong>Expense</strong> (in orange), and <strong>Expected Collection</strong> (the per-square-foot rate target, shown as a dashed line). This is the same Actual/Expected Collection concept used on the resident-facing Income Visibility page (specifically its "Collected vs Outstanding Receivables" chart) &mdash; kept identical on purpose, so the numbers always agree no matter which dashboard you're looking at.</p>
+    <p>Three things plotted together every month: <strong>Actual Collection</strong> (maintenance actually received, in green), <strong>Expense</strong> (in orange), and <strong>Expected Collection</strong> (the per-square-foot rate target, shown as a dashed line). This is the same Actual/Expected Collection concept used on the resident-facing Income Visibility page (specifically its "Collected vs unpaid maintenance" chart) &mdash; kept identical on purpose, so the numbers always agree no matter which dashboard you're looking at.</p>
   </div>
   <div class="card-explain neutral">
     <h3>Collection performance vs target</h3>
