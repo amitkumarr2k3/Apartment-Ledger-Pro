@@ -112,7 +112,7 @@ function Inner() {
   const [maintenanceRate, setMaintenanceRate] = useState(4.1);
   const [collectionPct, setCollectionPct] = useState(90);
   const [interestPct, setInterestPct] = useState(0);
-  const [inflationPct, setInflationPct] = useState(6);
+  const [inflationPct, setInflationPct] = useState(0);
   const [unknownExpense, setUnknownExpense] = useState(0);
   const [incomeCategoryPct, setIncomeCategoryPct] = useState<Record<string, number>>({});
   const [expenseCategoryPct, setExpenseCategoryPct] = useState<Record<string, number>>({});
@@ -136,10 +136,23 @@ function Inner() {
     [fyStart],
   );
 
+  // The current, still-in-progress calendar month (e.g. if today is
+  // somewhere in August, this is "1 August"). A month having *some* rows
+  // recorded doesn't mean it's finished -- expenses in particular tend to
+  // get entered later in the month, so an in-progress month's numbers are
+  // always partial. Every other chart in this app already excludes the
+  // ongoing month from "actual" for exactly this reason; Forecasting is a
+  // self-contained system that doesn't share that logic, so it needs its
+  // own copy of the same rule.
+  const currentRealMonthStart = useMemo(() => {
+    const n = new Date();
+    return new Date(n.getFullYear(), n.getMonth(), 1);
+  }, []);
+
   const actualByMonth = useMemo(() => {
     const map = new Map((monthlyTotals as any[]).map((m) => [m.month, m]));
-    return fyMonths.map((fm) => map.get(fm.label));
-  }, [fyMonths, monthlyTotals]);
+    return fyMonths.map((fm) => (fm.date.getTime() >= currentRealMonthStart.getTime() ? undefined : map.get(fm.label)));
+  }, [fyMonths, monthlyTotals, currentRealMonthStart]);
 
   const lastCompletedIdx = useMemo(() => {
     let idx = -1;
@@ -315,6 +328,10 @@ function Inner() {
     const parsedActuals = (monthlyTotals as any[])
       .map((m) => ({ m, d: parseMonthLabel(m.month) }))
       .filter((x): x is { m: any; d: Date } => x.d !== null)
+      // Exclude the current, still-in-progress month -- same rule as
+      // actualByMonth above: a month having some rows recorded doesn't mean
+      // it's finished, so it must never count as "real, final" data here.
+      .filter((x) => x.d.getTime() < currentRealMonthStart.getTime())
       .sort((a, b) => a.d.getTime() - b.d.getTime());
 
     if (parsedActuals.length === 0) return anchor;
@@ -345,7 +362,45 @@ function Inner() {
   }, [
     monthlyTotals, fyMonths, balanceStrip.opening, hasTrueAnchor, trueOpeningAnchor, defaultFyStart,
     maintenanceRate, collectionPct, interestPct, inflationPct, incomeLevers, expenseLevers, combineMode, inflationScope,
+    currentRealMonthStart,
   ]);
+
+  // OUTSTANDING RECEIVABLES -- pulled directly from the exact same
+  // real, all-time figure Overview shows (no new calculation invented
+  // here): the latest recorded "Previous Arrears Brought Forward" entry,
+  // taken at face value. Paired with its % of all-time total Expected
+  // Collection so there's a sense of scale, not just a raw rupee figure.
+  const isLiabilityCategoryName = (name: string) => /outstanding|arrears|default/i.test(name || "");
+  const isPreviousArrearsBF = (s: string) => (s || "").trim().toLowerCase() === "previous arrears brought forward";
+  const isExpectedCollectionReferenceName = (name: string) => /expected collection reference/i.test(name || "");
+
+  const cumulativeOutstandingReceivables = useMemo(() => {
+    let bfRaw: number[] = [];
+    (incomeTree as Category[]).filter((c) => isLiabilityCategoryName(c.name)).forEach((c) => {
+      (c.vendors || []).forEach((v) => {
+        (v.items || []).forEach((it) => {
+          if (isPreviousArrearsBF(it.name)) {
+            const monthly = it.monthly || [];
+            bfRaw = bfRaw.length === 0 ? [...monthly] : bfRaw.map((val, idx) => val + (monthly[idx] ?? 0));
+          }
+        });
+      });
+    });
+    for (let idx = bfRaw.length - 1; idx >= 0; idx--) {
+      if (bfRaw[idx]) return bfRaw[idx];
+    }
+    return 0;
+  }, [incomeTree]);
+
+  const totalExpectedCollectionAllTime = useMemo(() => {
+    const cat = (incomeTree as Category[]).find((c) => isExpectedCollectionReferenceName(c.name));
+    if (!cat) return 0;
+    return categoryMonthly(cat).reduce((s, v) => s + (v ?? 0), 0);
+  }, [incomeTree]);
+
+  const outstandingReceivablesPct = totalExpectedCollectionAllTime > 0
+    ? (cumulativeOutstandingReceivables / totalExpectedCollectionAllTime) * 100
+    : 0;
 
   // TODAY'S REAL POSITION -- deliberately independent of the FY dropdown
   // above. "Opening" and "Closing" on this page are scoped to whichever FY
@@ -358,6 +413,10 @@ function Inner() {
     const parsedActuals = (monthlyTotals as any[])
       .map((m) => ({ m, d: parseMonthLabel(m.month) }))
       .filter((x): x is { m: any; d: Date } => x.d !== null)
+      // Exclude the current, still-in-progress month -- same rule as
+      // actualByMonth above: a month having some rows recorded doesn't mean
+      // it's finished, so it must never count as "real, final" data here.
+      .filter((x) => x.d.getTime() < currentRealMonthStart.getTime())
       .sort((a, b) => a.d.getTime() - b.d.getTime());
     if (parsedActuals.length === 0) {
       return { netOperatingSurplus: 0, bankBalance: anchor, anchor, asOfLabel: null as string | null };
@@ -370,7 +429,7 @@ function Inner() {
       anchor,
       asOfLabel: lastActual.m.month as string,
     };
-  }, [monthlyTotals, hasTrueAnchor, trueOpeningAnchor, balanceStrip.opening]);
+  }, [monthlyTotals, hasTrueAnchor, trueOpeningAnchor, balanceStrip.opening, currentRealMonthStart]);
 
   const { rows: monthRows, mixByCategory } = useMemo(() => {
     let opening = fyOpeningBalance;
@@ -437,7 +496,7 @@ function Inner() {
   }));
 
   function resetAll() {
-    setMaintenanceRate(4.1); setCollectionPct(90); setInterestPct(0); setInflationPct(6);
+    setMaintenanceRate(4.1); setCollectionPct(90); setInterestPct(0); setInflationPct(0);
     setContingencyRate(null); setUnknownExpense(0); setIncomeCategoryPct({}); setExpenseCategoryPct({});
     setRefWindow(12); setCombineMode("compound"); setInflationScope("expense");
     setShowAllIncome(false); setShowAllExpense(false);
@@ -452,7 +511,7 @@ function Inner() {
     if (maintenanceRate !== 4.1) n++;
     if (collectionPct !== 90) n++;
     if (interestPct !== 0) n++;
-    if (inflationPct !== 6) n++;
+    if (inflationPct !== 0) n++;
     if (contingencyRate !== null) n++;
     if (unknownExpense !== 0) n++;
     n += Object.values(incomeCategoryPct).filter((v) => v !== 0).length;
@@ -556,24 +615,24 @@ function Inner() {
       {isWidgetVisible("forecasting.kpiTiles") && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           <div className="rounded-lg border p-3">
-            <div className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground truncate">Opening · {fyLabelFor(fyStart)}</div>
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground truncate">Opening · {fyLabelFor(fyStart)}</div>
             <div className="text-sm sm:text-lg font-black truncate">{inr(fyOpeningBalance)}</div>
-            <div className="text-[8px] text-muted-foreground mt-0.5 leading-tight">Carried forward from before this FY began</div>
+            <div className="text-[11px] text-muted-foreground mt-0.5 leading-tight">Carried forward from before this FY began</div>
           </div>
           <div className="rounded-lg p-3 bg-gradient-to-br from-[#0082c9] to-[#005f91] text-white">
-            <div className="text-[9px] font-semibold uppercase tracking-wider text-blue-100 truncate">Closing · {fyLabelFor(fyStart)}</div>
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-blue-100 truncate">Closing · {fyLabelFor(fyStart)}</div>
             <div className="text-sm sm:text-lg font-black truncate">{inr(closing)}</div>
-            <div className="text-[8px] text-blue-100 mt-0.5 leading-tight">Opening + full-year Net Surplus</div>
+            <div className="text-[11px] text-blue-100 mt-0.5 leading-tight">Opening + full-year Net Surplus</div>
           </div>
           <div className="rounded-lg border p-3">
-            <div className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground truncate">Net Surplus</div>
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground truncate">Net Surplus</div>
             <div className={"text-sm sm:text-lg font-black truncate " + (fyNet < 0 ? "text-rose-600" : "")}>{inr(fyNet)}</div>
-            <div className="text-[8px] text-muted-foreground mt-0.5 leading-tight">Total income minus total expense, all 12 months</div>
+            <div className="text-[11px] text-muted-foreground mt-0.5 leading-tight">Total income minus total expense, all 12 months</div>
           </div>
           <div className="rounded-lg border p-3">
-            <div className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground truncate">Risk</div>
-            <Badge variant="outline" className={"mt-0.5 text-[10px] " + riskClass}>{riskLabel}</Badge>
-            <div className="text-[8px] text-muted-foreground mt-1 leading-tight">Based on the lowest projected month-end balance this year</div>
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground truncate">Risk</div>
+            <Badge variant="outline" className={"mt-0.5 text-xs " + riskClass}>{riskLabel}</Badge>
+            <div className="text-[11px] text-muted-foreground mt-1 leading-tight">Based on the lowest projected month-end balance this year</div>
           </div>
         </div>
       )}
@@ -584,22 +643,33 @@ function Inner() {
       {isWidgetVisible("forecasting.kpiTiles") && todaySnapshot.asOfLabel && (
         <div className="rounded-lg border p-3 bg-muted/20">
           <div className="flex items-center justify-between mb-2 flex-wrap gap-1">
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               As of Today -- real position, not filtered by the FY selector above
             </div>
-            <Badge variant="outline" className="text-[9px] border-dashed">All-Time · as of {todaySnapshot.asOfLabel}</Badge>
+            <Badge variant="outline" className="text-[11px] border-dashed">All-Time · as of {todaySnapshot.asOfLabel}</Badge>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
-              <div className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">Net Operating Surplus</div>
+              <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Net Operating Surplus</div>
               <div className={"text-lg font-black truncate " + (todaySnapshot.netOperatingSurplus < 0 ? "text-rose-600" : "")}>{inr(todaySnapshot.netOperatingSurplus)}</div>
-              <div className="text-[8px] text-muted-foreground mt-0.5 leading-tight">All real income minus all real expense, since day one</div>
+              <div className="text-[11px] text-muted-foreground mt-0.5 leading-tight">All real income minus all real expense, since day one</div>
             </div>
             <div>
-              <div className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">Bank Balance</div>
+              <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Bank Balance</div>
               <div className="text-lg font-black truncate">{inr(todaySnapshot.bankBalance)}</div>
-              <div className="text-[8px] text-muted-foreground mt-0.5 leading-tight font-mono">
+              <div className="text-[11px] text-muted-foreground mt-0.5 leading-tight font-mono">
                 {inr(todaySnapshot.anchor)} (True Opening Balance) + {inr(todaySnapshot.netOperatingSurplus)} (Net Operating Surplus) = {inr(todaySnapshot.bankBalance)}
+              </div>
+            </div>
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Outstanding Receivables</div>
+              <div className="text-lg font-black truncate">{inr(cumulativeOutstandingReceivables)}</div>
+              <div className="text-[11px] text-muted-foreground mt-0.5 leading-tight">
+                Same cumulative figure as Overview ·{" "}
+                <span className="inline-block font-bold text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded">
+                  {outstandingReceivablesPct.toFixed(1)}%
+                </span>{" "}
+                of total expected collection ({inr(totalExpectedCollectionAllTime)})
               </div>
             </div>
           </div>
@@ -615,12 +685,12 @@ function Inner() {
           </CardHeader>
           <CardContent className="grid grid-cols-1 sm:grid-cols-3 gap-3 pb-4">
             <div className="space-y-1">
-              <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Reference Window (mo)</label>
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Reference Window (mo)</label>
               <Input type="number" min={1} max={24} value={refWindow} onChange={(e) => setRefWindow(Number(e.target.value) || 12)} className="h-8 text-sm" />
-              <p className="text-[10px] text-muted-foreground">As of today, {historyMonthsAvailable} mo of real history exist overall -- this grows by itself as each new month closes out, so expect it to be higher next time you check. Each category above only averages the months it actually has data for -- see "avg of N months" under each lever below.</p>
+              <p className="text-xs text-muted-foreground">As of today, {historyMonthsAvailable} mo of real history exist overall -- this grows by itself as each new month closes out, so expect it to be higher next time you check. Each category above only averages the months it actually has data for -- see "avg of N months" under each lever below.</p>
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Inflation Combination</label>
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Inflation Combination</label>
               <Select value={combineMode} onValueChange={(v) => setCombineMode(v as "compound" | "additive")}>
                 <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -630,7 +700,7 @@ function Inner() {
               </Select>
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Apply Inflation To</label>
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Apply Inflation To</label>
               <Select value={inflationScope} onValueChange={(v) => setInflationScope(v as "expense" | "both")}>
                 <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -652,7 +722,7 @@ function Inner() {
               <LeverRow label="Maintenance Rate (₹/sqft/mo)" value={maintenanceRate} onChange={setMaintenanceRate} min={3} max={5} step={0.05} display={"₹" + maintenanceRate.toFixed(2)} defaultValue={4.1} formatValue={(v) => "₹" + v.toFixed(2)} />
               <LeverRow label="Maintenance Collection %" value={collectionPct} onChange={setCollectionPct} min={50} max={100} step={1} display={collectionPct + "%"} defaultValue={90} formatValue={(v) => v + "%"} />
               <LeverRow label="Interest on Surplus %" value={interestPct} onChange={setInterestPct} min={0} max={10} step={0.5} display={interestPct + "%"} defaultValue={0} formatValue={(v) => v + "%"} />
-              <LeverRow label="Inflation (annual)" value={inflationPct} onChange={setInflationPct} min={0} max={15} step={0.5} display={inflationPct + "%"} defaultValue={6} formatValue={(v) => v + "%"} />
+              <LeverRow label="Inflation (annual)" value={inflationPct} onChange={setInflationPct} min={0} max={15} step={0.5} display={inflationPct + "%"} defaultValue={0} formatValue={(v) => v + "%"} />
               <LeverRow
                 label="Contingency Rate (₹/sqft/mo)"
                 value={effectiveContingencyRate}
@@ -665,9 +735,9 @@ function Inner() {
               />
               <div className="space-y-1">
                 <label className="text-sm font-medium flex items-center gap-1.5">
-                  Unknown Expense <span className="text-[10px] text-muted-foreground font-normal">(one-time, ₹)</span>
+                  Contingency Expenses <span className="text-xs text-muted-foreground font-normal">(one-time, ₹)</span>
                   {unknownExpense !== 0 && (
-                    <span className="inline-flex items-center gap-1 text-[9px] font-semibold text-amber-700 bg-amber-50 border border-amber-300 rounded-full px-1.5 py-0.5" title="Standard value is ₹0">
+                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-300 rounded-full px-1.5 py-0.5" title="Standard value is ₹0">
                       <span className="h-1.5 w-1.5 rounded-full bg-amber-500" /> Changed
                     </span>
                   )}
@@ -740,7 +810,7 @@ function Inner() {
                 {tableOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                 <CardTitle className="text-sm">Month-by-Month Detail · {fyLabelFor(fyStart)}</CardTitle>
               </div>
-              <Badge variant="outline" className="text-[10px]">{actualMonthsCount} actual · {forecastMonthsCount} forecast{noDataMonthsCount > 0 ? " · " + noDataMonthsCount + " no data" : ""}</Badge>
+              <Badge variant="outline" className="text-xs">{actualMonthsCount} actual · {forecastMonthsCount} forecast{noDataMonthsCount > 0 ? " · " + noDataMonthsCount + " no data" : ""}</Badge>
             </div>
           </CardHeader>
           {tableOpen && (
@@ -945,7 +1015,7 @@ function Inner() {
                   </span>
                 </div>
               </div>
-              <p className="text-[10px] text-muted-foreground mt-1.5">
+              <p className="text-xs text-muted-foreground mt-1.5">
                 This list includes every category currently shown on this page (not just the "top N" default view) -- so this reconciliation is always complete, not a partial sample.
               </p>
             </div>
@@ -983,7 +1053,7 @@ function LeverRow({
           <span className="truncate">{label}</span>
           {isChanged && (
             <span
-              className="shrink-0 inline-flex items-center gap-1 text-[9px] font-semibold text-amber-700 bg-amber-50 border border-amber-300 rounded-full px-1.5 py-0.5"
+              className="shrink-0 inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-300 rounded-full px-1.5 py-0.5"
               title={"Standard value is " + fmt(defaultValue as number)}
             >
               <span className="h-1.5 w-1.5 rounded-full bg-amber-500" /> Changed
@@ -1010,9 +1080,9 @@ function LeverRow({
           />
         )}
       </div>
-      {sub && <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold mt-1">{sub}</p>}
+      {sub && <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold mt-1">{sub}</p>}
       {isChanged && (
-        <p className="text-[10px] text-amber-700 mt-0.5">
+        <p className="text-xs text-amber-700 mt-0.5">
           Standard value is {fmt(defaultValue as number)} -- you're {delta > 0 ? fmt(Math.abs(delta)) + " above" : fmt(Math.abs(delta)) + " below"} that.
         </p>
       )}
