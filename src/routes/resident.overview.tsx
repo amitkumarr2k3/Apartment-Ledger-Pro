@@ -3,22 +3,21 @@ import { useState, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { PortalShell, usePeriod } from "@/components/portal-shell";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
-  Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell, LabelList,
+  Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell, LabelList, LineChart, Line,
 } from "recharts";
 import { SmartTooltipContent, getTooltipTrigger } from "@/components/smart-tooltip";
 import {
   inr, pct, categoryMonthly, total, vendorMonthly, sumMonthly,
 } from "@/lib/finance-mock";
-import { useMonthlyTotals, useExpenseTree, useIncomeTree, useWidgetVisibility, useAuditedReports, uploadAuditedReport, fetchAuditedReportFileUrl } from "@/lib/hooks";
+import { useMonthlyTotals, useExpenseTree, useIncomeTree, useWidgetVisibility, useAuditedReports, uploadAuditedReport, deleteAuditedReport, fetchAuditedReportFileUrl } from "@/lib/hooks";
 import { getSession } from "@/lib/session";
-import { Wallet, ArrowRight, TrendingUp, TrendingDown, Home, Banknote, ShieldCheck, CheckCircle2, AlertTriangle, ShoppingCart, PiggyBank, Vault, HandCoins, CreditCard, Scale, Gauge, Target, FileCheck2, Eye, UploadCloud, ExternalLink } from "lucide-react";
+import { Wallet, ArrowRight, TrendingUp, TrendingDown, Home, Banknote, ShieldCheck, CheckCircle2, AlertTriangle, ShoppingCart, PiggyBank, Vault, HandCoins, CreditCard, Target, FileCheck2, Eye, UploadCloud, ExternalLink, Landmark, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/resident/overview")({
@@ -35,7 +34,7 @@ function Page() {
 }
 
 function Inner() {
-  const { sliceMonthly, view } = usePeriod();
+  const { sliceMonthly, view, labels = [] } = usePeriod();
   // FIX (2026-08-15): real widget-level visibility, replacing the old
   // Dashboard Controls page that had no effect on what residents actually
   // see. Each real card below now checks its real widget id.
@@ -242,10 +241,10 @@ function Inner() {
   };
   const bfRawMonthly = liabilityLineItemRawMonthly(isPreviousArrearsBF);
   // "Current Month Unpaid Maintenance" -- used ONLY for the Total Expected
-  // Income card below (sum across the selected period, alongside Total
-  // Received Income and Opening Balance). This is a distinct, additive use
-  // from RD-32's Income Visibility chart and does not change that chart's
-  // behavior at all.
+  // Income card below, displayed there as "Outstanding Receivables" (sum
+  // across the selected period, alongside Total Received Income and
+  // Opening Balance). This is a distinct, additive use from RD-32's Income
+  // Visibility chart and does not change that chart's behavior at all.
   const isCurrentMonthUnpaidMaintenance = (s: string) => (s || "").trim().toLowerCase() === "current month unpaid maintenance";
   const currentMonthUnpaidRawMonthly = liabilityLineItemRawMonthly(isCurrentMonthUnpaidMaintenance);
 
@@ -266,25 +265,6 @@ function Inner() {
     }
   }
 
-  /**
-   * RECOVERY RATE
-   * Redefined: % of the EXPECTED (per-sqft target) collection that was
-   * actually collected for the selected period. Neither "Current Month
-   * Unpaid Maintenance" nor "Previous Arrears Brought Forward" are used
-   * here -- both are restricted to their own designated places only
-   * (RD-32 for the former; the Outstanding Dues card / Cashflow Health's
-   * cumulative outstanding line for the latter) and must not leak into any
-   * other calculation.
-   */
-  const recoveryRate = expectedCollection > 0
-    ? (collectedMaintenance / expectedCollection) * 100
-    : 0;
-  const recoveryStatus =
-    recoveryRate >= 90
-      ? { text: "Healthy", color: "text-green-600", dot: "bg-green-500" }
-      : recoveryRate >= 75
-        ? { text: "Watch", color: "text-amber-600", dot: "bg-amber-500" }
-        : { text: "At Risk", color: "text-red-600", dot: "bg-red-500" };
   /**
    * CORPUS WITH INTEREST (ACCUMULATED)
    * Supplied via CSV (head=reference, category="Corpus Fund Reference") as a
@@ -324,6 +304,24 @@ function Inner() {
     if (openingBalanceFullMonthly[idx]) { trueOpeningAnchor = openingBalanceFullMonthly[idx]; break; }
   }
   const bankBalance = trueOpeningAnchor + allTimeCollection - allTimeExpense;
+  /**
+   * OPENING BALANCE (PERIOD-FILTERED)
+   * Mirrors the exact calculation already used on the Opening & Closing
+   * Balance dashboard's "Opening balance" strip cell: the confirmed
+   * Opening Balance anchor PLUS every month's net movement (collection -
+   * expense) strictly BEFORE the selected period starts. Unlike Bank
+   * Balance above (always all-time), this number DOES change with
+   * whichever period the resident has selected -- e.g. picking
+   * "Apr '26 to Jul '26" shows the balance as it stood on 1 Apr '26, not
+   * today's running total.
+   */
+  const periodStartMonth = period[0]?.month;
+  const periodStartIdx = periodStartMonth
+    ? safeMonthlyTotals.findIndex((m) => m.month === periodStartMonth)
+    : -1;
+  const priorMonths = periodStartIdx >= 0 ? safeMonthlyTotals.slice(0, periodStartIdx) : [];
+  const priorNet = priorMonths.reduce((s, m) => s + (m.collection || 0) - (m.expense || 0), 0);
+  const periodOpeningBalance = trueOpeningAnchor + priorNet;
   // Contingency Cash is a RING-FENCED PORTION of Bank Balance, not additional
   // money on top of it. These two values drive the composition bar on the
   // Bank Balance card so that relationship is visually unmistakable.
@@ -332,24 +330,30 @@ function Inner() {
   
   // Final Financial Metrics
   const totalIncome = collectedMaintenance + communityIncome;
-  // TOTAL EXPECTED INCOME = Total Received Income (this period) + ALL
-  // "Current Month Unpaid Maintenance" ever recorded, across every month --
-  // deliberately NOT sliced by the dashboard's period filter, same
-  // "all-time" treatment as Bank Balance / Contingency Cash / Corpus /
-  // Outstanding Receivables -- + the historical Opening Balance anchor.
-  // This is a projection of total funds expected to be available,
-  // deliberately shown as its own card BEFORE Total Received Income so the
-  // "expected" and "actually received" figures are never confused.
-  const currentMonthUnpaidAllTime = total(currentMonthUnpaidRawMonthly);
-  const totalExpectedIncome = totalIncome + currentMonthUnpaidAllTime + trueOpeningAnchor;
+  // TOTAL EXPECTED INCOME = Total Received Income (this period) + Outstanding
+  // Receivables (billed but not yet collected, summed for THIS SAME
+  // selected period -- respects the dashboard's period filter, same as
+  // Total Received Income right next to it) + the historical Opening
+  // Balance anchor. This is a projection of total funds expected to be
+  // available, deliberately shown as its own card BEFORE Total Received
+  // Income so the "expected" and "actually received" figures are never
+  // confused.
+  const outstandingReceivablesForPeriod = total(sliceMonthly(currentMonthUnpaidRawMonthly));
+  // Uses periodOpeningBalance (not the raw all-time trueOpeningAnchor) so
+  // this stays internally consistent with the Opening Balance figure shown
+  // right next to it -- both always describe the SAME "balance at the
+  // start of whichever period is selected", not the society's original
+  // founding balance from inception.
+  const totalExpectedIncome = totalIncome + outstandingReceivablesForPeriod + periodOpeningBalance;
   const netSurplus = totalIncome - totalExpense;
-  const expenseIncomeRatio = totalIncome === 0 ? 0 : (totalExpense / totalIncome) * 100;
-  const ratioStatus =
-    expenseIncomeRatio > 100
-      ? { text: "Over Budget", color: "text-red-600" }
-      : expenseIncomeRatio > 85
-        ? { text: "Caution", color: "text-amber-600" }
-        : { text: "Healthy", color: "text-gray-600" };
+
+  // MAINTENANCE RATE TREND (moved here from Cashflow Health, replacing the
+  // old Expense/Income Ratio card). Per-sqft rate -- display only, sourced
+  // from the same "Maintenance Rate Reference" CSV category used elsewhere
+  // on this page. Sliced to the selected period so it moves with whichever
+  // range the resident has chosen, same as Cashflow Health's original.
+  const rateCategoryForDisplay = safeIncomeTree.find((c) => isMaintenanceRateReference(c.name));
+  const rateMonthlyForDisplay = rateCategoryForDisplay ? sliceMonthly(categoryMonthly(rateCategoryForDisplay)) : [];
 
 
   return (
@@ -405,11 +409,16 @@ function Inner() {
       >
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
 			<MetricCard 
+			  label="OPENING BALANCE" 
+			  value={inr(periodOpeningBalance)} 
+			  subText={`BALANCE AS OF START OF ${periodLabel}`} 
+			  icon={<Landmark className="h-5 w-5 text-slate-500" />}
+			/>
+			<MetricCard 
 			  label="TOTAL EXPECTED INCOME" 
 			  value={inr(totalExpectedIncome)} 
-			  subText={`RECEIVED (${periodLabel}) + UNPAID DUES (ALL-TIME) + OPENING BALANCE`} 
+			  subText={`TOTAL RECEIVED INCOME (${periodLabel}) + OUTSTANDING RECEIVABLES (${periodLabel}) + OPENING BALANCE`} 
 			  icon={<Target className="h-5 w-5 text-emerald-500" />}
-			  className="ring-1 ring-slate-200 rounded-lg"
 			/>
 			<MetricCard 
 			  label="TOTAL RECEIVED INCOME" 
@@ -424,7 +433,6 @@ function Inner() {
 			  value={inr(totalExpense)} 
 			  subText={`OPERATING SPEND FOR ${periodLabel} · CLICK TO VIEW DETAILS`} 
 			  icon={<ShoppingCart className="h-5 w-5 text-gray-400" />}
-			  className="bg-gray-50/50"
 			  to="/resident/drilldown"
 			  search={(((prev: any) => ({ ...prev, head: "expense", category: undefined, vendor: undefined, line: undefined })) as any)}
 			/>
@@ -436,20 +444,6 @@ function Inner() {
             footer={
               <div className={`flex items-center gap-1 text-xs font-medium mt-2 ${netSurplus >= 0 ? "text-green-600" : "text-red-600"}`}>
                 <div className={`h-2 w-2 rounded-full ${netSurplus >= 0 ? "bg-green-500" : "bg-red-500"}`} /> {netSurplus >= 0 ? "Positive" : "Negative"}
-              </div>
-            }
-          />
-          <MetricCard 
-            label="RECOVERY RATE" 
-            value={`${recoveryRate.toFixed(1)}%`} 
-            icon={<Gauge className="h-5 w-5 text-blue-500" />}
-            subText={`MAINTENANCE COLLECTED VS EXPECTED TARGET FOR ${periodLabel}`}
-            footer={
-              <div className="w-full mt-2">
-                <div className={`flex items-center gap-1 text-xs font-medium mb-1 ${recoveryStatus.color}`}>
-                  <div className={`h-2 w-2 rounded-full ${recoveryStatus.dot}`} /> {recoveryStatus.text}
-                </div>
-                <Progress value={Math.min(recoveryRate, 100)} className="h-1.5 bg-gray-100" />
               </div>
             }
           />
@@ -513,23 +507,50 @@ function Inner() {
               </div>
             }
           />
-          <MetricCard 
-            label="EXPENSE / INCOME RATIO" 
-            value={`${expenseIncomeRatio.toFixed(1)}%`} 
-            subText="BUDGET EFFICIENCY INDICATOR" 
-            icon={<Scale className="h-5 w-5 text-indigo-400" />}
-            footer={
-              <div className="w-full mt-2">
-                <div className={`text-center text-xs font-medium mb-1 ${ratioStatus.color}`}>{ratioStatus.text}</div>
-                <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-gradient-to-r from-purple-500 via-blue-500 to-cyan-400" 
-                    style={{ width: `${Math.min(expenseIncomeRatio, 100)}%` }} 
-                  />
-                </div>
-              </div>
-            }
-          />
+          <Card className="relative border-none shadow-none">
+            <CardHeader className="p-2 pb-0">
+              <CardDescription className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                Maintenance rate trend · selected range
+              </CardDescription>
+              <CardTitle className="text-2xl font-mono">
+                {"₹"}{(rateMonthlyForDisplay[rateMonthlyForDisplay.length - 1] ?? 0) / 100}/sqft
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-2">
+              {(() => {
+                // Trim leading months with no rate on file yet (stored as 0)
+                // instead of plotting a false "rate was Rs 0" flat prefix.
+                // Start the trend at the FIRST month a rate actually exists for.
+                const firstAvailableIdx = rateMonthlyForDisplay.findIndex((v) => (v ?? 0) > 0);
+                const trimmedLabels = firstAvailableIdx >= 0 ? labels.slice(firstAvailableIdx) : [];
+                const trimmedRates = firstAvailableIdx >= 0 ? rateMonthlyForDisplay.slice(firstAvailableIdx) : [];
+                const rateTrendData = trimmedLabels.map((m, i) => ({ month: m, rate: (trimmedRates[i] ?? 0) / 100 }));
+                const first = (trimmedRates[0] ?? 0) / 100;
+                const last = (trimmedRates[trimmedRates.length - 1] ?? 0) / 100;
+                const delta = last - first;
+                return (
+                  <>
+                    <p className="text-[10px] text-gray-500 mb-1">
+                      {rateTrendData.length === 0
+                        ? "No rate has been uploaded yet for this range"
+                        : rateTrendData.length < 2 || delta === 0
+                          ? "Unchanged across the selected range"
+                          : `${delta > 0 ? "Up" : "Down"} from ₹${first}/sqft at the start of this range (${trimmedLabels[0]})`}
+                    </p>
+                    {rateTrendData.length > 0 && (
+                      <ResponsiveContainer width="100%" height={48}>
+                        <LineChart data={rateTrendData} margin={{ top: 4, right: 4, bottom: 0, left: 4 }}>
+                          <XAxis dataKey="month" hide />
+                          <Tooltip trigger={getTooltipTrigger()} content={<SmartTooltipContent labelPrefix="Month" valueFormatter={(v) => `₹${v}/sqft`} />} />
+                          <Line type="monotone" dataKey="rate" stroke="var(--color-chart-5, #9333ea)" strokeWidth={2} dot={{ r: 2 }} activeDot={{ r: 4 }} />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    )}
+                  </>
+                );
+              })()}
+            </CardContent>
+          </Card>
         </div>
       </DashboardSection>
       )}
@@ -732,6 +753,8 @@ function AuditedReportCard() {
   const [uploading, setUploading] = useState(false);
   const [fileUrl, setFileUrl] = useState<string | null>(null);
   const [fileLoading, setFileLoading] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const report = reports.find((r) => r.fiscal_year === selectedFY);
   // Most mobile browsers don't reliably render a PDF INLINE inside an
@@ -789,6 +812,20 @@ function AuditedReportCard() {
     }
   }
 
+  async function handleDelete() {
+    if (!report) return;
+    setDeleting(true);
+    const ok = await deleteAuditedReport(report.id);
+    setDeleting(false);
+    if (ok) {
+      toast.success(`Audited report for ${selectedFY} deleted`);
+      setDeleteOpen(false);
+      qc.invalidateQueries({ queryKey: ["audited-reports"] });
+    } else {
+      toast.error("Delete failed \u2014 please try again.");
+    }
+  }
+
   return (
     <Card className="border-indigo-500/30 bg-indigo-500/5">
       <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3">
@@ -822,6 +859,11 @@ function AuditedReportCard() {
         {isSuperAdmin && (
           <Button size="sm" variant="outline" onClick={() => { setUploadFY(selectedFY); setUploadOpen(true); }}>
             <UploadCloud className="h-4 w-4 mr-1" /> {report ? "Replace" : "Upload"}
+          </Button>
+        )}
+        {isSuperAdmin && report && (
+          <Button size="sm" variant="outline" className="text-red-600 border-red-200 hover:bg-red-50" onClick={() => setDeleteOpen(true)}>
+            <Trash2 className="h-4 w-4 mr-1" /> Delete
           </Button>
         )}
       </CardContent>
@@ -887,6 +929,26 @@ function AuditedReportCard() {
                   }}
                 />
               </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Delete confirmation: superadmin only */}
+      {isSuperAdmin && (
+        <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Delete audited report?</DialogTitle>
+              <DialogDescription>
+                This will permanently remove the audited report for {selectedFY} ({report?.file_name}). This cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex justify-end gap-2 mt-2">
+              <Button size="sm" variant="outline" onClick={() => setDeleteOpen(false)} disabled={deleting}>Cancel</Button>
+              <Button size="sm" variant="destructive" onClick={handleDelete} disabled={deleting}>
+                {deleting ? "Deleting…" : "Delete"}
+              </Button>
             </div>
           </DialogContent>
         </Dialog>
@@ -975,3 +1037,5 @@ function MetricCard({ label, value, subText, icon, footer, className, valueClass
   }
   return card;
 }
+
+

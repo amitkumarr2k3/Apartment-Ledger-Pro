@@ -134,12 +134,6 @@ function Inner() {
     // const expectedCollectionThisMonth = ((rateMonthly[i] ?? 0) / 100) * TOTAL_SQFT; // OLD
     return {
       month,
-      // FIX: a month with no real row in monthlyTotals at all (e.g. before
-      // record-keeping began) previously defaulted expense/income to 0 and
-      // was still eligible to "win" Best/Worst Month -- a genuinely empty
-      // pre-history month looked like a real Rs0-net month. hasData marks
-      // that distinction so Best/Worst Month below can exclude it.
-      hasData: !!monthlyTotal,
       actual_collection: actualCollection,
       expected_collection: expectedCollectionThisMonth,
       other_income: otherIncome,
@@ -170,9 +164,8 @@ function Inner() {
     : ((totalActualClean - totalExpectedClean) / totalExpectedClean) * 100;
 
   // NEW INSIGHT: best / worst month by net (total income - expense)
-  const monthsWithData = monthlyTrend.filter((m) => m.hasData);
-  const bestMonth = monthsWithData.length ? monthsWithData.reduce((a, b) => (b.net > a.net ? b : a)) : null;
-  const worstMonth = monthsWithData.length ? monthsWithData.reduce((a, b) => (b.net < a.net ? b : a)) : null;
+  const bestMonth = monthlyTrend.length ? monthlyTrend.reduce((a, b) => (b.net > a.net ? b : a)) : null;
+  const worstMonth = monthlyTrend.length ? monthlyTrend.reduce((a, b) => (b.net < a.net ? b : a)) : null;
 
   return (
     <>
@@ -217,10 +210,11 @@ function Inner() {
         </Card>
       </div>
 
-      {/* NEW INSIGHTS: Expected-vs-Actual variance + best/worst month callouts +
-          current per-sqft rate (as a compact stat, not a whole extra chart --
-          a rate that barely moves month to month doesn't need its own axis). */}
-      <div className="grid gap-4 md:grid-cols-3">
+      {/* NEW INSIGHTS: Expected-vs-Actual variance + best/worst month callouts.
+          Per Sqft Rate trend moved to Overview's Long-Term Financial
+          Strength section (replacing the old Expense/Income Ratio card),
+          so it isn't duplicated across two dashboards anymore. */}
+      <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader className="pb-2">
             <CardDescription className="text-xs uppercase tracking-wider">Collection performance vs target</CardDescription>
@@ -251,55 +245,6 @@ function Inner() {
                 <span className="font-mono">{inr(worstMonth.net)}</span>
               </div>
             )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="text-xs uppercase tracking-wider">Maintenance rate trend · selected range</CardDescription>
-            <CardTitle className="text-3xl font-mono">
-              {"\u20B9"}{(rateMonthlyForDisplay[rateMonthlyForDisplay.length - 1] ?? 0) / 100}/sqft
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {(() => {
-              // Trim leading months with no rate on file yet (stored as 0)
-              // instead of plotting a false "rate was Rs 0" flat prefix --
-              // that both looks like a sharp/artificial rise AND produces a
-              // misleading "up from Rs 0" insight below. Start the trend at
-              // the FIRST month a rate actually exists for.
-              const firstAvailableIdx = rateMonthlyForDisplay.findIndex((v) => (v ?? 0) > 0);
-              const trimmedLabels = firstAvailableIdx >= 0 ? labels.slice(firstAvailableIdx) : [];
-              const trimmedRates = firstAvailableIdx >= 0 ? rateMonthlyForDisplay.slice(firstAvailableIdx) : [];
-              const rateTrendData = trimmedLabels.map((m, i) => ({ month: m, rate: (trimmedRates[i] ?? 0) / 100 }));
-              const first = (trimmedRates[0] ?? 0) / 100;
-              const last = (trimmedRates[trimmedRates.length - 1] ?? 0) / 100;
-              const delta = last - first;
-              return (
-                <>
-                  <p className="text-xs text-muted-foreground mb-1">
-                    {rateTrendData.length === 0
-                      ? "No rate has been uploaded yet for this range"
-                      : rateTrendData.length < 2 || delta === 0
-                        ? "Unchanged across the selected range"
-                        : `${delta > 0 ? "Up" : "Down"} from \u20B9${first}/sqft at the start of this range (${trimmedLabels[0]})`}
-                  </p>
-                  {rateTrendData.length > 0 && (
-                    // Sparkline -- the trend itself, without the overhead of a
-                    // full chart (no gridlines/legend). The X axis is real but
-                    // hidden -- needed so the tooltip resolves actual month
-                    // labels (e.g. "Apr '26") instead of falling back to a
-                    // raw row index when no axis/dataKey is present at all.
-                    <ResponsiveContainer width="100%" height={48}>
-                      <LineChart data={rateTrendData} margin={{ top: 4, right: 4, bottom: 0, left: 4 }}>
-                        <XAxis dataKey="month" hide />
-                        <Tooltip trigger={getTooltipTrigger()} content={<SmartTooltipContent labelPrefix="Month" valueFormatter={(v) => `\u20B9${v}/sqft`} />} />
-                        <Line type="monotone" dataKey="rate" stroke="var(--color-chart-5, #9333ea)" strokeWidth={2} dot={{ r: 2 }} activeDot={{ r: 4 }} />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  )}
-                </>
-              );
-            })()}
           </CardContent>
         </Card>
       </div>
