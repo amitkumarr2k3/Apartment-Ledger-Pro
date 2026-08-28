@@ -310,7 +310,7 @@ function Inner() {
       >
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <MetricCard 
-            label="EXPECTED COLLECTION" 
+            label="EXPECTED MAINTENANCE COLLECTION" 
             value={inr(expectedCollection)} 
             subText={`TARGET COLLECTION FOR ${periodLabel}`} 
             icon={<Target className="h-5 w-5 text-blue-500" />}
