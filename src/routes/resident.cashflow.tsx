@@ -39,8 +39,11 @@ function Inner() {
   const isMaintenanceRateReference = (s: string) => /maintenance rate reference/i.test(s || "");
   const isContingencyRateReference = (s: string) => /contingency rate reference/i.test(s || "");
   const isExpectedCollectionReference = (s: string) => /expected collection reference/i.test(s || "");
+  const isOpeningBalanceReference = (s: string) => /opening balance reference/i.test(s || "");
+  const isCorpusFundReference = (s: string) => /corpus fund reference/i.test(s || "");
   const isAnyRateReference = (s: string) =>
-    isMaintenanceRateReference(s) || isContingencyRateReference(s) || isExpectedCollectionReference(s);
+    isMaintenanceRateReference(s) || isContingencyRateReference(s) || isExpectedCollectionReference(s) ||
+    isOpeningBalanceReference(s) || isCorpusFundReference(s);
 
   // Actual Collection = ONLY the "Maintenance Charge" line item (mirrors
   // Overview\u2019s Collected Maintenance card exactly).
