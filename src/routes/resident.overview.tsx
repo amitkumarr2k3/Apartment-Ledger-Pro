@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
-  Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell,
+  Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell, LabelList,
 } from "recharts";
 import { SmartTooltipContent, getTooltipTrigger } from "@/components/smart-tooltip";
 import {
@@ -70,8 +70,9 @@ function Inner() {
   const isContingencyRateReference = (name: string) => /contingency rate reference/i.test(name || "");
   const isExpectedCollectionReference = (name: string) => /expected collection reference/i.test(name || "");
   const isOpeningBalanceReference = (name: string) => /opening balance reference/i.test(name || "");
+  const isCorpusFundReference = (name: string) => /corpus fund reference/i.test(name || "");
   const isAnyRateReference = (name: string) =>
-    isMaintenanceRateReference(name) || isContingencyRateReference(name) || isExpectedCollectionReference(name) || isOpeningBalanceReference(name);
+    isMaintenanceRateReference(name) || isContingencyRateReference(name) || isExpectedCollectionReference(name) || isOpeningBalanceReference(name) || isCorpusFundReference(name);
 
   // ============================================================
   // EXPECTED COLLECTION -- now supplied DIRECTLY via CSV (head=reference,
@@ -187,6 +188,27 @@ function Inner() {
 
   const topCardsClass = "h-full min-h-[380px]";
   const chartHeight = 240;
+
+  // Renders "xx.x% of total" directly on top-5 bar charts (instead of only
+  // in the tooltip). `total` is the sum of the 5 bars shown in that chart,
+  // matching the % already used in the list view for consistency.
+  const renderPercentLabel = (grandTotal: number) => (props: any) => {
+    const { x, y, width, height, value } = props;
+    const pct = grandTotal > 0 ? (value / grandTotal) * 100 : 0;
+    return (
+      <text
+        x={x + width + 6}
+        y={y + height / 2}
+        dy={4}
+        fontSize={11}
+        fontWeight={600}
+        fill="var(--color-muted-foreground, #6b7280)"
+        textAnchor="start"
+      >
+        {`${pct.toFixed(1)}%`}
+      </text>
+    );
+  };
   
   // Date logic for "current month - 1"
   const previousMonthDate = new Date();
@@ -219,6 +241,13 @@ function Inner() {
     return result;
   };
   const bfRawMonthly = liabilityLineItemRawMonthly(isPreviousArrearsBF);
+  // "Current Month Unpaid Maintenance" -- used ONLY for the Total Expected
+  // Income card below (sum across the selected period, alongside Total
+  // Received Income and Opening Balance). This is a distinct, additive use
+  // from RD-32's Income Visibility chart and does not change that chart's
+  // behavior at all.
+  const isCurrentMonthUnpaidMaintenance = (s: string) => (s || "").trim().toLowerCase() === "current month unpaid maintenance";
+  const currentMonthUnpaidRawMonthly = liabilityLineItemRawMonthly(isCurrentMonthUnpaidMaintenance);
 
   /**
    * OUTSTANDING DUES CARD -- CUMULATIVE (ALL-TIME).
@@ -256,7 +285,25 @@ function Inner() {
       : recoveryRate >= 75
         ? { text: "Watch", color: "text-amber-600", dot: "bg-amber-500" }
         : { text: "At Risk", color: "text-red-600", dot: "bg-red-500" };
-  const corpusValue = "₹1,85,60,000";
+  /**
+   * CORPUS WITH INTEREST (ACCUMULATED)
+   * Supplied via CSV (head=reference, category="Corpus Fund Reference") as a
+   * running balance snapshot per month. Always takes the LATEST dated entry
+   * at face value -- never summed, never period-filtered -- so re-uploading
+   * a newer month's figure immediately becomes the displayed corpus value.
+   * Same "latest entry wins" convention already used for the Outstanding
+   * Receivables / Previous Arrears Brought Forward figure below.
+   */
+  const corpusFundCategory = safeIncomeTree.find((c) => isCorpusFundReference(c.name));
+  const corpusFundFullMonthly = corpusFundCategory ? categoryMonthly(corpusFundCategory) : [];
+  let corpusFundValue = 0;
+  for (let idx = corpusFundFullMonthly.length - 1; idx >= 0; idx--) {
+    if (corpusFundFullMonthly[idx]) {
+      corpusFundValue = corpusFundFullMonthly[idx];
+      break;
+    }
+  }
+  const corpusValue = inr(corpusFundValue);
   // BANK BALANCE = cumulative (Collection - Expense) across EVERY month ever
   // recorded, deliberately NOT sliced by the dashboard's period filter --
   // this represents the actual liquid cash on hand today, not a period flow.
@@ -285,6 +332,16 @@ function Inner() {
   
   // Final Financial Metrics
   const totalIncome = collectedMaintenance + communityIncome;
+  // TOTAL EXPECTED INCOME = Total Received Income (this period) + ALL
+  // "Current Month Unpaid Maintenance" ever recorded, across every month --
+  // deliberately NOT sliced by the dashboard's period filter, same
+  // "all-time" treatment as Bank Balance / Contingency Cash / Corpus /
+  // Outstanding Receivables -- + the historical Opening Balance anchor.
+  // This is a projection of total funds expected to be available,
+  // deliberately shown as its own card BEFORE Total Received Income so the
+  // "expected" and "actually received" figures are never confused.
+  const currentMonthUnpaidAllTime = total(currentMonthUnpaidRawMonthly);
+  const totalExpectedIncome = totalIncome + currentMonthUnpaidAllTime + trueOpeningAnchor;
   const netSurplus = totalIncome - totalExpense;
   const expenseIncomeRatio = totalIncome === 0 ? 0 : (totalExpense / totalIncome) * 100;
   const ratioStatus =
@@ -346,9 +403,16 @@ function Inner() {
         icon={<Banknote className="h-5 w-5 text-green-600" />} 
         headerColor="bg-green-50 border-green-200"
       >
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
 			<MetricCard 
-			  label="TOTAL INCOME" 
+			  label="TOTAL EXPECTED INCOME" 
+			  value={inr(totalExpectedIncome)} 
+			  subText={`RECEIVED (${periodLabel}) + UNPAID DUES (ALL-TIME) + OPENING BALANCE`} 
+			  icon={<Target className="h-5 w-5 text-emerald-500" />}
+			  className="ring-1 ring-slate-200 rounded-lg"
+			/>
+			<MetricCard 
+			  label="TOTAL RECEIVED INCOME" 
 			  value={inr(totalIncome)} 
 			  subText="MAINTENANCE + OTHER INCOME · CLICK TO VIEW DETAILS" 
 			  icon={<TrendingUp className="h-5 w-5 text-green-500" />}
@@ -485,9 +549,9 @@ function Inner() {
               </div>
             ) : view === "chart" ? (
               <ResponsiveContainer width="100%" height={chartHeight}>
-                <BarChart data={top5Income} layout="vertical" margin={{ left: 20 }}>
+                <BarChart data={top5Income} layout="vertical" margin={{ left: 20, right: 44 }}>
                   <CartesianGrid horizontal={false} strokeDasharray="3 3" opacity={0.3} />
-                  <XAxis type="number" tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} fontSize={11} />
+                  <XAxis type="number" domain={[0, (max: number) => max * 1.12]} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} fontSize={11} />
                   <YAxis type="category" dataKey="name" width={110} fontSize={12} />
                   <Tooltip trigger={getTooltipTrigger()} cursor={{ fill: "var(--color-muted)", opacity: 0.35 }} content={<SmartTooltipContent labelPrefix="Income" valueFormatter={(v) => inr(v)} />} />
                   <Bar dataKey="total" radius={[0, 4, 4, 0]} className="cursor-pointer">
@@ -497,6 +561,7 @@ function Inner() {
                           window.location.href = `/resident/drilldown?head=income&category=${encodeURIComponent(income.name)}`;
                         }} />
                     ))}
+                    <LabelList dataKey="total" content={renderPercentLabel(top5IncomeTotal)} />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
@@ -540,9 +605,9 @@ function Inner() {
               </div>
             ) : view === "chart" ? (
               <ResponsiveContainer width="100%" height={chartHeight}>
-                <BarChart data={top5} layout="vertical" margin={{ left: 20 }}>
+                <BarChart data={top5} layout="vertical" margin={{ left: 20, right: 44 }}>
                   <CartesianGrid horizontal={false} strokeDasharray="3 3" opacity={0.3} />
-                  <XAxis type="number" tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} fontSize={11} />
+                  <XAxis type="number" domain={[0, (max: number) => max * 1.12]} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} fontSize={11} />
                   <YAxis type="category" dataKey="name" width={110} fontSize={12} />
                   <Tooltip trigger={getTooltipTrigger()} cursor={{ fill: "var(--color-muted)", opacity: 0.35 }} content={<SmartTooltipContent labelPrefix="Category" valueFormatter={(v) => inr(v)} />} />
                   <Bar dataKey="total" radius={[0, 4, 4, 0]} className="cursor-pointer">
@@ -552,6 +617,7 @@ function Inner() {
                           window.location.href = `/resident/drilldown?head=expense&category=${encodeURIComponent(c.name)}`;
                         }} />
                     ))}
+                    <LabelList dataKey="total" content={renderPercentLabel(top5Total)} />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
@@ -592,9 +658,9 @@ function Inner() {
               <p className="text-sm text-muted-foreground">No vendor-tagged expense data is available for this period.</p>
             ) : view === "chart" ? (
               <ResponsiveContainer width="100%" height={chartHeight}>
-                <BarChart data={top5Vendors} layout="vertical" margin={{ left: 20 }}>
+                <BarChart data={top5Vendors} layout="vertical" margin={{ left: 20, right: 44 }}>
                   <CartesianGrid horizontal={false} strokeDasharray="3 3" opacity={0.3} />
-                  <XAxis type="number" tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} fontSize={11} />
+                  <XAxis type="number" domain={[0, (max: number) => max * 1.12]} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} fontSize={11} />
                   <YAxis type="category" dataKey="name" width={110} fontSize={12} />
                   <Tooltip trigger={getTooltipTrigger()} cursor={{ fill: "var(--color-muted)", opacity: 0.35 }} content={<SmartTooltipContent labelPrefix="Vendor" valueFormatter={(v) => inr(v)} />} />
                   <Bar dataKey="total" radius={[0, 4, 4, 0]} className="cursor-pointer">
@@ -604,6 +670,7 @@ function Inner() {
                           window.location.href = `/resident/drilldown?head=expense&category=${encodeURIComponent(v.category)}&vendor=${encodeURIComponent(v.name)}`;
                         }} />
                     ))}
+                    <LabelList dataKey="total" content={renderPercentLabel(top5VendorTotal)} />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>

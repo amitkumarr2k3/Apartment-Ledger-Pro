@@ -14,7 +14,6 @@
 server {
   listen 80;
   server_name ${DOMAIN};
-  client_max_body_size 25m;   # <-- add this line (raises the 1MB default; adjust as needed for your largest expected PDF)
 
   # Let certbot's webroot plugin write challenge files here during renewal.
   location /.well-known/acme-challenge/ {
@@ -32,6 +31,11 @@ server {
   listen 443 ssl;
   http2 on;
   server_name ${DOMAIN};
+
+  # nginx's own default (1MB) was silently rejecting audited-report PDF
+  # uploads (413) before they ever reached the Fastify API, which already
+  # allows up to 10MB via @fastify/multipart. Match/exceed that here.
+  client_max_body_size 15m;
 
   # Let's Encrypt certificate paths (managed by certbot on the host).
   ssl_certificate     /etc/letsencrypt/live/${DOMAIN}/fullchain.pem;
