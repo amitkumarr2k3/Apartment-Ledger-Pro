@@ -46,7 +46,7 @@ import { Home, BarChart3, Table2, Menu, ChevronLeft, LogOut, UserCircle2, HelpCi
 type ChatLink = { to: string; label: string };
 type ChatMessage = { role: "bot" | "user"; text: string; link?: ChatLink };
 
-const CHAT_STORAGE_PREFIX = "pulseledger-help-chat";
+const CHAT_STORAGE_PREFIX = "boulevardpulse-help-chat";
 
 function loadStoredMessages(persona: "resident" | "admin"): ChatMessage[] | null {
   if (typeof window === "undefined") return null;
@@ -83,7 +83,7 @@ function HelpChat({ persona, currentView, onClose }: { persona: "resident" | "ad
     const stored = loadStoredMessages(persona);
     if (stored) return stored;
     return [
-      { role: "bot", text: `Hi! I'm Munshi, your PulseLedger assistant. You're currently viewing **${currentView}**. Ask me anything about the cards, badges, or charts on this page -- or ask "where can I find..." something.` },
+      { role: "bot", text: `Hi! I'm Munshi, your BoulevardPulse assistant. You're currently viewing **${currentView}**. Ask me anything about the cards, badges, or charts on this page -- or ask "where can I find..." something.` },
     ];
   });
   const [input, setInput] = useState("");
@@ -406,7 +406,7 @@ function SidebarNav({
           </div>
           <div className="flex flex-col">
             <span className="text-xl font-black leading-none tracking-tight text-slate-900 dark:text-white">
-              Pulse<span className="text-[#0082c9]">Ledger</span>
+              Boulevard<span className="text-[#0082c9]">Pulse</span>
             </span>
             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.15em] mt-1">
               CG Boulevard
@@ -597,7 +597,7 @@ export function PortalShell({
   const [chatOpen, setChatOpenState] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
     try {
-      return window.sessionStorage.getItem("pulseledger-help-chat-open") === "1";
+      return window.sessionStorage.getItem("boulevardpulse-help-chat-open") === "1";
     } catch {
       return false;
     }
@@ -606,7 +606,7 @@ export function PortalShell({
     setChatOpenState(v);
     if (typeof window !== "undefined") {
       try {
-        window.sessionStorage.setItem("pulseledger-help-chat-open", v ? "1" : "0");
+        window.sessionStorage.setItem("boulevardpulse-help-chat-open", v ? "1" : "0");
       } catch {
         // ignore -- sessionStorage may be unavailable (e.g. private browsing)
       }

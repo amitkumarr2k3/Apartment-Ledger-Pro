@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import { z } from "zod";
 import { fallback, zodValidator } from "@tanstack/zod-adapter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,7 +15,6 @@ import { KeyRound, Mail, MailQuestion, ShieldCheck, RefreshCw, Lock, Loader2, Bu
 
 const searchSchema = z.object({
   redirect: fallback(z.string().optional(), undefined),
-  reason: fallback(z.string().optional(), undefined),
 });
 
 export const Route = createFileRoute("/login")({
@@ -23,7 +22,7 @@ export const Route = createFileRoute("/login")({
   validateSearch: zodValidator(searchSchema),
   head: () => ({
     meta: [
-      { title: "Sign in · PulseLedger — CG Boulevard" },
+      { title: "Sign in · BoulevardPulse — CG Boulevard" },
       { name: "description", content: "OTP-based sign in for whitelisted residents and admins." },
     ],
   }),
@@ -102,17 +101,7 @@ function OtpBoxes({
 
 function LoginPage() {
   const navigate = useNavigate();
-  const { redirect, reason } = useSearch({ from: "/login" });
-  // Shown once when an expired/invalid session bounced someone here (see
-  // handleUnauthorized() in lib/api.ts) -- previously there was no forced
-  // logout at all, so an expired session just left every dashboard the user
-  // was on silently rendering empty/zero data.
-  useEffect(() => {
-    if (reason === "expired") {
-      toast.error("Your session expired -- please sign in again.");
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const { redirect } = useSearch({ from: "/login" });
   const [mode, setMode] = useState<"password" | "otp">("otp");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -208,7 +197,7 @@ function LoginPage() {
               </div>
               <div className="flex flex-col">
                 <h1 className="text-2xl sm:text-3xl font-black tracking-tight leading-none">
-                  Pulse<span className="text-[#0082c9]">Ledger</span>
+                  Boulevard<span className="text-[#0082c9]">Pulse</span>
                 </h1>
                 <span className="text-[11px] sm:text-xs font-bold text-muted-foreground uppercase tracking-[0.15em] mt-1.5">
                   CG Boulevard Apartment Ledger Portal
