@@ -246,10 +246,24 @@ export async function routes(app: FastifyInstance) {
       [community_id, lower, name],
     );
     const userId = u.rows[0].id;
-    await pool.query(
-      `INSERT INTO user_roles (user_id, role) VALUES ($1,$2) ON CONFLICT DO NOTHING`,
-      [userId, role],
-    );
+    // FIX: "ON CONFLICT DO NOTHING" here meant user_roles was only ever
+    // populated on a user's FIRST-EVER login and silently left untouched
+    // on every login after that -- so a role change made later in
+    // Admin > Residents & Whitelist (which correctly updates
+    // allowed_emails.role) never took effect for anyone who had already
+    // logged in at least once, no matter how many times they logged in
+    // again. user_roles must be resynced to exactly match the CURRENT
+    // allowed_emails.role on every login, not just inserted once.
+    // Mirrors the same "superadmin implies admin too" convention used by
+    // the bootstrap superadmin in the password-login route below.
+    const rolesToGrant = role === "superadmin" ? ["superadmin", "admin"] : [role];
+    await pool.query(`DELETE FROM user_roles WHERE user_id=$1`, [userId]);
+    for (const r of rolesToGrant) {
+      await pool.query(
+        `INSERT INTO user_roles (user_id, role) VALUES ($1,$2) ON CONFLICT DO NOTHING`,
+        [userId, r],
+      );
+    }
 
     const user = await loadUserByEmail(lower);
     const token = await reply.jwtSign({
