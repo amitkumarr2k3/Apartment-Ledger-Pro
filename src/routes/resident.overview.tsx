@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell, LabelList, LineChart, Line,
 } from "recharts";
@@ -17,7 +18,7 @@ import {
 } from "@/lib/finance-mock";
 import { useMonthlyTotals, useExpenseTree, useIncomeTree, useWidgetVisibility, useAuditedReports, uploadAuditedReport, deleteAuditedReport, fetchAuditedReportFileUrl } from "@/lib/hooks";
 import { getSession } from "@/lib/session";
-import { Wallet, ArrowRight, TrendingUp, TrendingDown, Home, Banknote, ShieldCheck, CheckCircle2, AlertTriangle, ShoppingCart, PiggyBank, Vault, HandCoins, CreditCard, Target, FileCheck2, Eye, UploadCloud, ExternalLink, Landmark, Trash2 } from "lucide-react";
+import { Wallet, ArrowRight, TrendingUp, TrendingDown, Home, Banknote, ShieldCheck, CheckCircle2, AlertTriangle, ShoppingCart, PiggyBank, Vault, HandCoins, CreditCard, Target, FileCheck2, Eye, UploadCloud, ExternalLink, Landmark, Trash2, ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/resident/overview")({
@@ -355,13 +356,114 @@ function Inner() {
   const rateCategoryForDisplay = safeIncomeTree.find((c) => isMaintenanceRateReference(c.name));
   const rateMonthlyForDisplay = rateCategoryForDisplay ? sliceMonthly(categoryMonthly(rateCategoryForDisplay)) : [];
 
+  // ONE plain-English sentence a resident can read in 5 seconds instead of
+  // scanning every card below to work out whether things are fine.
+  // Uses the SAME terms as the cards elsewhere on this page (Total Received
+  // Income, Total Expense, Net Operating Surplus/Deficit, Outstanding
+  // Receivables) rather than inventing new plain-English phrasing, so a
+  // resident reading this sentence recognizes the exact same words they'll
+  // see on the Collections & Spending tab. Numbers are bolded/colored so
+  // they're easy to pick out of the sentence at a glance.
+  const netLabel = netSurplus >= 0 ? "Net Operating Surplus" : "Net Operating Deficit";
+  const netTone = netSurplus >= 0 ? "text-emerald-700" : "text-rose-700";
+  const atAGlanceSummary = (
+    <>
+      This period ({periodLabel}), Total Received Income was{" "}
+      <strong className="text-emerald-700">{inr(totalIncome)}</strong> against Total Expense of{" "}
+      <strong className="text-rose-700">{inr(totalExpense)}</strong> -- resulting in a {netLabel} of{" "}
+      <strong className={netTone}>{inr(Math.abs(netSurplus))}</strong>.{" "}
+      {cumulativeOutstandingDue > 0 ? (
+        <>Outstanding Receivables stand at <strong className="text-amber-700">{inr(cumulativeOutstandingDue)}</strong> (all-time).</>
+      ) : (
+        <>There are no Outstanding Receivables right now.</>
+      )}
+    </>
+  );
+  // Shared scale for the Income vs Expense comparison bars in the Summary
+  // tab, so both bars are visually proportionate to each other.
+  const maxIncomeExpense = Math.max(totalIncome, totalExpense, 1);
 
   return (
-    <div className="space-y-6">
-      {/* Audited Report -- prominent placeholder at the very top, above
-          every other card, so it's the first thing a resident sees. */}
-      {isWidgetVisible("overview.auditedReport") && <AuditedReportCard />}
+    <div className="space-y-4">
+      <Tabs defaultValue="summary" className="w-full">
+        <TabsList className="flex-wrap h-auto">
+          <TabsTrigger value="summary" className="gap-1.5"><Home className="h-4 w-4" />Summary</TabsTrigger>
+          <TabsTrigger value="collections" className="gap-1.5"><Wallet className="h-4 w-4" />Collections &amp; Spending</TabsTrigger>
+          <TabsTrigger value="reserves" className="gap-1.5"><ShieldCheck className="h-4 w-4" />Reserves &amp; Long-term</TabsTrigger>
+          <TabsTrigger value="documents" className="gap-1.5"><FileCheck2 className="h-4 w-4" />Audited Report</TabsTrigger>
+        </TabsList>
 
+      <TabsContent value="summary" className="space-y-4 mt-4">
+        {/* Plain-English headline -- readable in 5 seconds, no scanning
+            required. */}
+        <div className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm">
+          <div className="flex items-center gap-2 mb-3">
+            <div className={`h-2.5 w-2.5 rounded-full ${netSurplus >= 0 ? "bg-emerald-500" : "bg-red-500"}`} />
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">At a glance &middot; {periodLabel}</span>
+          </div>
+          <p className="text-base sm:text-lg text-slate-800 leading-relaxed">
+            {atAGlanceSummary}
+          </p>
+        </div>
+
+        {/* Three compact visuals instead of ~9 flat number tiles -- every
+            number below is still shown, just as a label on a bar/hero
+            stat instead of a standalone card. */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="rounded-xl border border-slate-200 bg-white p-5 flex flex-col items-center justify-center text-center">
+            <HeroStat
+              label="Net Position"
+              value={inr(Math.abs(netSurplus))}
+              sub={netSurplus >= 0 ? "Surplus retained this period" : "Shortfall to cover this period"}
+              tone={netSurplus >= 0 ? "emerald" : "rose"}
+              icon={netSurplus >= 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+              hero
+            />
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-white p-5">
+            <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-3">Collection Progress</div>
+            <ProgressBar
+              label="Maintenance collected"
+              value={collectedMaintenance}
+              max={expectedCollection}
+              valueLabel={`${inr(collectedMaintenance)} of ${inr(expectedCollection)} expected`}
+              tone="blue"
+            />
+            <div className="text-[11px] text-amber-600 font-medium mt-3">
+              {inr(cumulativeOutstandingDue)} outstanding from residents (all-time)
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-white p-5">
+            <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-3">Income vs Expense &middot; {periodLabel}</div>
+            <ComparisonBar label="Received" value={totalIncome} max={maxIncomeExpense} tone="emerald" />
+            <ComparisonBar label="Expense" value={totalExpense} max={maxIncomeExpense} tone="rose" />
+          </div>
+        </div>
+
+        {/* Reserves at a glance -- same composition-bar language already
+            used on the Bank Balance card in the Reserves tab, just
+            surfaced here too since "do we have money saved up" is a
+            top-of-mind question for most residents. */}
+        <div className="rounded-xl border border-slate-200 bg-white p-5">
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Reserves &middot; Bank Balance</div>
+            <div className="text-sm font-bold text-slate-900">{inr(bankBalance)}</div>
+          </div>
+          <div className="h-2.5 w-full rounded-full overflow-hidden flex bg-gray-100">
+            <div className="h-full bg-pink-400" style={{ width: `${contingencyShareOfBank}%` }} title={`Contingency reserve (ring-fenced): ${inr(contingencyCash)}`} />
+            <div className="h-full bg-yellow-400" style={{ width: `${100 - contingencyShareOfBank}%` }} title={`Unrestricted / freely usable: ${inr(unrestrictedCash)}`} />
+          </div>
+          <div className="flex items-center justify-between w-full mt-2 text-[11px] text-slate-500">
+            <span>&#9679; <span className="text-pink-500 font-medium">Contingency</span> {inr(contingencyCash)}</span>
+            <span>Corpus (accumulated) <span className="font-medium text-orange-600">{corpusValue}</span></span>
+            <span><span className="text-yellow-600 font-medium">Unrestricted</span> {inr(unrestrictedCash)} &#9679;</span>
+          </div>
+        </div>
+      </TabsContent>
+
+      <TabsContent value="collections" className="space-y-4 mt-4">
       {/* Section 1: Collection Health */}
       {isWidgetVisible("overview.collectionHealth") && (
       <DashboardSection 
@@ -447,110 +549,6 @@ function Inner() {
               </div>
             }
           />
-        </div>
-      </DashboardSection>
-      )}
-
-      {/* Section 3: Long-Term Financial Strength */}
-      {isWidgetVisible("overview.financialStrength") && (
-      <DashboardSection 
-        title="Long-Term Financial Strength" 
-        icon={<ShieldCheck className="h-5 w-5 text-orange-600" />} 
-        headerColor="bg-orange-50 border-orange-200"
-      >
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <MetricCard 
-            label="CORPUS WITH INTEREST (ACCUMULATED)" 
-            value={corpusValue} 
-            subText={`INCLUDES FIXED SINKING FUND TILL ${prevMonthLabel.toUpperCase()}`} 
-            icon={<Vault className="h-5 w-5 text-orange-500" />}
-            fixed
-          />
-          <MetricCard 
-            label="CONTINGENCY CASH" 
-            value={inr(contingencyCash)} 
-            subText="CUMULATIVE RESERVE · CLICK FOR MONTHLY TREND" 
-            icon={<HandCoins className="h-5 w-5 text-pink-500" />}
-            to="/resident/balance"
-            hash="contingency-fund-chart"
-            fixed
-            footer={
-              <div className="mt-2 text-[9px] font-semibold text-pink-600 bg-pink-50 rounded px-2 py-1 leading-tight">
-                ⊆ Included within Bank Balance -- not additional funds
-              </div>
-            }
-          />
-          <MetricCard 
-            label="BANK BALANCE" 
-            value={inr(bankBalance)} 
-            subText="CUMULATIVE COLLECTION − EXPENSE · NOT FILTER-DEPENDENT" 
-            icon={<CreditCard className="h-5 w-5 text-yellow-500" />}
-            fixed
-            footer={
-              <div className="w-full mt-2">
-                <div className="h-1.5 w-full rounded-full overflow-hidden flex bg-gray-100">
-                  <div
-                    className="h-full bg-pink-400"
-                    style={{ width: `${contingencyShareOfBank}%` }}
-                    title={`Contingency reserve (ring-fenced): ${inr(contingencyCash)}`}
-                  />
-                  <div
-                    className="h-full bg-yellow-400"
-                    style={{ width: `${100 - contingencyShareOfBank}%` }}
-                    title={`Unrestricted / freely usable: ${inr(unrestrictedCash)}`}
-                  />
-                </div>
-                <div className="flex items-center justify-between w-full mt-1 text-[9px] text-gray-500 leading-tight">
-                  <span>● <span className="text-pink-500 font-medium">Contingency</span> {inr(contingencyCash)}</span>
-                  <span><span className="text-yellow-600 font-medium">Unrestricted</span> {inr(unrestrictedCash)} ●</span>
-                </div>
-              </div>
-            }
-          />
-          <Card className="relative border-none shadow-none">
-            <CardHeader className="p-2 pb-0">
-              <CardDescription className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
-                Maintenance rate trend · selected range
-              </CardDescription>
-              <CardTitle className="text-2xl font-mono">
-                {"₹"}{(rateMonthlyForDisplay[rateMonthlyForDisplay.length - 1] ?? 0) / 100}/sqft
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-2">
-              {(() => {
-                // Trim leading months with no rate on file yet (stored as 0)
-                // instead of plotting a false "rate was Rs 0" flat prefix.
-                // Start the trend at the FIRST month a rate actually exists for.
-                const firstAvailableIdx = rateMonthlyForDisplay.findIndex((v) => (v ?? 0) > 0);
-                const trimmedLabels = firstAvailableIdx >= 0 ? labels.slice(firstAvailableIdx) : [];
-                const trimmedRates = firstAvailableIdx >= 0 ? rateMonthlyForDisplay.slice(firstAvailableIdx) : [];
-                const rateTrendData = trimmedLabels.map((m, i) => ({ month: m, rate: (trimmedRates[i] ?? 0) / 100 }));
-                const first = (trimmedRates[0] ?? 0) / 100;
-                const last = (trimmedRates[trimmedRates.length - 1] ?? 0) / 100;
-                const delta = last - first;
-                return (
-                  <>
-                    <p className="text-[10px] text-gray-500 mb-1">
-                      {rateTrendData.length === 0
-                        ? "No rate has been uploaded yet for this range"
-                        : rateTrendData.length < 2 || delta === 0
-                          ? "Unchanged across the selected range"
-                          : `${delta > 0 ? "Up" : "Down"} from ₹${first}/sqft at the start of this range (${trimmedLabels[0]})`}
-                    </p>
-                    {rateTrendData.length > 0 && (
-                      <ResponsiveContainer width="100%" height={48}>
-                        <LineChart data={rateTrendData} margin={{ top: 4, right: 4, bottom: 0, left: 4 }}>
-                          <XAxis dataKey="month" hide />
-                          <Tooltip trigger={getTooltipTrigger()} content={<SmartTooltipContent labelPrefix="Month" valueFormatter={(v) => `₹${v}/sqft`} />} />
-                          <Line type="monotone" dataKey="rate" stroke="var(--color-chart-5, #9333ea)" strokeWidth={2} dot={{ r: 2 }} activeDot={{ r: 4 }} />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    )}
-                  </>
-                );
-              })()}
-            </CardContent>
-          </Card>
         </div>
       </DashboardSection>
       )}
@@ -721,6 +719,118 @@ function Inner() {
         </Card>
         )}
       </div>
+      </TabsContent>
+
+      <TabsContent value="reserves" className="space-y-4 mt-4">
+      {/* Section 3: Long-Term Financial Strength */}
+      {isWidgetVisible("overview.financialStrength") && (
+      <DashboardSection 
+        title="Long-Term Financial Strength" 
+        icon={<ShieldCheck className="h-5 w-5 text-orange-600" />} 
+        headerColor="bg-orange-50 border-orange-200"
+      >
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <MetricCard 
+            label="CORPUS WITH INTEREST (ACCUMULATED)" 
+            value={corpusValue} 
+            subText={`INCLUDES FIXED SINKING FUND TILL ${prevMonthLabel.toUpperCase()}`} 
+            icon={<Vault className="h-5 w-5 text-orange-500" />}
+            fixed
+          />
+          <MetricCard 
+            label="CONTINGENCY CASH" 
+            value={inr(contingencyCash)} 
+            subText="CUMULATIVE RESERVE · CLICK FOR MONTHLY TREND" 
+            icon={<HandCoins className="h-5 w-5 text-pink-500" />}
+            to="/resident/balance"
+            hash="contingency-fund-chart"
+            fixed
+            footer={
+              <div className="mt-2 text-[9px] font-semibold text-pink-600 bg-pink-50 rounded px-2 py-1 leading-tight">
+                ⊆ Included within Bank Balance -- not additional funds
+              </div>
+            }
+          />
+          <MetricCard 
+            label="BANK BALANCE" 
+            value={inr(bankBalance)} 
+            subText="CUMULATIVE COLLECTION − EXPENSE · NOT FILTER-DEPENDENT" 
+            icon={<CreditCard className="h-5 w-5 text-yellow-500" />}
+            fixed
+            footer={
+              <div className="w-full mt-2">
+                <div className="h-1.5 w-full rounded-full overflow-hidden flex bg-gray-100">
+                  <div
+                    className="h-full bg-pink-400"
+                    style={{ width: `${contingencyShareOfBank}%` }}
+                    title={`Contingency reserve (ring-fenced): ${inr(contingencyCash)}`}
+                  />
+                  <div
+                    className="h-full bg-yellow-400"
+                    style={{ width: `${100 - contingencyShareOfBank}%` }}
+                    title={`Unrestricted / freely usable: ${inr(unrestrictedCash)}`}
+                  />
+                </div>
+                <div className="flex items-center justify-between w-full mt-1 text-[9px] text-gray-500 leading-tight">
+                  <span>● <span className="text-pink-500 font-medium">Contingency</span> {inr(contingencyCash)}</span>
+                  <span><span className="text-yellow-600 font-medium">Unrestricted</span> {inr(unrestrictedCash)} ●</span>
+                </div>
+              </div>
+            }
+          />
+          <Card className="relative border-none shadow-none">
+            <CardHeader className="p-2 pb-0">
+              <CardDescription className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                Maintenance rate trend · selected range
+              </CardDescription>
+              <CardTitle className="text-2xl font-mono">
+                {"₹"}{(rateMonthlyForDisplay[rateMonthlyForDisplay.length - 1] ?? 0) / 100}/sqft
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-2">
+              {(() => {
+                // Trim leading months with no rate on file yet (stored as 0)
+                // instead of plotting a false "rate was Rs 0" flat prefix.
+                // Start the trend at the FIRST month a rate actually exists for.
+                const firstAvailableIdx = rateMonthlyForDisplay.findIndex((v) => (v ?? 0) > 0);
+                const trimmedLabels = firstAvailableIdx >= 0 ? labels.slice(firstAvailableIdx) : [];
+                const trimmedRates = firstAvailableIdx >= 0 ? rateMonthlyForDisplay.slice(firstAvailableIdx) : [];
+                const rateTrendData = trimmedLabels.map((m, i) => ({ month: m, rate: (trimmedRates[i] ?? 0) / 100 }));
+                const first = (trimmedRates[0] ?? 0) / 100;
+                const last = (trimmedRates[trimmedRates.length - 1] ?? 0) / 100;
+                const delta = last - first;
+                return (
+                  <>
+                    <p className="text-[10px] text-gray-500 mb-1">
+                      {rateTrendData.length === 0
+                        ? "No rate has been uploaded yet for this range"
+                        : rateTrendData.length < 2 || delta === 0
+                          ? "Unchanged across the selected range"
+                          : `${delta > 0 ? "Up" : "Down"} from ₹${first}/sqft at the start of this range (${trimmedLabels[0]})`}
+                    </p>
+                    {rateTrendData.length > 0 && (
+                      <ResponsiveContainer width="100%" height={48}>
+                        <LineChart data={rateTrendData} margin={{ top: 4, right: 4, bottom: 0, left: 4 }}>
+                          <XAxis dataKey="month" hide />
+                          <Tooltip trigger={getTooltipTrigger()} content={<SmartTooltipContent labelPrefix="Month" valueFormatter={(v) => `₹${v}/sqft`} />} />
+                          <Line type="monotone" dataKey="rate" stroke="var(--color-chart-5, #9333ea)" strokeWidth={2} dot={{ r: 2 }} activeDot={{ r: 4 }} />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    )}
+                  </>
+                );
+              })()}
+            </CardContent>
+          </Card>
+        </div>
+      </DashboardSection>
+      )}
+      </TabsContent>
+
+      <TabsContent value="documents" className="space-y-4 mt-4">
+        {isWidgetVisible("overview.auditedReport") && <AuditedReportCard />}
+      </TabsContent>
+      </Tabs>
     </div>
   );
 }
@@ -1036,6 +1146,83 @@ function MetricCard({ label, value, subText, icon, footer, className, valueClass
     );
   }
   return card;
+}
+
+// One of the 4 "At a Glance" hero numbers at the top of Overview. Bigger
+// and bolder than the detail-section MetricCards on purpose -- this is the
+// only row a casual resident needs to read. Color is used sparingly and
+// only where it's a genuine signal (green/red on Net Position, amber on
+// Outstanding Receivables) so it doesn't turn into decoration.
+function HeroStat({ label, value, sub, tone, icon, hero }: {
+  label: string;
+  value: string;
+  sub?: string;
+  tone?: "emerald" | "rose" | "amber";
+  icon?: React.ReactNode;
+  hero?: boolean;
+}) {
+  const toneClass = tone === "emerald" ? "text-emerald-600" : tone === "rose" ? "text-rose-600" : tone === "amber" ? "text-amber-600" : "text-slate-900";
+  const iconBg = tone === "emerald" ? "bg-emerald-50 text-emerald-500" : tone === "rose" ? "bg-rose-50 text-rose-500" : tone === "amber" ? "bg-amber-50 text-amber-500" : "bg-slate-100 text-slate-500";
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-1">
+        {icon && <div className={`h-6 w-6 rounded-md flex items-center justify-center shrink-0 ${iconBg}`}>{icon}</div>}
+        <div className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-500 leading-tight">{label}</div>
+      </div>
+      <div className={`font-bold ${hero ? "text-2xl sm:text-3xl" : "text-lg sm:text-xl"} ${toneClass}`}>{value}</div>
+      {sub && <div className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5">{sub}</div>}
+    </div>
+  );
+}
+
+// Visual-first building block for the Summary tab: replaces a pair of flat
+// number tiles (e.g. Expected vs Collected Maintenance) with one progress
+// bar that shows the relationship between the two numbers at a glance.
+function ProgressBar({ label, value, max, valueLabel, tone = "blue" }: {
+  label: string;
+  value: number;
+  max: number;
+  valueLabel: string;
+  tone?: "blue" | "emerald" | "rose";
+}) {
+  const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0;
+  const barColor = tone === "emerald" ? "bg-emerald-500" : tone === "rose" ? "bg-rose-500" : "bg-blue-500";
+  return (
+    <div>
+      <div className="flex items-center justify-between text-xs mb-1.5">
+        <span className="font-medium text-slate-600">{label}</span>
+        <span className="font-semibold text-slate-800">{pct.toFixed(0)}%</span>
+      </div>
+      <div className="h-2.5 w-full bg-gray-100 rounded-full overflow-hidden">
+        <div className={`h-full rounded-full ${barColor}`} style={{ width: `${pct}%` }} />
+      </div>
+      <div className="text-[11px] text-slate-400 mt-1">{valueLabel}</div>
+    </div>
+  );
+}
+
+// Two of these stacked, scaled to the SAME max, turn "Income: X / Expense: Y"
+// into an instantly-comparable pair of bars instead of two separate tiles.
+function ComparisonBar({ label, value, max, tone }: {
+  label: string;
+  value: number;
+  max: number;
+  tone: "emerald" | "rose";
+}) {
+  const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0;
+  const barColor = tone === "emerald" ? "bg-emerald-500" : "bg-rose-500";
+  const textColor = tone === "emerald" ? "text-emerald-700" : "text-rose-700";
+  return (
+    <div className="mb-3 last:mb-0">
+      <div className="flex items-center justify-between text-xs mb-1">
+        <span className="font-medium text-slate-600">{label}</span>
+        <span className={`font-semibold ${textColor}`}>{inr(value)}</span>
+      </div>
+      <div className="h-2.5 w-full bg-gray-100 rounded-full overflow-hidden">
+        <div className={`h-full rounded-full ${barColor}`} style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
 }
 
 

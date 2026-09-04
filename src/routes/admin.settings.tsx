@@ -69,15 +69,19 @@ const DASHBOARD_DEFS: DashboardDef[] = [
     widgets: [
       { id: "income.sourcesBreakdown", label: "Income sources (maintenance + other income breakdown)" },
       { id: "income.expenseRatio", label: "Expense / Income ratio card" },
-      { id: "income.collectedVsUnpaid", label: "Collected vs Outstanding Receivables chart (bars + expected collection target)" },
+      { id: "income.collectedVsUnpaid", label: "Collected vs unpaid maintenance chart (bars + expected collection target)" },
       { id: "income.recoveryRateTrend", label: "Recovery rate trend chart (with 90% healthy benchmark line)" },
     ],
   },
   {
     key: "resident.drilldown",
     label: "Resident \u00B7 Head Drill-down",
-    widgets: [],
-    notApplicable: "This page is one continuous drill-down flow (Heads -> Categories -> Vendors -> Line items) -- each screen replaces the last based on what's selected, so individual sections can't be hidden without breaking navigation. Use the whole-dashboard toggle above to show/hide this entire page.",
+    widgets: [
+      {
+        id: "drilldown.lineItems",
+        label: "Individual line items below vendor level (applies to BOTH Income and Expense heads) -- when hidden, residents can view a vendor's monthly trend but cannot drill into its individual line items. Admins/superadmins always see full depth regardless of this setting.",
+      },
+    ],
   },
   {
     key: "resident.balance",
@@ -88,19 +92,21 @@ const DASHBOARD_DEFS: DashboardDef[] = [
       { id: "balance.contingencyChart", label: "Monthly contingency fund collection chart" },
     ],
   },
-  {
-    key: "resident.forecasting",
-    label: "Resident · Forecasting",
-    widgets: [
-      { id: "forecasting.kpiTiles", label: "Closing Balance / Net Surplus / Risk tiles" },
-      { id: "forecasting.monthTable", label: "Month-by-month detail table" },
-      { id: "forecasting.charts", label: "Income, Expense & Closing Balance chart" },
-      { id: "forecasting.mix", label: "Forecast expense mix (donut)" },
-      { id: "forecasting.assumptions", label: "Income & Expense assumption sliders" },
-      { id: "forecasting.configPanel", label: "Advanced configuration (reference window, inflation method)" },
-    ],
-  },
 ];
+
+// Stable, module-level reference used as the fallback for `data` while the
+// dashboard-settings query is still loading (data is `undefined` at that
+// point). This MUST be a single shared constant, not an inline `[]`
+// literal in the destructure below -- an inline literal creates a brand
+// new array object on every render, which made the effect below (which
+// depends on this value) re-fire every render while loading, calling
+// setState every time -> infinite render loop -> "Maximum update depth
+// exceeded" (React error #185). This is exactly why the page crashed only
+// on the FIRST click right after login (query still loading, `data` still
+// undefined) and worked fine on the second click (query already
+// resolved/cached by then, so the real fetched array -- a stable
+// reference -- was used instead of this fallback).
+const EMPTY_SETTINGS_ROWS: DashboardSettingRow[] = [];
 
 function Page() {
   // FIX (2026-08-15): this page crashed with a React hydration mismatch
@@ -111,7 +117,7 @@ function Page() {
   // same fix applied to useWidgetVisibility for the resident-facing pages.
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
-  const { data: remoteSettings = [], isLoading, refetch } = useDashboardSettings();
+  const { data: remoteSettings = EMPTY_SETTINGS_ROWS, isLoading, refetch } = useDashboardSettings();
   const [rows, setRows] = useState<DashboardSettingRow[]>([]);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);

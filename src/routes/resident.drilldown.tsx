@@ -8,8 +8,9 @@ import { SmartTooltipContent, getTooltipTrigger } from "@/components/smart-toolt
 import {
   inr, categoryMonthly, vendorMonthly, total,
 } from "@/lib/finance-mock";
-import { useExpenseTree, useIncomeTree } from "@/lib/hooks";
+import { useExpenseTree, useIncomeTree, useWidgetVisibility } from "@/lib/hooks";
 import { filterReportableIncomeCategories } from "@/lib/income-utils";
+import { getSession } from "@/lib/session";
 import { ChevronRight } from "lucide-react";
 
 export const Route = createFileRoute("/resident/drilldown")({
@@ -35,12 +36,26 @@ function Inner() {
   };
   const { data: expenseTree = [] } = useExpenseTree();
   const { data: incomeTree = [] } = useIncomeTree();
+  // NEW dashboard control: admin can restrict how far RESIDENTS may drill
+  // down. When "drilldown.lineItems" is hidden, residents can still see a
+  // vendor's monthly trend (the level shown in the requested screenshot)
+  // but the individual line-item list beneath it -- and everything past
+  // it -- is disabled. Applies identically to both Income and Expense
+  // heads since they share this exact same rendering path below.
+  // Admins/superadmins ALWAYS retain full drill-down depth, regardless of
+  // this setting -- checked directly via role, not the widget toggle.
+  const { isWidgetVisible } = useWidgetVisibility("resident.drilldown");
+  const session = getSession();
+  const isResident = session?.role === "resident";
+  const canViewLineItems = !isResident || isWidgetVisible("drilldown.lineItems");
   const head: Head | null = search.head === "expense" || search.head === "income" ? search.head : null;
   const reportableIncomeTree = filterReportableIncomeCategories(incomeTree);
   const tree = head === "income" ? reportableIncomeTree : expenseTree;
   const category = search.category ? tree.find((c) => c.name === search.category) ?? null : null;
   const vendor = category && search.vendor ? category.vendors.find((v) => v.name === search.vendor) ?? null : null;
-  const line = vendor && search.line ? vendor.items.find((it) => it.name === search.line) ?? null : null;
+  // Defense in depth: even if a resident manually crafts a URL with a
+  // "line" param while this control is restricting them, don't resolve it.
+  const line = vendor && search.line && canViewLineItems ? vendor.items.find((it) => it.name === search.line) ?? null : null;
 
   const update = (patch: { head?: Head | null; category?: string | null; vendor?: string | null; line?: string | null }) => {
     navigate({
@@ -169,6 +184,7 @@ function Inner() {
               </ResponsiveContainer>
             </CardContent>
           </Card>
+          {canViewLineItems ? (
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Line items</CardTitle>
@@ -196,6 +212,13 @@ function Inner() {
               })}
             </CardContent>
           </Card>
+          ) : (
+          <Card className="border-dashed">
+            <CardContent className="py-6 text-center text-sm text-muted-foreground">
+              Individual line-item detail isn't available at this level. Contact your management committee for a full breakdown.
+            </CardContent>
+          </Card>
+          )}
         </>
       )}
 
