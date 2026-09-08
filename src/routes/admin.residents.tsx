@@ -23,9 +23,7 @@ export const Route = createFileRoute("/admin/residents")({
 
 // ── API helpers ──────────────────────────────────────────────────────────────
 function authHeader(): HeadersInit {
-  if (typeof window === "undefined") return {};
-  const t = window.localStorage.getItem("apf.token");
-  return t ? { Authorization: `Bearer ${t}` } : {};
+  return {};
 }
 
 // FIX (2026-08-15): the old mapper collapsed "superadmin" -> "admin" for

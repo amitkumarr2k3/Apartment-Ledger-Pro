@@ -1,7 +1,9 @@
 FROM node:20-alpine AS build
 WORKDIR /app
 COPY package.json tsconfig.json ./
-RUN npm install
+COPY package-lock.json ./
+RUN npm install -g npm@11.19.1 && \
+	npm ci --legacy-peer-deps
 COPY src ./src
 COPY db ./db
 COPY scripts ./scripts

@@ -9,12 +9,35 @@ Postgres system of record, Fastify API, React/TanStack frontend, seeded demo dat
 - **Vendors** are surfaced through insights only; the app does not offer a vendor CRUD screen. Vendor rows are imported via CSV or created on the fly when a transaction references a new vendor name.
 - **CSV-first ingestion.** Transactions/residents can be uploaded with per-batch mapping rules to handle non-uniform month-over-month line items.
 
+## Local vs Production (do not edit individual source files)
+
+Use environment variables in `.env` and the compose overlays. Do not modify backend source or Dockerfiles per environment.
+
+- Local HTTP run:
+  - `make up-local`
+  - open `http://localhost` (or `http://localhost:<WEB_PORT>` if you changed `WEB_PORT`)
+- Production HTTPS run:
+  - set `DOMAIN`, `APP_URL`, `CORS_ORIGIN`, `NODE_ENV=production`, `COOKIE_SECURE=true` in `.env`
+  - run `make up-prod`
+
+For your domain, set this in `.env`:
+
+```env
+DOMAIN=pulseledger.cgboulevard.com
+APP_URL=https://pulseledger.cgboulevard.com
+CORS_ORIGIN=https://pulseledger.cgboulevard.com
+NODE_ENV=production
+COOKIE_SECURE=true
+```
+
+Note: Do **not** hardcode `DOMAIN` in `docker-compose.https.yml`; keep it as `${DOMAIN:?...}` and set the value in `.env`.
+
 ## Local setup — exact steps
 
 ### 1. Prerequisites
 
 - Docker Desktop 4.30+ **or** `bun` 1.1+ (for the frontend-only preview).
-- Ports free on the host: `8090` (web), `8035` (MailHog UI), `1035` (SMTP), `5442` (Postgres), `4010` (API). Container-internal ports (80/8025/1025/5432/4000) are unchanged, so nothing inside the compose network needs reconfiguring — override the host side in `docker-compose.yml` if these still collide.
+- Ports free on the host: `80` (web, configurable via `WEB_PORT`), `8035` (MailHog UI), `1035` (SMTP), `5442` (Postgres), `4010` (API). Container-internal ports (80/8025/1025/5432/4000) are unchanged, so nothing inside the compose network needs reconfiguring.
 
 ### 2. Environment variables
 
@@ -28,13 +51,17 @@ cp .env.example .env
 | `JWT_SECRET` | Signs session tokens issued after OTP verification | dev value — **rotate for prod** |
 | `SUPERADMIN_EMAIL` | Bootstrap admin whitelisted on first migration | `admin@example.com` |
 | `SMTP_HOST` / `SMTP_PORT` | Where OTP emails go (MailHog in dev, container port) | `mailhog` / `1025` |
-| `APP_URL` | Absolute URL used inside OTP emails | `http://localhost:8090` |
+| `APP_URL` | Absolute URL used inside OTP emails | `http://localhost` |
+| `WEB_PORT` | Host port mapped to nginx container port 80 | `80` |
+| `NODE_ENV` | Runtime mode for backend safety checks | `development` |
+| `COOKIE_SECURE` | Secure cookie flag | `false` in local HTTP, `true` in HTTPS prod |
+| `DOMAIN` | Public domain used by HTTPS overlay | empty in local, required in HTTPS prod |
 
 ### 3. Boot the full stack (Docker)
 
 ```bash
-docker compose up -d --build              # db, api, web, mailhog, migrate
-open http://localhost:8090                # portal
+make up-local                             # db, api, web, mailhog, migrate, seed, ssr
+open http://localhost                     # portal (or :WEB_PORT if changed)
 open http://localhost:8035                # MailHog inbox for OTPs
 ```
 
@@ -94,7 +121,7 @@ export const GUEST_SESSION = { email: "guest@prototype.local", role: "admin", ..
 
 When enabled:
 
-1. Open `http://localhost:8090/login`.
+1. Open `http://localhost/login` (or `http://localhost:<WEB_PORT>/login`).
 2. Enter a whitelisted email (`admin@example.com`, `treasurer@example.com`, or `resident@example.com`).
 3. Open MailHog at `http://localhost:8035` and copy the 6-digit OTP.
 4. Paste it back → the app stores a JWT in `localStorage` and the route guards let you in.
@@ -116,7 +143,7 @@ the login page shows the code on-screen so you can paste it without SMTP.
 | --- | --- |
 | `GET http://localhost:4010/health` | API liveness — cheap, no DB. |
 | `GET http://localhost:4010/ready`  | API readiness — DB reachable + `_migrations` populated. Returns 503 with `checks` JSON otherwise. |
-| `GET http://localhost:8090/health` | Web container liveness (nginx-served, no upstream). |
+| `GET http://localhost/health` | Web container liveness (nginx-served, no upstream). |
 
 #### Running the smoke test
 
@@ -129,7 +156,7 @@ make smoke                                    # default settings
 LOG_LINES=200 make smoke                      # more logs on failure
 TIMEOUT=180 READY_TIMEOUT=300 make smoke      # slow machines / cold DB
 API_URL=http://localhost:4010 \
-  WEB_URL=http://localhost:8090 make smoke    # custom ports
+  WEB_URL=http://localhost make smoke         # custom ports
 
 # Direct invocation (identical):
 ./scripts/smoke-test.sh
@@ -306,5 +333,5 @@ bun scripts/responsive-check.mjs
 
 ## Make targets
 
-`make up | down | logs | psql | seed | reset | test`
+`make up-local | up-prod | down-local | down-prod | logs-local | logs-prod | psql | seed | reset | test`
 

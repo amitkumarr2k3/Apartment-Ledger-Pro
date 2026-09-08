@@ -7,9 +7,7 @@ import { AUTH_ENABLED } from "./feature-flags";
 const API = (import.meta as any).env?.VITE_API_URL ?? "/api";
 
 function tokenHeader(): HeadersInit {
-  if (typeof window === "undefined") return {};
-  const t = window.localStorage.getItem("apf.token");
-  return t ? { Authorization: `Bearer ${t}` } : {};
+  return {};
 }
 
 // Fires once per expired/invalid session. Several queries can hit 401 at the
@@ -40,7 +38,7 @@ async function get<T>(path: string): Promise<T> {
 
 function hasStoredAuth(): boolean {
   return typeof window !== "undefined"
-    && (!!window.localStorage.getItem("apf.token") || !!window.localStorage.getItem("apf.session"));
+    && !!window.localStorage.getItem("apf.session");
 }
 
 function canUseMockFallback(): boolean {

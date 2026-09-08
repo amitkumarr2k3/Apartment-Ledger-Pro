@@ -144,9 +144,7 @@ function Inner() {
     setOpen(true);
   }
   function authHeadersObj(): Record<string, string> {
-    if (typeof window === "undefined") return {};
-    const t = window.localStorage.getItem("apf.token");
-    return t ? { Authorization: `Bearer ${t}` } : {};
+    return {};
   }
 
   async function save() {

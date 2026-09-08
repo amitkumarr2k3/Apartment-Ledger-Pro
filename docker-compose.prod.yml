@@ -1,0 +1,9 @@
+services:
+  api:
+    environment:
+      NODE_ENV: production
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+
+  web:
+    ports:
+      - "80:80"

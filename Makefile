@@ -1,13 +1,31 @@
-.PHONY: up down logs psql seed test reset smoke csv-samples db-backup db-cleanup api-check
+.PHONY: up up-local up-prod down down-local down-prod logs logs-local logs-prod psql seed test reset smoke csv-samples db-backup db-cleanup api-check
 
 up:
 	docker compose up -d --build
 
+up-local:
+	docker compose -f docker-compose.yml up -d --build
+
+up-prod:
+	docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.https.yml up -d --build
+
 down:
 	docker compose down
 
+down-local:
+	docker compose -f docker-compose.yml down
+
+down-prod:
+	docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.https.yml down
+
 logs:
 	docker compose logs -f api
+
+logs-local:
+	docker compose -f docker-compose.yml logs -f web api ssr
+
+logs-prod:
+	docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.https.yml logs -f web api ssr
 
 psql:
 	docker compose exec db psql -U apf -d apartment_finance

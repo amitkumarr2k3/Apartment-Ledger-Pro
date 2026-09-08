@@ -1,4 +1,4 @@
-// Client-side gate: when a user is signed in (apf.token present) and a screen
+// Client-side gate: when a user is signed in and a screen
 // is not yet wired to the real API, show a clear "No data yet" state instead
 // of misleading mock numbers. Prevents the "why is DB empty but dashboard
 // still full?" confusion.
@@ -12,8 +12,7 @@ export function useShowMockData(): boolean {
   const [show, setShow] = useState(true);
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const authed = !!window.localStorage.getItem("apf.token")
-      || !!window.localStorage.getItem("apf.session");
+    const authed = !!window.localStorage.getItem("apf.session");
     if (authed) setShow(false);
   }, []);
   return show;

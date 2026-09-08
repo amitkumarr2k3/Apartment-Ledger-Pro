@@ -37,9 +37,7 @@ type AuditRow = {
 };
 
 function authHeader(): HeadersInit {
-  if (typeof window === "undefined") return {};
-  const t = window.localStorage.getItem("apf.token");
-  return t ? { Authorization: `Bearer ${t}` } : {};
+  return {};
 }
 
 function summarise(row: any): string {

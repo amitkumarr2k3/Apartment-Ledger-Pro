@@ -119,9 +119,7 @@ function buildCanonicalCsv(rows: MappedRow[], spec: FieldSpec[]): string {
 }
 
 function authHeader(): HeadersInit {
-  if (typeof window === "undefined") return {};
-  const t = window.localStorage.getItem("apf.token");
-  return t ? { Authorization: `Bearer ${t}` } : {};
+  return {};
 }
 
 async function fetchImportHistory(): Promise<ImportBatch[]> {

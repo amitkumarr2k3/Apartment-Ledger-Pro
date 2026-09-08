@@ -32,14 +32,14 @@ services:
       # Certbot webroot for .well-known/acme-challenge/ during renewals.
       - certbot_webroot:/var/www/certbot:ro
     environment:
-      DOMAIN: ${DOMAIN}
+      DOMAIN: ${DOMAIN:?DOMAIN must be set for HTTPS deployment}
       API_UPSTREAM: "http://api:4000"
       SSR_UPSTREAM: "http://ssr:3000"
 
   api:
     environment:
       # Override APP_URL so OTP / magic-link emails carry the https:// URL.
-      APP_URL: https://${DOMAIN}
+      APP_URL: https://${DOMAIN:?DOMAIN must be set for HTTPS deployment}
 
 volumes:
   certbot_webroot:

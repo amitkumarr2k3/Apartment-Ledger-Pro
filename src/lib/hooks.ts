@@ -251,7 +251,7 @@ function authCacheKey() {
 
 function hasStoredAuth(): boolean {
   return typeof window !== "undefined"
-    && (!!window.localStorage.getItem("apf.token") || !!window.localStorage.getItem("apf.session"));
+    && !!window.localStorage.getItem("apf.session");
 }
 
 // ---- resident.overview ----
@@ -447,9 +447,7 @@ export function useAdminTransactions() {
 
 // ---- helpers ----
 function authHeaders(): RequestInit {
-  if (typeof window === "undefined") return {};
-  const t = window.localStorage.getItem("apf.token");
-  return t ? { headers: { Authorization: `Bearer ${t}` } } : {};
+  return {};
 }
 
 function buildTree(rows: any[]): mock.Category[] {

@@ -9,103 +9,46 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as LoginRouteImport } from './routes/login'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as ResidentOverviewRouteImport } from './routes/resident.overview'
-import { Route as ResidentIncomeRouteImport } from './routes/resident.income'
-import { Route as ResidentDrilldownRouteImport } from './routes/resident.drilldown'
-import { Route as ResidentCashflowRouteImport } from './routes/resident.cashflow'
-import { Route as ResidentBalanceRouteImport } from './routes/resident.balance'
-import { Route as AdminVendorsRouteImport } from './routes/admin.vendors'
-import { Route as AdminTransactionsRouteImport } from './routes/admin.transactions'
-import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
-import { Route as AdminResidentsRouteImport } from './routes/admin.residents'
-import { Route as AdminIncomeRouteImport } from './routes/admin.income'
-import { Route as AdminImportsRouteImport } from './routes/admin.imports'
-import { Route as AdminEtlRouteImport } from './routes/admin.etl'
-import { Route as AdminCollectionsRouteImport } from './routes/admin.collections'
-import { Route as AdminAuditRouteImport } from './routes/admin.audit'
-import { Route as AdminAlertsRouteImport } from './routes/admin.alerts'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as AdminActionsRouteImport } from './routes/admin.actions'
+import { Route as AdminAlertsRouteImport } from './routes/admin.alerts'
+import { Route as AdminAuditRouteImport } from './routes/admin.audit'
+import { Route as AdminCollectionsRouteImport } from './routes/admin.collections'
+import { Route as AdminDrilldownRouteImport } from './routes/admin.drilldown'
+import { Route as AdminEtlRouteImport } from './routes/admin.etl'
+import { Route as AdminImportsRouteImport } from './routes/admin.imports'
+import { Route as AdminIncomeRouteImport } from './routes/admin.income'
+import { Route as AdminResidentsRouteImport } from './routes/admin.residents'
+import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
+import { Route as AdminTransactionsRouteImport } from './routes/admin.transactions'
+import { Route as AdminVendorsRouteImport } from './routes/admin.vendors'
+import { Route as ResidentBalanceRouteImport } from './routes/resident.balance'
+import { Route as ResidentCashflowRouteImport } from './routes/resident.cashflow'
+import { Route as ResidentDrilldownRouteImport } from './routes/resident.drilldown'
+import { Route as ResidentForecastingRouteImport } from './routes/resident.forecasting'
+import { Route as ResidentIncomeRouteImport } from './routes/resident.income'
+import { Route as ResidentOverviewRouteImport } from './routes/resident.overview'
+import { Route as ResidentOverview_bkRouteImport } from './routes/resident.overview_bk'
+import { Route as ResidentOverview_v1RouteImport } from './routes/resident.overview_v1'
+import { Route as BackResidentBalanceRouteImport } from './routes/Back/resident.balance'
+import { Route as BackResidentCashflowRouteImport } from './routes/Back/resident.cashflow'
+import { Route as BackResidentIncomeRouteImport } from './routes/Back/resident.income'
+import { Route as BackResidentOverviewRouteImport } from './routes/Back/resident.overview'
 
-const LoginRoute = LoginRouteImport.update({
-  id: '/login',
-  path: '/login',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ResidentOverviewRoute = ResidentOverviewRouteImport.update({
-  id: '/resident/overview',
-  path: '/resident/overview',
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ResidentIncomeRoute = ResidentIncomeRouteImport.update({
-  id: '/resident/income',
-  path: '/resident/income',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ResidentDrilldownRoute = ResidentDrilldownRouteImport.update({
-  id: '/resident/drilldown',
-  path: '/resident/drilldown',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ResidentCashflowRoute = ResidentCashflowRouteImport.update({
-  id: '/resident/cashflow',
-  path: '/resident/cashflow',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ResidentBalanceRoute = ResidentBalanceRouteImport.update({
-  id: '/resident/balance',
-  path: '/resident/balance',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AdminVendorsRoute = AdminVendorsRouteImport.update({
-  id: '/admin/vendors',
-  path: '/admin/vendors',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AdminTransactionsRoute = AdminTransactionsRouteImport.update({
-  id: '/admin/transactions',
-  path: '/admin/transactions',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AdminSettingsRoute = AdminSettingsRouteImport.update({
-  id: '/admin/settings',
-  path: '/admin/settings',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AdminResidentsRoute = AdminResidentsRouteImport.update({
-  id: '/admin/residents',
-  path: '/admin/residents',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AdminIncomeRoute = AdminIncomeRouteImport.update({
-  id: '/admin/income',
-  path: '/admin/income',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AdminImportsRoute = AdminImportsRouteImport.update({
-  id: '/admin/imports',
-  path: '/admin/imports',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AdminEtlRoute = AdminEtlRouteImport.update({
-  id: '/admin/etl',
-  path: '/admin/etl',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AdminCollectionsRoute = AdminCollectionsRouteImport.update({
-  id: '/admin/collections',
-  path: '/admin/collections',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AdminAuditRoute = AdminAuditRouteImport.update({
-  id: '/admin/audit',
-  path: '/admin/audit',
+const AdminActionsRoute = AdminActionsRouteImport.update({
+  id: '/admin/actions',
+  path: '/admin/actions',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminAlertsRoute = AdminAlertsRouteImport.update({
@@ -113,9 +56,114 @@ const AdminAlertsRoute = AdminAlertsRouteImport.update({
   path: '/admin/alerts',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AdminActionsRoute = AdminActionsRouteImport.update({
-  id: '/admin/actions',
-  path: '/admin/actions',
+const AdminAuditRoute = AdminAuditRouteImport.update({
+  id: '/admin/audit',
+  path: '/admin/audit',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminCollectionsRoute = AdminCollectionsRouteImport.update({
+  id: '/admin/collections',
+  path: '/admin/collections',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminDrilldownRoute = AdminDrilldownRouteImport.update({
+  id: '/admin/drilldown',
+  path: '/admin/drilldown',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminEtlRoute = AdminEtlRouteImport.update({
+  id: '/admin/etl',
+  path: '/admin/etl',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminImportsRoute = AdminImportsRouteImport.update({
+  id: '/admin/imports',
+  path: '/admin/imports',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminIncomeRoute = AdminIncomeRouteImport.update({
+  id: '/admin/income',
+  path: '/admin/income',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminResidentsRoute = AdminResidentsRouteImport.update({
+  id: '/admin/residents',
+  path: '/admin/residents',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminSettingsRoute = AdminSettingsRouteImport.update({
+  id: '/admin/settings',
+  path: '/admin/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminTransactionsRoute = AdminTransactionsRouteImport.update({
+  id: '/admin/transactions',
+  path: '/admin/transactions',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminVendorsRoute = AdminVendorsRouteImport.update({
+  id: '/admin/vendors',
+  path: '/admin/vendors',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResidentBalanceRoute = ResidentBalanceRouteImport.update({
+  id: '/resident/balance',
+  path: '/resident/balance',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResidentCashflowRoute = ResidentCashflowRouteImport.update({
+  id: '/resident/cashflow',
+  path: '/resident/cashflow',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResidentDrilldownRoute = ResidentDrilldownRouteImport.update({
+  id: '/resident/drilldown',
+  path: '/resident/drilldown',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResidentForecastingRoute = ResidentForecastingRouteImport.update({
+  id: '/resident/forecasting',
+  path: '/resident/forecasting',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResidentIncomeRoute = ResidentIncomeRouteImport.update({
+  id: '/resident/income',
+  path: '/resident/income',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResidentOverviewRoute = ResidentOverviewRouteImport.update({
+  id: '/resident/overview',
+  path: '/resident/overview',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResidentOverview_bkRoute = ResidentOverview_bkRouteImport.update({
+  id: '/resident/overview_bk',
+  path: '/resident/overview_bk',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResidentOverview_v1Route = ResidentOverview_v1RouteImport.update({
+  id: '/resident/overview_v1',
+  path: '/resident/overview_v1',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BackResidentBalanceRoute = BackResidentBalanceRouteImport.update({
+  id: '/Back/resident/balance',
+  path: '/Back/resident/balance',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BackResidentCashflowRoute = BackResidentCashflowRouteImport.update({
+  id: '/Back/resident/cashflow',
+  path: '/Back/resident/cashflow',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BackResidentIncomeRoute = BackResidentIncomeRouteImport.update({
+  id: '/Back/resident/income',
+  path: '/Back/resident/income',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BackResidentOverviewRoute = BackResidentOverviewRouteImport.update({
+  id: '/Back/resident/overview',
+  path: '/Back/resident/overview',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -126,6 +174,7 @@ export interface FileRoutesByFullPath {
   '/admin/alerts': typeof AdminAlertsRoute
   '/admin/audit': typeof AdminAuditRoute
   '/admin/collections': typeof AdminCollectionsRoute
+  '/admin/drilldown': typeof AdminDrilldownRoute
   '/admin/etl': typeof AdminEtlRoute
   '/admin/imports': typeof AdminImportsRoute
   '/admin/income': typeof AdminIncomeRoute
@@ -136,8 +185,15 @@ export interface FileRoutesByFullPath {
   '/resident/balance': typeof ResidentBalanceRoute
   '/resident/cashflow': typeof ResidentCashflowRoute
   '/resident/drilldown': typeof ResidentDrilldownRoute
+  '/resident/forecasting': typeof ResidentForecastingRoute
   '/resident/income': typeof ResidentIncomeRoute
   '/resident/overview': typeof ResidentOverviewRoute
+  '/resident/overview_bk': typeof ResidentOverview_bkRoute
+  '/resident/overview_v1': typeof ResidentOverview_v1Route
+  '/Back/resident/balance': typeof BackResidentBalanceRoute
+  '/Back/resident/cashflow': typeof BackResidentCashflowRoute
+  '/Back/resident/income': typeof BackResidentIncomeRoute
+  '/Back/resident/overview': typeof BackResidentOverviewRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -146,6 +202,7 @@ export interface FileRoutesByTo {
   '/admin/alerts': typeof AdminAlertsRoute
   '/admin/audit': typeof AdminAuditRoute
   '/admin/collections': typeof AdminCollectionsRoute
+  '/admin/drilldown': typeof AdminDrilldownRoute
   '/admin/etl': typeof AdminEtlRoute
   '/admin/imports': typeof AdminImportsRoute
   '/admin/income': typeof AdminIncomeRoute
@@ -156,8 +213,15 @@ export interface FileRoutesByTo {
   '/resident/balance': typeof ResidentBalanceRoute
   '/resident/cashflow': typeof ResidentCashflowRoute
   '/resident/drilldown': typeof ResidentDrilldownRoute
+  '/resident/forecasting': typeof ResidentForecastingRoute
   '/resident/income': typeof ResidentIncomeRoute
   '/resident/overview': typeof ResidentOverviewRoute
+  '/resident/overview_bk': typeof ResidentOverview_bkRoute
+  '/resident/overview_v1': typeof ResidentOverview_v1Route
+  '/Back/resident/balance': typeof BackResidentBalanceRoute
+  '/Back/resident/cashflow': typeof BackResidentCashflowRoute
+  '/Back/resident/income': typeof BackResidentIncomeRoute
+  '/Back/resident/overview': typeof BackResidentOverviewRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -167,6 +231,7 @@ export interface FileRoutesById {
   '/admin/alerts': typeof AdminAlertsRoute
   '/admin/audit': typeof AdminAuditRoute
   '/admin/collections': typeof AdminCollectionsRoute
+  '/admin/drilldown': typeof AdminDrilldownRoute
   '/admin/etl': typeof AdminEtlRoute
   '/admin/imports': typeof AdminImportsRoute
   '/admin/income': typeof AdminIncomeRoute
@@ -177,8 +242,15 @@ export interface FileRoutesById {
   '/resident/balance': typeof ResidentBalanceRoute
   '/resident/cashflow': typeof ResidentCashflowRoute
   '/resident/drilldown': typeof ResidentDrilldownRoute
+  '/resident/forecasting': typeof ResidentForecastingRoute
   '/resident/income': typeof ResidentIncomeRoute
   '/resident/overview': typeof ResidentOverviewRoute
+  '/resident/overview_bk': typeof ResidentOverview_bkRoute
+  '/resident/overview_v1': typeof ResidentOverview_v1Route
+  '/Back/resident/balance': typeof BackResidentBalanceRoute
+  '/Back/resident/cashflow': typeof BackResidentCashflowRoute
+  '/Back/resident/income': typeof BackResidentIncomeRoute
+  '/Back/resident/overview': typeof BackResidentOverviewRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -189,6 +261,7 @@ export interface FileRouteTypes {
     | '/admin/alerts'
     | '/admin/audit'
     | '/admin/collections'
+    | '/admin/drilldown'
     | '/admin/etl'
     | '/admin/imports'
     | '/admin/income'
@@ -199,8 +272,15 @@ export interface FileRouteTypes {
     | '/resident/balance'
     | '/resident/cashflow'
     | '/resident/drilldown'
+    | '/resident/forecasting'
     | '/resident/income'
     | '/resident/overview'
+    | '/resident/overview_bk'
+    | '/resident/overview_v1'
+    | '/Back/resident/balance'
+    | '/Back/resident/cashflow'
+    | '/Back/resident/income'
+    | '/Back/resident/overview'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -209,6 +289,7 @@ export interface FileRouteTypes {
     | '/admin/alerts'
     | '/admin/audit'
     | '/admin/collections'
+    | '/admin/drilldown'
     | '/admin/etl'
     | '/admin/imports'
     | '/admin/income'
@@ -219,8 +300,15 @@ export interface FileRouteTypes {
     | '/resident/balance'
     | '/resident/cashflow'
     | '/resident/drilldown'
+    | '/resident/forecasting'
     | '/resident/income'
     | '/resident/overview'
+    | '/resident/overview_bk'
+    | '/resident/overview_v1'
+    | '/Back/resident/balance'
+    | '/Back/resident/cashflow'
+    | '/Back/resident/income'
+    | '/Back/resident/overview'
   id:
     | '__root__'
     | '/'
@@ -229,6 +317,7 @@ export interface FileRouteTypes {
     | '/admin/alerts'
     | '/admin/audit'
     | '/admin/collections'
+    | '/admin/drilldown'
     | '/admin/etl'
     | '/admin/imports'
     | '/admin/income'
@@ -239,8 +328,15 @@ export interface FileRouteTypes {
     | '/resident/balance'
     | '/resident/cashflow'
     | '/resident/drilldown'
+    | '/resident/forecasting'
     | '/resident/income'
     | '/resident/overview'
+    | '/resident/overview_bk'
+    | '/resident/overview_v1'
+    | '/Back/resident/balance'
+    | '/Back/resident/cashflow'
+    | '/Back/resident/income'
+    | '/Back/resident/overview'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -250,6 +346,7 @@ export interface RootRouteChildren {
   AdminAlertsRoute: typeof AdminAlertsRoute
   AdminAuditRoute: typeof AdminAuditRoute
   AdminCollectionsRoute: typeof AdminCollectionsRoute
+  AdminDrilldownRoute: typeof AdminDrilldownRoute
   AdminEtlRoute: typeof AdminEtlRoute
   AdminImportsRoute: typeof AdminImportsRoute
   AdminIncomeRoute: typeof AdminIncomeRoute
@@ -260,19 +357,19 @@ export interface RootRouteChildren {
   ResidentBalanceRoute: typeof ResidentBalanceRoute
   ResidentCashflowRoute: typeof ResidentCashflowRoute
   ResidentDrilldownRoute: typeof ResidentDrilldownRoute
+  ResidentForecastingRoute: typeof ResidentForecastingRoute
   ResidentIncomeRoute: typeof ResidentIncomeRoute
   ResidentOverviewRoute: typeof ResidentOverviewRoute
+  ResidentOverview_bkRoute: typeof ResidentOverview_bkRoute
+  ResidentOverview_v1Route: typeof ResidentOverview_v1Route
+  BackResidentBalanceRoute: typeof BackResidentBalanceRoute
+  BackResidentCashflowRoute: typeof BackResidentCashflowRoute
+  BackResidentIncomeRoute: typeof BackResidentIncomeRoute
+  BackResidentOverviewRoute: typeof BackResidentOverviewRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/login': {
-      id: '/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof LoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/': {
       id: '/'
       path: '/'
@@ -280,74 +377,46 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/resident/overview': {
-      id: '/resident/overview'
-      path: '/resident/overview'
-      fullPath: '/resident/overview'
-      preLoaderRoute: typeof ResidentOverviewRouteImport
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/resident/income': {
-      id: '/resident/income'
-      path: '/resident/income'
-      fullPath: '/resident/income'
-      preLoaderRoute: typeof ResidentIncomeRouteImport
+    '/admin/actions': {
+      id: '/admin/actions'
+      path: '/admin/actions'
+      fullPath: '/admin/actions'
+      preLoaderRoute: typeof AdminActionsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/resident/drilldown': {
-      id: '/resident/drilldown'
-      path: '/resident/drilldown'
-      fullPath: '/resident/drilldown'
-      preLoaderRoute: typeof ResidentDrilldownRouteImport
+    '/admin/alerts': {
+      id: '/admin/alerts'
+      path: '/admin/alerts'
+      fullPath: '/admin/alerts'
+      preLoaderRoute: typeof AdminAlertsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/resident/cashflow': {
-      id: '/resident/cashflow'
-      path: '/resident/cashflow'
-      fullPath: '/resident/cashflow'
-      preLoaderRoute: typeof ResidentCashflowRouteImport
+    '/admin/audit': {
+      id: '/admin/audit'
+      path: '/admin/audit'
+      fullPath: '/admin/audit'
+      preLoaderRoute: typeof AdminAuditRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/resident/balance': {
-      id: '/resident/balance'
-      path: '/resident/balance'
-      fullPath: '/resident/balance'
-      preLoaderRoute: typeof ResidentBalanceRouteImport
+    '/admin/collections': {
+      id: '/admin/collections'
+      path: '/admin/collections'
+      fullPath: '/admin/collections'
+      preLoaderRoute: typeof AdminCollectionsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/admin/vendors': {
-      id: '/admin/vendors'
-      path: '/admin/vendors'
-      fullPath: '/admin/vendors'
-      preLoaderRoute: typeof AdminVendorsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/admin/transactions': {
-      id: '/admin/transactions'
-      path: '/admin/transactions'
-      fullPath: '/admin/transactions'
-      preLoaderRoute: typeof AdminTransactionsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/admin/settings': {
-      id: '/admin/settings'
-      path: '/admin/settings'
-      fullPath: '/admin/settings'
-      preLoaderRoute: typeof AdminSettingsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/admin/residents': {
-      id: '/admin/residents'
-      path: '/admin/residents'
-      fullPath: '/admin/residents'
-      preLoaderRoute: typeof AdminResidentsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/admin/income': {
-      id: '/admin/income'
-      path: '/admin/income'
-      fullPath: '/admin/income'
-      preLoaderRoute: typeof AdminIncomeRouteImport
+    '/admin/drilldown': {
+      id: '/admin/drilldown'
+      path: '/admin/drilldown'
+      fullPath: '/admin/drilldown'
+      preLoaderRoute: typeof AdminDrilldownRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/etl': {
@@ -364,32 +433,123 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminImportsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/admin/collections': {
-      id: '/admin/collections'
-      path: '/admin/collections'
-      fullPath: '/admin/collections'
-      preLoaderRoute: typeof AdminCollectionsRouteImport
+    '/admin/income': {
+      id: '/admin/income'
+      path: '/admin/income'
+      fullPath: '/admin/income'
+      preLoaderRoute: typeof AdminIncomeRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/admin/audit': {
-      id: '/admin/audit'
-      path: '/admin/audit'
-      fullPath: '/admin/audit'
-      preLoaderRoute: typeof AdminAuditRouteImport
+    '/admin/residents': {
+      id: '/admin/residents'
+      path: '/admin/residents'
+      fullPath: '/admin/residents'
+      preLoaderRoute: typeof AdminResidentsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/admin/alerts': {
-      id: '/admin/alerts'
-      path: '/admin/alerts'
-      fullPath: '/admin/alerts'
-      preLoaderRoute: typeof AdminAlertsRouteImport
+    '/admin/settings': {
+      id: '/admin/settings'
+      path: '/admin/settings'
+      fullPath: '/admin/settings'
+      preLoaderRoute: typeof AdminSettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/admin/actions': {
-      id: '/admin/actions'
-      path: '/admin/actions'
-      fullPath: '/admin/actions'
-      preLoaderRoute: typeof AdminActionsRouteImport
+    '/admin/transactions': {
+      id: '/admin/transactions'
+      path: '/admin/transactions'
+      fullPath: '/admin/transactions'
+      preLoaderRoute: typeof AdminTransactionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/vendors': {
+      id: '/admin/vendors'
+      path: '/admin/vendors'
+      fullPath: '/admin/vendors'
+      preLoaderRoute: typeof AdminVendorsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/resident/balance': {
+      id: '/resident/balance'
+      path: '/resident/balance'
+      fullPath: '/resident/balance'
+      preLoaderRoute: typeof ResidentBalanceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/resident/cashflow': {
+      id: '/resident/cashflow'
+      path: '/resident/cashflow'
+      fullPath: '/resident/cashflow'
+      preLoaderRoute: typeof ResidentCashflowRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/resident/drilldown': {
+      id: '/resident/drilldown'
+      path: '/resident/drilldown'
+      fullPath: '/resident/drilldown'
+      preLoaderRoute: typeof ResidentDrilldownRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/resident/forecasting': {
+      id: '/resident/forecasting'
+      path: '/resident/forecasting'
+      fullPath: '/resident/forecasting'
+      preLoaderRoute: typeof ResidentForecastingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/resident/income': {
+      id: '/resident/income'
+      path: '/resident/income'
+      fullPath: '/resident/income'
+      preLoaderRoute: typeof ResidentIncomeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/resident/overview': {
+      id: '/resident/overview'
+      path: '/resident/overview'
+      fullPath: '/resident/overview'
+      preLoaderRoute: typeof ResidentOverviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/resident/overview_bk': {
+      id: '/resident/overview_bk'
+      path: '/resident/overview_bk'
+      fullPath: '/resident/overview_bk'
+      preLoaderRoute: typeof ResidentOverview_bkRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/resident/overview_v1': {
+      id: '/resident/overview_v1'
+      path: '/resident/overview_v1'
+      fullPath: '/resident/overview_v1'
+      preLoaderRoute: typeof ResidentOverview_v1RouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/Back/resident/balance': {
+      id: '/Back/resident/balance'
+      path: '/Back/resident/balance'
+      fullPath: '/Back/resident/balance'
+      preLoaderRoute: typeof BackResidentBalanceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/Back/resident/cashflow': {
+      id: '/Back/resident/cashflow'
+      path: '/Back/resident/cashflow'
+      fullPath: '/Back/resident/cashflow'
+      preLoaderRoute: typeof BackResidentCashflowRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/Back/resident/income': {
+      id: '/Back/resident/income'
+      path: '/Back/resident/income'
+      fullPath: '/Back/resident/income'
+      preLoaderRoute: typeof BackResidentIncomeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/Back/resident/overview': {
+      id: '/Back/resident/overview'
+      path: '/Back/resident/overview'
+      fullPath: '/Back/resident/overview'
+      preLoaderRoute: typeof BackResidentOverviewRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -402,6 +562,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminAlertsRoute: AdminAlertsRoute,
   AdminAuditRoute: AdminAuditRoute,
   AdminCollectionsRoute: AdminCollectionsRoute,
+  AdminDrilldownRoute: AdminDrilldownRoute,
   AdminEtlRoute: AdminEtlRoute,
   AdminImportsRoute: AdminImportsRoute,
   AdminIncomeRoute: AdminIncomeRoute,
@@ -412,9 +573,26 @@ const rootRouteChildren: RootRouteChildren = {
   ResidentBalanceRoute: ResidentBalanceRoute,
   ResidentCashflowRoute: ResidentCashflowRoute,
   ResidentDrilldownRoute: ResidentDrilldownRoute,
+  ResidentForecastingRoute: ResidentForecastingRoute,
   ResidentIncomeRoute: ResidentIncomeRoute,
   ResidentOverviewRoute: ResidentOverviewRoute,
+  ResidentOverview_bkRoute: ResidentOverview_bkRoute,
+  ResidentOverview_v1Route: ResidentOverview_v1Route,
+  BackResidentBalanceRoute: BackResidentBalanceRoute,
+  BackResidentCashflowRoute: BackResidentCashflowRoute,
+  BackResidentIncomeRoute: BackResidentIncomeRoute,
+  BackResidentOverviewRoute: BackResidentOverviewRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

@@ -29,6 +29,7 @@ const SUPERADMIN_EMAIL = (process.env.SUPERADMIN_EMAIL || "admin@example.com").t
 // set COOKIE_SECURE=true in your environment the moment you're actually
 // serving over HTTPS, and leave it true from then on.
 const COOKIE_SECURE = (process.env.COOKIE_SECURE ?? "false").toLowerCase() === "true";
+const IS_PROD = (process.env.NODE_ENV ?? "development").toLowerCase() === "production";
 
 // FIX (2026-08-15): removed. This used to force-inject "superadmin"+"admin"
 // onto any JWT whose email matched SUPERADMIN_EMAIL, on every request --
@@ -66,6 +67,11 @@ export async function registerAuth(app: FastifyInstance) {
     throw new Error(
       "JWT_SECRET is not set. Refusing to start with an insecure default -- " +
       "set JWT_SECRET in your environment (generate one with: openssl rand -hex 32).",
+    );
+  }
+  if (IS_PROD && !COOKIE_SECURE) {
+    throw new Error(
+      "COOKIE_SECURE must be true in production. Refusing to start with insecure auth cookies.",
     );
   }
   await app.register(fCookie);

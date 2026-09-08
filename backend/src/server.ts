@@ -24,12 +24,21 @@ import { pool } from "./db";
 
 export async function buildApp() {
   const app = Fastify({ logger: { level: process.env.LOG_LEVEL || "info" } });
+  const isProd = (process.env.NODE_ENV || "development").toLowerCase() === "production";
   const allowedOrigins = (process.env.CORS_ORIGIN || "")
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
+  const corsOrigins = allowedOrigins.length > 0
+    ? allowedOrigins
+    : (isProd ? [] : ["http://localhost:8090", "http://localhost:3000", "http://localhost:5173"]);
+
+  if (isProd && corsOrigins.length === 0) {
+    throw new Error("CORS_ORIGIN is required in production when credentials are enabled");
+  }
+
   await app.register(cors, {
-    origin: allowedOrigins.length > 0 ? allowedOrigins : true,
+    origin: corsOrigins,
     credentials: true,
   });
 

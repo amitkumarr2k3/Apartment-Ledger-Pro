@@ -44,7 +44,10 @@ const INCOMES = [
 
 async function ensureSuperadmin(c: Client, communityId: string) {
   const superadmin = process.env.SUPERADMIN_EMAIL || "admin@example.com";
-  const superadminPassword = process.env.SUPERADMIN_PASSWORD || "ChangeMe!2026";
+  const superadminPassword = process.env.SUPERADMIN_PASSWORD;
+  if (!superadminPassword || superadminPassword.length < 14 || superadminPassword === "ChangeMe!2026") {
+    throw new Error("SUPERADMIN_PASSWORD must be set to a strong non-default value (min 14 chars)");
+  }
   const pwHash = await argon2.hash(superadminPassword);
   await c.query(
     `INSERT INTO allowed_emails (email, community_id, role, name, invited_by)
@@ -60,7 +63,7 @@ async function ensureSuperadmin(c: Client, communityId: string) {
   await c.query(
     `INSERT INTO user_roles (user_id, role) VALUES ($1,'superadmin'),($1,'admin')
      ON CONFLICT DO NOTHING`, [superUserId]);
-  console.log(`Superadmin ensured → email: ${superadmin}  password: ${superadminPassword}`);
+  console.log(`Superadmin ensured -> email: ${superadmin}`);
 }
 
 async function main() {

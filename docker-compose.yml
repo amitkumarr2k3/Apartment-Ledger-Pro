@@ -25,7 +25,6 @@ services:
     command: ["sh", "./docker-entrypoint.sh", "migrate"]
     environment:
       DATABASE_URL: postgres://apf:apf@db:5432/apartment_finance
-      SEED_ON_MIGRATE: "true"
       SUPERADMIN_EMAIL: admin@example.com
     depends_on:
       db: { condition: service_healthy }
@@ -38,7 +37,7 @@ services:
     environment:
       DATABASE_URL: postgres://apf:apf@db:5432/apartment_finance
       SUPERADMIN_EMAIL: admin@example.com
-      SUPERADMIN_PASSWORD: ChangeMe!2026
+      SUPERADMIN_PASSWORD: ${SUPERADMIN_PASSWORD:?SUPERADMIN_PASSWORD must be set}
     depends_on:
       migrate: { condition: service_completed_successfully }
       db: { condition: service_healthy }
@@ -52,7 +51,7 @@ services:
     environment:
       DATABASE_URL: postgres://apf:apf@db:5432/apartment_finance
       JWT_SECRET: ${JWT_SECRET}
-      CORS_ORIGIN: ${CORS_ORIGIN}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost}
       # Once you have a real domain + TLS terminating at nginx, set COOKIE_SECURE=true in your .env and restart — otherwise the cookie stays sendable over HTTP too, which defeats part of the point of Secure once you actually have HTTPS available.
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
       # -- AI Assistant ("Munshi") --
@@ -83,10 +82,10 @@ services:
       # SMTP_HOST: mailhog
       # SMTP_PORT: 1025
       # ───────────────────────────────────────────────────────────────────────
-      APP_URL: http://localhost:8090
+      APP_URL: http://localhost
       SUPERADMIN_EMAIL: admin@example.com
       AUTH_ENABLED: "true"
-      NODE_ENV: production
+      NODE_ENV: ${NODE_ENV:-development}
     volumes:
       - ./ETL:/app/ETL
     ports: ["4010:4000"]
@@ -125,7 +124,7 @@ services:
       dockerfile: web/Dockerfile
       target: web
     restart: unless-stopped
-    ports: ["8090:80"]
+    ports: ["${WEB_PORT:-80}:80"]
     depends_on:
       ssr: { condition: service_started }
       api: { condition: service_started }

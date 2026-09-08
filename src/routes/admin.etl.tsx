@@ -29,8 +29,7 @@ import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 
 function authHeader(): HeadersInit {
-  const t = typeof window !== "undefined" ? window.localStorage.getItem("apf.token") : null;
-  return t ? { Authorization: `Bearer ${t}` } : {};
+  return {};
 }
 
 export const Route = createFileRoute("/admin/etl")({
@@ -42,7 +41,7 @@ function Page() {
   const queryClient = useQueryClient();
   const [uploadedFiles, setUploadedFiles] = useState<{ file: File; kind: string }[]>([]);
   const [isUploading, setIsUploading] = useState(false);
-  const hasToken = typeof window !== "undefined" && !!window.localStorage.getItem("apf.token");
+  const hasToken = typeof window !== "undefined" && !!window.localStorage.getItem("apf.session");
 
   // Fetch ETL sessions — disabled during SSR (no localStorage on server)
   const { data: sessionsData, isLoading: isLoadingSessions } = useQuery({
@@ -135,7 +134,7 @@ function Page() {
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>Authentication required</AlertTitle>
             <AlertDescription>
-              Your session does not have an API token. Please sign out and sign in again from the login page.
+              No active session found. Please sign out and sign in again from the login page.
             </AlertDescription>
           </Alert>
         )}

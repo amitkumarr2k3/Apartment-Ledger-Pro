@@ -55,9 +55,12 @@ export async function routes(app: FastifyInstance) {
     const prompt = buildPrompt(question, currentView, context);
 
     try {
-      const r = await fetch(`${GEMINI_URL}?key=${GEMINI_API_KEY}`, {
+      const r = await fetch(GEMINI_URL, {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json",
+          "x-goog-api-key": GEMINI_API_KEY,
+        },
         body: JSON.stringify({
           contents: [{ role: "user", parts: [{ text: prompt }] }],
           // maxOutputTokens raised from 300 -- newer Gemini models can spend
