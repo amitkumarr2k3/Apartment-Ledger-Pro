@@ -76,12 +76,8 @@ const DASHBOARD_DEFS: DashboardDef[] = [
   {
     key: "resident.drilldown",
     label: "Resident \u00B7 Head Drill-down",
-    widgets: [
-      {
-        id: "drilldown.lineItems",
-        label: "Individual line items below vendor level (applies to BOTH Income and Expense heads) -- when hidden, residents can view a vendor's monthly trend but cannot drill into its individual line items. Admins/superadmins always see full depth regardless of this setting.",
-      },
-    ],
+    widgets: [],
+    notApplicable: "This page now stops by design at a category's combined monthly trend (Heads -> Categories -> Category chart) -- there is no vendor or line-item level to toggle here anymore, so there's nothing to configure. The full Heads -> Categories -> Vendors -> Line items depth still exists, unrestricted, on the ADMIN side under Admin > Dashboards > Head Drill-down.",
   },
   {
     key: "resident.balance",

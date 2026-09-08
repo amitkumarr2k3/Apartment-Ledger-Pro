@@ -243,24 +243,17 @@ export const momChanges = expenseTree.map((c) => {
 
 // Nav structure — Admin is split into "Dashboards" (analytics) and
 // "Controls" (administrative CRUD/audit) so the two surfaces are separate.
-// Icons here are the exact same emoji already used as each section's
-// heading in the user guide (dashboard-user-guide-*.html) -- keeping one
-// single source of truth in the guide would be nicer, but the guide is a
-// static HTML export, not something this app can import from at runtime,
-// so the mapping is intentionally duplicated here. If the guide's icon for
-// a section ever changes, update it here too.
 export const navSections = [
   {
     label: "Resident",
     tone: "resident" as const,
     group: "dashboards" as const,
     items: [
-      { to: "/resident/overview", label: "Overview", icon: "🏠", req: "RD-01 → RD-05" },
-      { to: "/resident/drilldown", label: "Head Drill-down", icon: "🔍", req: "RD-10 → RD-15" },
-      { to: "/resident/cashflow", label: "Cashflow Health", icon: "💧", req: "RD-20 → RD-23" },
-      { to: "/resident/income", label: "Income Visibility", icon: "💰", req: "RD-30 → RD-32" },
-      { to: "/resident/balance", label: "Opening & Closing", icon: "🏦", req: "RD-40 → RD-44" },
-      { to: "/resident/forecasting", label: "Forecasting", icon: "🔮", req: "RD-50 → RD-54" },
+      { to: "/resident/overview", label: "Overview", req: "RD-01 → RD-05" },
+      { to: "/resident/drilldown", label: "Head Drill-down", req: "RD-10 → RD-15" },
+      { to: "/resident/cashflow", label: "Cashflow Health", req: "RD-20 → RD-23" },
+      { to: "/resident/income", label: "Income Visibility", req: "RD-30 → RD-32" },
+      { to: "/resident/balance", label: "Opening & Closing", req: "RD-40 → RD-44" },
     ],
   },
   {
@@ -268,11 +261,17 @@ export const navSections = [
     tone: "admin" as const,
     group: "dashboards" as const,
     items: [
-      { to: "/admin/actions", label: "Action Needed", icon: "🚨", req: "AD-40 → AD-43" },
-      { to: "/admin/alerts", label: "Cost Alerts & Trends", icon: "📈", req: "AD-01 → AD-05" },
-      { to: "/admin/vendors", label: "Vendor Insights", icon: "🏢", req: "AD-10 → AD-14" },
-      { to: "/admin/collections", label: "Collections", icon: "💵", req: "AD-20 → AD-24" },
-      { to: "/admin/income", label: "Income Optimisation", icon: "💡", req: "AD-30 → AD-33" },
+      { to: "/admin/actions", label: "Action Needed", req: "AD-40 → AD-43" },
+      { to: "/admin/alerts", label: "Cost Alerts & Trends", req: "AD-01 → AD-05" },
+      { to: "/admin/vendors", label: "Vendor Insights", req: "AD-10 → AD-14" },
+      { to: "/admin/collections", label: "Collections", req: "AD-20 → AD-24" },
+      { to: "/admin/income", label: "Income Optimisation", req: "AD-30 → AD-33" },
+      // Moved here from the Resident nav -- full unrestricted Heads ->
+      // Categories -> Vendors -> Line items depth, admin/superadmin only.
+      // The Resident nav's own "Head Drill-down" now points to a separate,
+      // structurally simpler page that stops at a category's combined
+      // chart (see resident/drilldown.tsx).
+      { to: "/admin/drilldown", label: "Head Drill-down", req: "RD-10 → RD-15" },
     ],
   },
   {
@@ -280,12 +279,12 @@ export const navSections = [
     tone: "admin" as const,
     group: "controls" as const,
     items: [
-      { to: "/admin/transactions", label: "Transactions (CRUD)", icon: "📝", req: "AC-01 → AC-05" },
-      { to: "/admin/residents", label: "Residents & Whitelist", icon: "👥", req: "AC-10 → AC-13" },
-      { to: "/admin/settings", label: "Dashboard Controls", icon: "🎛️", req: "AC-30 → AC-32" },
-      { to: "/admin/audit", label: "Audit Trail", icon: "🛡️", req: "AC-40 → AC-41" },
-      { to: "/admin/imports", label: "CSV Imports", icon: "📤", req: "AC-50 → AC-52" },
-      { to: "/admin/etl", label: "ETL Integration", icon: "⚙️", req: "AC-53 → AC-55" },
+      { to: "/admin/transactions", label: "Transactions (CRUD)", req: "AC-01 → AC-05" },
+      { to: "/admin/residents", label: "Residents & Whitelist", req: "AC-10 → AC-13" },
+      { to: "/admin/settings", label: "Dashboard Controls", req: "AC-30 → AC-32" },
+      { to: "/admin/audit", label: "Audit Trail", req: "AC-40 → AC-41" },
+      { to: "/admin/imports", label: "CSV Imports", req: "AC-50 → AC-52" },
+      { to: "/admin/etl", label: "ETL Integration", req: "AC-53 → AC-55" },
     ],
   },
 ];
@@ -439,17 +438,12 @@ export type ImportBatch = {
   uploadedAt: string;
   rows: number;
   committed: number;
-  // FIX: "committed" alone can't distinguish "genuinely inserted" from "row
-  // was a duplicate, correctly skipped via ON CONFLICT DO NOTHING, but that
-  // silence used to leave zero trace." This is now tracked and shown
-  // separately in the Import History table.
-  duplicate: number;
   status: "staged" | "committed" | "failed" | "partial";
 };
 
 export const seedImports: ImportBatch[] = [
-  { id: "IMP-91", filename: "tally-export-jul26.csv", kind: "transactions", uploadedBy: "rahul.mehta@example.com",   uploadedAt: "2026-07-13 10:45", rows: 214, committed: 208, duplicate: 0, status: "partial"   },
-  { id: "IMP-90", filename: "vendors-master.csv",     kind: "vendors",      uploadedBy: "system",                     uploadedAt: "2026-07-09 11:03", rows:  12, committed:  12, duplicate: 0, status: "committed" },
-  { id: "IMP-89", filename: "residents-2026.csv",     kind: "residents",    uploadedBy: "rahul.mehta@example.com",   uploadedAt: "2026-06-30 17:20", rows:  84, committed:  84, duplicate: 0, status: "committed" },
-  { id: "IMP-88", filename: "collections-may26.xlsx.csv", kind: "transactions", uploadedBy: "anita.kulkarni@example.com", uploadedAt: "2026-06-05 09:12", rows: 128, committed: 0,   duplicate: 0, status: "failed"    },
+  { id: "IMP-91", filename: "tally-export-jul26.csv", kind: "transactions", uploadedBy: "rahul.mehta@example.com",   uploadedAt: "2026-07-13 10:45", rows: 214, committed: 208, status: "partial"   },
+  { id: "IMP-90", filename: "vendors-master.csv",     kind: "vendors",      uploadedBy: "system",                     uploadedAt: "2026-07-09 11:03", rows:  12, committed:  12, status: "committed" },
+  { id: "IMP-89", filename: "residents-2026.csv",     kind: "residents",    uploadedBy: "rahul.mehta@example.com",   uploadedAt: "2026-06-30 17:20", rows:  84, committed:  84, status: "committed" },
+  { id: "IMP-88", filename: "collections-may26.xlsx.csv", kind: "transactions", uploadedBy: "anita.kulkarni@example.com", uploadedAt: "2026-06-05 09:12", rows: 128, committed: 0,   status: "failed"    },
 ];

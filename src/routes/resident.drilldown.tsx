@@ -1,16 +1,14 @@
 import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router";
 import { PortalShell, usePeriod } from "@/components/portal-shell";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
-import { Tooltip, Bar, BarChart, CartesianGrid, ResponsiveContainer, XAxis, YAxis, Legend } from "recharts";
+import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
+import { Tooltip, Bar, BarChart, CartesianGrid, ResponsiveContainer, XAxis, YAxis } from "recharts";
 import { SmartTooltipContent, getTooltipTrigger } from "@/components/smart-tooltip";
 import {
-  inr, categoryMonthly, vendorMonthly, total,
+  inr, categoryMonthly, total,
 } from "@/lib/finance-mock";
-import { useExpenseTree, useIncomeTree, useWidgetVisibility } from "@/lib/hooks";
+import { useExpenseTree, useIncomeTree } from "@/lib/hooks";
 import { filterReportableIncomeCategories } from "@/lib/income-utils";
-import { getSession } from "@/lib/session";
 import { ChevronRight } from "lucide-react";
 
 export const Route = createFileRoute("/resident/drilldown")({
@@ -22,50 +20,41 @@ type Head = "expense" | "income";
 
 function Page() {
   return (
-    <PortalShell title="Head-wise drill-down" reqIds="RD-10 → RD-15" persona="resident">
+    <PortalShell title="Head-wise drill-down" reqIds="RD-10 · RD-15" persona="resident">
       <Inner />
     </PortalShell>
   );
 }
 
+// RESIDENT-FACING drill-down: intentionally capped at ONE level deeper than
+// the category list. Clicking a category shows the COMBINED monthly trend
+// across every vendor under it (categoryMonthly() already sums across all
+// of a category's vendors -- that's exactly the "add up all vendors for
+// the selected months" cumulative chart requested) and stops there. There
+// is no vendor list and no line-item list on this page at all -- not
+// hidden behind a toggle, structurally absent -- so residents can never
+// see the individual vendor/line-item breakdown. The full, unrestricted
+// Heads -> Categories -> Vendors -> Line items -> Individual line item
+// drill-down still exists in full for admins/superadmins, at
+// /admin/drilldown (Admin · Dashboards nav).
 function Inner() {
   const navigate = useNavigate();
   const { sliceMonthly, labels } = usePeriod();
-  const search = useSearch({ strict: false }) as {
-    head?: string; category?: string; vendor?: string; line?: string;
-  };
+  const search = useSearch({ strict: false }) as { head?: string; category?: string };
   const { data: expenseTree = [] } = useExpenseTree();
   const { data: incomeTree = [] } = useIncomeTree();
-  // NEW dashboard control: admin can restrict how far RESIDENTS may drill
-  // down. When "drilldown.lineItems" is hidden, residents can still see a
-  // vendor's monthly trend (the level shown in the requested screenshot)
-  // but the individual line-item list beneath it -- and everything past
-  // it -- is disabled. Applies identically to both Income and Expense
-  // heads since they share this exact same rendering path below.
-  // Admins/superadmins ALWAYS retain full drill-down depth, regardless of
-  // this setting -- checked directly via role, not the widget toggle.
-  const { isWidgetVisible } = useWidgetVisibility("resident.drilldown");
-  const session = getSession();
-  const isResident = session?.role === "resident";
-  const canViewLineItems = !isResident || isWidgetVisible("drilldown.lineItems");
   const head: Head | null = search.head === "expense" || search.head === "income" ? search.head : null;
   const reportableIncomeTree = filterReportableIncomeCategories(incomeTree);
   const tree = head === "income" ? reportableIncomeTree : expenseTree;
   const category = search.category ? tree.find((c) => c.name === search.category) ?? null : null;
-  const vendor = category && search.vendor ? category.vendors.find((v) => v.name === search.vendor) ?? null : null;
-  // Defense in depth: even if a resident manually crafts a URL with a
-  // "line" param while this control is restricting them, don't resolve it.
-  const line = vendor && search.line && canViewLineItems ? vendor.items.find((it) => it.name === search.line) ?? null : null;
 
-  const update = (patch: { head?: Head | null; category?: string | null; vendor?: string | null; line?: string | null }) => {
+  const update = (patch: { head?: Head | null; category?: string | null }) => {
     navigate({
       to: "/resident/drilldown",
       search: (((prev: any) => ({
         ...prev,
         head: patch.head === null ? undefined : patch.head ?? prev.head,
         category: patch.category === null ? undefined : patch.category ?? prev.category,
-        vendor: patch.vendor === null ? undefined : patch.vendor ?? prev.vendor,
-        line: patch.line === null ? undefined : patch.line ?? prev.line,
       })) as any),
     });
   };
@@ -73,29 +62,27 @@ function Inner() {
   const expenseTotal = expenseTree.reduce((s, c) => s + total(sliceMonthly(categoryMonthly(c))), 0);
   const incomeTotal = reportableIncomeTree.reduce((s, c) => s + total(sliceMonthly(categoryMonthly(c))), 0);
 
+  const categoryMonthlySliced = category ? sliceMonthly(categoryMonthly(category)) : [];
+  const categoryTotal = total(categoryMonthlySliced);
+  const categoryChartData = labels.map((m, i) => ({ month: m, value: categoryMonthlySliced[i] ?? 0 }));
+
   return (
     <>
       <Breadcrumb>
         <BreadcrumbList>
           <BreadcrumbItem>
-            <button className="hover:text-foreground" onClick={() => update({ head: null, category: null, vendor: null, line: null })}>
+            <button className="hover:text-foreground" onClick={() => update({ head: null, category: null })}>
               Heads
             </button>
           </BreadcrumbItem>
           {head && (<><BreadcrumbSeparator />
             <BreadcrumbItem>
-              <button className="hover:text-foreground capitalize" onClick={() => update({ category: null, vendor: null, line: null })}>{head}</button>
+              <button className="hover:text-foreground capitalize" onClick={() => update({ category: null })}>{head}</button>
             </BreadcrumbItem></>)}
           {category && (<><BreadcrumbSeparator />
             <BreadcrumbItem>
-              <button className="hover:text-foreground" onClick={() => update({ vendor: null, line: null })}>{category.name}</button>
+              <span className="text-foreground">{category.name}</span>
             </BreadcrumbItem></>)}
-          {vendor && (<><BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <button className="hover:text-foreground" onClick={() => update({ line: null })}>{vendor.name}</button>
-            </BreadcrumbItem></>)}
-          {line && (<><BreadcrumbSeparator />
-            <BreadcrumbItem><BreadcrumbPage>{line.name}</BreadcrumbPage></BreadcrumbItem></>)}
         </BreadcrumbList>
       </Breadcrumb>
 
@@ -110,7 +97,7 @@ function Inner() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base capitalize">{head} categories</CardTitle>
-            <CardDescription>RD-10 · Select a category to see vendor breakdown</CardDescription>
+            <CardDescription>RD-10 · Select a category to see its combined monthly trend</CardDescription>
           </CardHeader>
           <CardContent className="divide-y divide-border">
             {[...tree]
@@ -134,115 +121,27 @@ function Inner() {
         </Card>
       )}
 
-      {category && !vendor && (
+      {category && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">{category.name} · Vendors</CardTitle>
-            <CardDescription>RD-11 · Click a vendor to see line items</CardDescription>
-          </CardHeader>
-          <CardContent className="divide-y divide-border">
-            {[...category.vendors]
-              .sort((a, b) => total(sliceMonthly(vendorMonthly(b))) - total(sliceMonthly(vendorMonthly(a))))
-              .map((v) => {
-              const t = total(sliceMonthly(vendorMonthly(v)));
-              return (
-                <button key={v.name} onClick={() => update({ vendor: v.name })} className="w-full flex items-center justify-between py-3 text-left hover:bg-accent/40 -mx-4 px-4 rounded">
-                  <div>
-                    <div className="font-medium flex items-center gap-2">
-                      {v.name}
-                      <Badge variant="outline" className="text-[10px]">{v.kind}</Badge>
-                    </div>
-                    <div className="text-xs text-muted-foreground">{v.items.length} line item{v.items.length > 1 ? "s" : ""}</div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="font-mono text-sm">{inr(t)}</span>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                </button>
-              );
-            })}
-          </CardContent>
-        </Card>
-      )}
-
-      {vendor && !line && (
-        <>
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">{vendor.name} · Monthly trend</CardTitle>
-              <CardDescription>RD-15 · Total vendor spend per month before drilling into items</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={220}>
-                <BarChart data={labels.map((m, i) => ({ month: m, value: sliceMonthly(vendorMonthly(vendor))[i] }))}>
-                  <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                  <XAxis dataKey="month" fontSize={11} />
-                  <YAxis tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} fontSize={11} />
-                  <Tooltip trigger={getTooltipTrigger()} cursor={{ fill: "var(--color-muted)", opacity: 0.35 }} content={<SmartTooltipContent labelPrefix="Month" valueFormatter={(v) => inr(v)} />} />
-                  <Bar dataKey="value" fill="var(--color-chart-3)" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-          {canViewLineItems ? (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Line items</CardTitle>
-              <CardDescription>RD-12 · Absent months show as ₹0</CardDescription>
-            </CardHeader>
-            <CardContent className="divide-y divide-border">
-              {[...vendor.items]
-                .sort((a, b) => total(sliceMonthly(b.monthly)) - total(sliceMonthly(a.monthly)))
-                .map((it) => {
-                const sliced = sliceMonthly(it.monthly);
-                const t = total(sliced);
-                const activeMonths = sliced.filter((n) => n > 0).length;
-                return (
-                  <button key={it.name} onClick={() => update({ line: it.name })} className="w-full flex items-center justify-between py-3 text-left hover:bg-accent/40 -mx-4 px-4 rounded">
-                    <div>
-                      <div className="font-medium">{it.name}</div>
-                      <div className="text-xs text-muted-foreground">Active in {activeMonths} of {labels.length} months</div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="font-mono text-sm">{inr(t)}</span>
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                  </button>
-                );
-              })}
-            </CardContent>
-          </Card>
-          ) : (
-          <Card className="border-dashed">
-            <CardContent className="py-6 text-center text-sm text-muted-foreground">
-              Individual line-item detail isn't available at this level. Contact your management committee for a full breakdown.
-            </CardContent>
-          </Card>
-          )}
-        </>
-      )}
-
-      {line && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">{line.name} · Monthly trend</CardTitle>
-            <CardDescription>RD-13 · Selected-period bar chart · Absent months = ₹0</CardDescription>
+            <CardTitle className="text-base">{category.name} · Combined monthly trend</CardTitle>
+            <CardDescription>
+              RD-15 · Sum of all {category.vendors.length} vendor{category.vendors.length > 1 ? "s" : ""} under this category, per month, for the selected range — this is the final level of detail available here
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={labels.map((m, i) => ({ month: m, value: sliceMonthly(line.monthly)[i] }))}>
+            <ResponsiveContainer width="100%" height={260}>
+              <BarChart data={categoryChartData}>
                 <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                 <XAxis dataKey="month" fontSize={11} />
                 <YAxis tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} fontSize={11} />
                 <Tooltip trigger={getTooltipTrigger()} cursor={{ fill: "var(--color-muted)", opacity: 0.35 }} content={<SmartTooltipContent labelPrefix="Month" valueFormatter={(v) => inr(v)} />} />
-                <Legend />
-                <Bar dataKey="value" name={line.name} fill="var(--color-chart-4)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="value" fill="var(--color-chart-3)" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
-            <div className="mt-4 grid grid-cols-3 gap-4 text-sm">
-              <Stat label="Total in period" value={inr(total(sliceMonthly(line.monthly)))} />
-              <Stat label="Peak month" value={inr(Math.max(0, ...sliceMonthly(line.monthly)))} />
-              <Stat label="Active months" value={`${sliceMonthly(line.monthly).filter(n=>n>0).length} / ${labels.length}`} />
+            <div className="mt-4 rounded-md border border-border p-3 flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">Total for selected period, all vendors combined</span>
+              <span className="font-mono text-sm font-semibold">{inr(categoryTotal)}</span>
             </div>
           </CardContent>
         </Card>
@@ -269,14 +168,5 @@ function HeadCard({ label, total: t, categories, onClick, tone }: { label: strin
         </CardContent>
       </Card>
     </button>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-md border border-border p-3">
-      <div className="text-xs text-muted-foreground">{label}</div>
-      <div className="font-mono mt-1">{value}</div>
-    </div>
   );
 }
