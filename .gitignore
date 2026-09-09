@@ -44,7 +44,9 @@ backups/*
 *.sln
 *.sw?
 .env
+.env.prod
 .lovable
 AGENTS.md
 docs/samples/Back/*
 docs/samples/Back
+release-202*

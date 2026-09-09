@@ -32,6 +32,81 @@ COOKIE_SECURE=true
 
 Note: Do **not** hardcode `DOMAIN` in `docker-compose.https.yml`; keep it as `${DOMAIN:?...}` and set the value in `.env`.
 
+## Image-only deployment to VM (no source copy)
+
+You can deploy without cloning/copying the full repository to the server.
+
+### 1. Build + pack images on local machine
+
+~~~bash
+# from repo root
+./scripts/build-release-images.sh 2026.09.08 release-2026.09.08.tar
+~~~
+
+This builds and packs:
+- backend image
+- ssr image
+- web image
+- postgres and mailhog base images
+
+### 2. Copy bundle + runtime files to VM
+
+~~~bash
+scp release-2026.09.08.tar azureuser@<VM_IP>:~/deploy/
+scp docker-compose.yml docker-compose.images.yml docker-compose.prod.yml docker-compose.https.yml .env azureuser@<VM_IP>:~/deploy/
+~~~
+
+### 3. Load and run on VM
+
+~~~bash
+ssh azureuser@<VM_IP>
+cd ~/deploy
+docker load -i release-2026.09.08.tar
+APP_IMAGE_TAG=2026.09.08 docker compose -f docker-compose.yml -f docker-compose.images.yml up -d
+~~~
+
+For HTTPS production mode, include overlays too:
+
+~~~bash
+APP_IMAGE_TAG=2026.09.08 docker compose \
+  -f docker-compose.yml \
+  -f docker-compose.images.yml \
+  -f docker-compose.prod.yml \
+  -f docker-compose.https.yml \
+  up -d
+~~~
+
+Important:
+- `APP_IMAGE_TAG` must match the tag used during image build.
+- With image-only mode, Compose does not build on VM.
+- Keep `.env` on VM updated for DOMAIN, APP_URL, CORS_ORIGIN, JWT_SECRET and SUPERADMIN_PASSWORD.
+- During `release-to-vm.sh`, if `db` already exists on the VM, only `api`, `ssr`, and `web` are updated; Postgres is left running with existing data/volume.
+- Keep the same Compose project name on every release (default: `apartment-ledger-pro`) so the existing stack is updated instead of creating a second stack.
+
+### 4. One-command release (build + copy + load + up)
+
+~~~bash
+./scripts/release-to-vm.sh \
+  --host azureuser@<VM_IP> \
+  --key ~/.ssh/apf_vm \
+  --tag 2026.09.08 \
+  --env-file .env.prod \
+  --project-name apartment-ledger-pro \
+  --mode prod
+~~~
+
+Use a separate untracked `.env.prod` for production secrets/settings. If `--env-file` is omitted in prod mode, the script auto-uses `.env.prod` when it exists.
+The release script mirrors the `web/` tree, the ETL runtime files (`ETL/transform.py`, `ETL/README.md`, `ETL/requirements.txt`, `ETL/config/mapping.yaml`), and `scripts/{db-cleanup.sh,vm_housekeeping.sh}` into `~/deploy` on the VM whenever those files are missing or have changed. It also creates the ETL folder structure (`config/`, `input/`, `output/`, `CG Finacnes/`) before syncing.
+
+Also available as a Make target:
+
+~~~bash
+make release-vm HOST=azureuser@<VM_IP> KEY=~/.ssh/apf_vm TAG=2026.09.08 MODE=prod
+~~~
+
+`MODE=local` uses only `docker-compose.yml` + `docker-compose.images.yml`.
+`MODE=prod` additionally includes `docker-compose.prod.yml` + `docker-compose.https.yml`.
+
 ## Local setup — exact steps
 
 ### 1. Prerequisites

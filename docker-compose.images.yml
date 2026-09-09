@@ -1,0 +1,20 @@
+services:
+  migrate:
+    image: ${APF_BACKEND_IMAGE:-apf-backend}:${APP_IMAGE_TAG:?APP_IMAGE_TAG is required}
+    build: null
+
+  seed:
+    image: ${APF_BACKEND_IMAGE:-apf-backend}:${APP_IMAGE_TAG:?APP_IMAGE_TAG is required}
+    build: null
+
+  api:
+    image: ${APF_BACKEND_IMAGE:-apf-backend}:${APP_IMAGE_TAG:?APP_IMAGE_TAG is required}
+    build: null
+
+  ssr:
+    image: ${APF_SSR_IMAGE:-apf-ssr}:${APP_IMAGE_TAG:?APP_IMAGE_TAG is required}
+    build: null
+
+  web:
+    image: ${APF_WEB_IMAGE:-apf-web}:${APP_IMAGE_TAG:?APP_IMAGE_TAG is required}
+    build: null

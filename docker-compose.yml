@@ -25,7 +25,7 @@ services:
     command: ["sh", "./docker-entrypoint.sh", "migrate"]
     environment:
       DATABASE_URL: postgres://apf:apf@db:5432/apartment_finance
-      SUPERADMIN_EMAIL: admin@example.com
+      SUPERADMIN_EMAIL: ${SUPERADMIN_EMAIL:-admin@example.com}
     depends_on:
       db: { condition: service_healthy }
 
@@ -36,7 +36,7 @@ services:
     command: ["sh", "./docker-entrypoint.sh", "seed"]
     environment:
       DATABASE_URL: postgres://apf:apf@db:5432/apartment_finance
-      SUPERADMIN_EMAIL: admin@example.com
+      SUPERADMIN_EMAIL: ${SUPERADMIN_EMAIL:-admin@example.com}
       SUPERADMIN_PASSWORD: ${SUPERADMIN_PASSWORD:?SUPERADMIN_PASSWORD must be set}
     depends_on:
       migrate: { condition: service_completed_successfully }
@@ -61,14 +61,14 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY}
       # ── Email / OTP ────────────────────────────────────────────────────────
       # Choose provider: gmail (default), resend, or mailhog
-      EMAIL_PROVIDER: gmail
+      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-gmail}
 
       # Gmail SMTP (default)
-      SMTP_HOST: smtp.gmail.com
-      SMTP_PORT: 465
-      SMTP_USER: ${SMTP_USER}
-      SMTP_PASS: ${SMTP_PASS}
-      FROM_EMAIL: ${FROM_EMAIL}
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-465}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      FROM_EMAIL: ${FROM_EMAIL:-}
 
       # Resend (keep for future switch)
       # Set EMAIL_PROVIDER: resend and configure below values
@@ -82,8 +82,8 @@ services:
       # SMTP_HOST: mailhog
       # SMTP_PORT: 1025
       # ───────────────────────────────────────────────────────────────────────
-      APP_URL: http://localhost
-      SUPERADMIN_EMAIL: admin@example.com
+      APP_URL: ${APP_URL:-http://localhost}
+      SUPERADMIN_EMAIL: ${SUPERADMIN_EMAIL:-admin@example.com}
       AUTH_ENABLED: "true"
       NODE_ENV: ${NODE_ENV:-development}
     volumes:
@@ -91,6 +91,7 @@ services:
     ports: ["4010:4000"]
     depends_on:
       migrate: { condition: service_completed_successfully }
+      seed: { condition: service_completed_successfully }
       db: { condition: service_healthy }
     healthcheck:
       test: ["CMD-SHELL", "node -e \"fetch('http://localhost:4000/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))\""]

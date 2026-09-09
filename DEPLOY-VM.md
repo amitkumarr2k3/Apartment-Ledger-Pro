@@ -167,6 +167,83 @@ Option B — copy your local working directory as-is (from your Windows machine,
 scp -i "$HOME\.ssh\apf_vm" -r "C:\Users\z003yujx\Downloads\PM_Folder\Personal_Task_Optimizer_Repo\RFP_NxtGen" azureuser@<VM_PUBLIC_IP>:~/app
 ```
 
+### Option C — image-only deployment (no source code on VM)
+
+Use this when you want to build locally and deploy only Docker images + runtime config files.
+
+#### C1. Build and pack images locally
+
+Run from repo root on your local machine (WSL/Linux shell):
+
+```bash
+./scripts/build-release-images.sh 2026.09.08 release-2026.09.08.tar
+```
+
+This creates a tar containing:
+- `apf-backend:2026.09.08`
+- `apf-ssr:2026.09.08`
+- `apf-web:2026.09.08`
+- `postgres:16-alpine`
+- `mailhog/mailhog:latest`
+
+#### C2. Copy only deployment artifacts to VM
+
+From local machine:
+
+```bash
+scp release-2026.09.08.tar azureuser@<VM_PUBLIC_IP>:~/deploy/
+scp docker-compose.yml docker-compose.images.yml docker-compose.prod.yml docker-compose.https.yml .env azureuser@<VM_PUBLIC_IP>:~/deploy/
+```
+
+#### C3. Load and run images on VM
+
+```bash
+ssh -i "$HOME/.ssh/apf_vm" azureuser@<VM_PUBLIC_IP>
+cd ~/deploy
+docker load -i release-2026.09.08.tar
+```
+
+Start stack without build context:
+
+```bash
+APP_IMAGE_TAG=2026.09.08 docker compose -f docker-compose.yml -f docker-compose.images.yml up -d
+```
+
+For HTTPS production mode:
+
+```bash
+APP_IMAGE_TAG=2026.09.08 docker compose \
+  -f docker-compose.yml \
+  -f docker-compose.images.yml \
+  -f docker-compose.prod.yml \
+  -f docker-compose.https.yml \
+  up -d
+```
+
+Notes:
+- `APP_IMAGE_TAG` must match the tag used while building locally.
+- `docker-compose.images.yml` overrides build directives and pins image tags.
+- Keep `.env` on VM updated (`DOMAIN`, `APP_URL`, `CORS_ORIGIN`, `JWT_SECRET`, `SUPERADMIN_PASSWORD`).
+- For updates, repeat C1/C2/C3 with a new tag.
+
+#### C4. One-command release (recommended once SSH is working)
+
+From your local machine:
+
+```bash
+./scripts/release-to-vm.sh \
+  --host azureuser@<VM_PUBLIC_IP> \
+  --key ~/.ssh/apf_vm \
+  --tag 2026.09.08 \
+  --mode prod
+```
+
+Equivalent Make command:
+
+```bash
+make release-vm HOST=azureuser@<VM_PUBLIC_IP> KEY=~/.ssh/apf_vm TAG=2026.09.08 MODE=prod
+```
+
 ---
 
 ## Part 4 — Configure production environment variables
