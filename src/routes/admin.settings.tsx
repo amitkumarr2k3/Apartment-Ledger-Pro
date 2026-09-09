@@ -88,20 +88,30 @@ const DASHBOARD_DEFS: DashboardDef[] = [
       { id: "balance.contingencyChart", label: "Monthly contingency fund collection chart" },
     ],
   },
+  {
+    key: "resident.forecasting",
+    label: "Resident · Forecasting",
+    widgets: [
+      { id: "forecasting.kpiTiles", label: "Closing Balance / Net Surplus / Risk tiles" },
+      { id: "forecasting.monthTable", label: "Month-by-month detail table" },
+      { id: "forecasting.charts", label: "Income, Expense & Closing Balance chart" },
+      { id: "forecasting.mix", label: "Forecast expense mix (donut)" },
+      { id: "forecasting.assumptions", label: "Income & Expense assumption sliders" },
+      { id: "forecasting.configPanel", label: "Advanced configuration (reference window, inflation method)" },
+    ],
+  },
 ];
 
 // Stable, module-level reference used as the fallback for `data` while the
 // dashboard-settings query is still loading (data is `undefined` at that
 // point). This MUST be a single shared constant, not an inline `[]`
 // literal in the destructure below -- an inline literal creates a brand
-// new array object on every render, which made the effect below (which
-// depends on this value) re-fire every render while loading, calling
-// setState every time -> infinite render loop -> "Maximum update depth
-// exceeded" (React error #185). This is exactly why the page crashed only
-// on the FIRST click right after login (query still loading, `data` still
-// undefined) and worked fine on the second click (query already
-// resolved/cached by then, so the real fetched array -- a stable
-// reference -- was used instead of this fallback).
+// new array object on every render, which made an effect depending on
+// this value re-fire every render while loading, calling setState every
+// time -> infinite render loop -> "Maximum update depth exceeded" (React
+// error #185). This is exactly why the page crashed only on the FIRST
+// click right after login (query still loading, `data` still undefined)
+// and worked fine on the second click (query already resolved/cached).
 const EMPTY_SETTINGS_ROWS: DashboardSettingRow[] = [];
 
 function Page() {

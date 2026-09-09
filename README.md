@@ -291,6 +291,7 @@ named `compose-logs-<run-id>-<attempt>`, retained for 14 days.
 | File | Purpose |
 | --- | --- |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Component/deployment architecture, container topology |
+| [`docs/ARCHITECTURE-DETAILED.md`](docs/ARCHITECTURE-DETAILED.md) | Deep-dive architecture: component interactions, OTP/auth flow, ETL/import flow, security, and runtime sequences |
 | [`docs/DATA-MODEL.md`](docs/DATA-MODEL.md) | Postgres schema, sparse-data strategy, rollups |
 | [`docs/AUTH.md`](docs/AUTH.md) | Whitelist + OTP flow, RBAC, session lifetime |
 | [`docs/ADMIN-CONTROLS.md`](docs/ADMIN-CONTROLS.md) | Dashboard visibility toggles, Residents, Audit, CSV imports |

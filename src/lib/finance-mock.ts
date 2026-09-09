@@ -254,6 +254,7 @@ export const navSections = [
       { to: "/resident/cashflow", label: "Cashflow Health", req: "RD-20 → RD-23" },
       { to: "/resident/income", label: "Income Visibility", req: "RD-30 → RD-32" },
       { to: "/resident/balance", label: "Opening & Closing", req: "RD-40 → RD-44" },
+      { to: "/resident/forecasting", label: "Forecasting", req: "RD-50 → RD-54" },
     ],
   },
   {

@@ -1,5 +1,7 @@
 # Architecture
 
+For a full implementation-level walkthrough (component interactions, runtime sequences, OTP internals, ETL/import pipeline, and security controls), see [`ARCHITECTURE-DETAILED.md`](./ARCHITECTURE-DETAILED.md).
+
 ## Container topology (docker-compose)
 
 ```
