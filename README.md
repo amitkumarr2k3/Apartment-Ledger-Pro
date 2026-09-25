@@ -1,4 +1,4 @@
-# Apartment Ledger Pro
+# BoulevardPulse Portal
 
 Self-hosted, Docker-based portal for apartment communities.
 Postgres system of record, Fastify API, React/TanStack frontend, seeded demo data.

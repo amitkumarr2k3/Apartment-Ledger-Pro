@@ -228,7 +228,7 @@ function LoginPage() {
                 <span className="text-sm font-medium">Welcome back</span>
               </div>
               <Badge variant="outline" className="text-[10px]">
-                {mode === "password" ? "Super Admin" : "Resident OTP"}
+                {mode === "password" ? "Super Admin" : "Resident/Admin OTP"}
               </Badge>
             </div>
             <CardTitle className="text-2xl">Sign in</CardTitle>

@@ -1,7 +1,7 @@
 # Technical Design Document
-## Apartment Ledger Pro — Self-Hosted, Docker-Based
+## BoulevardPulse Portal — Self-Hosted, Docker-Based
 
-**Version:** 1.0 · **Owner:** Apartment Ledger Pro team · **Status:** Approved for build
+**Version:** 1.0 · **Owner:** BoulevardPulse Portal team · **Status:** Approved for build
 
 ---
 

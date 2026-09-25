@@ -1,6 +1,6 @@
 # Detailed System Architecture
 
-This document describes how every major component in Apartment Ledger Pro works together at runtime.
+This document describes how every major component in BoulevardPulse Portal works together at runtime.
 It is implementation-accurate as of 2026-09-09 and aligned to the current code in backend, frontend, Docker Compose, and ETL modules.
 
 ## 1. System Context

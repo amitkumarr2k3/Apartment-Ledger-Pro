@@ -1,5 +1,5 @@
 
-Deploy Apartment Ledger Pro to Azure â Minimal Cost Runbook
+Deploy BoulevardPulse Portal to Azure â Minimal Cost Runbook
 
 Target monthly cost: ~$0â3 (Container Apps free grant covers low traffic; Neon Postgres free tier; ghcr.io free).
 

@@ -1,4 +1,4 @@
-// Mock data for the Apartment Ledger Pro prototype screens.
+// Mock data for the CG BoulevardPulse Portal prototype screens.
 // All figures are illustrative only.
 
 export const inr = (n: number) => {

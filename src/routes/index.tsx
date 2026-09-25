@@ -31,6 +31,6 @@ export const Route = createFileRoute("/")({
   },
   component: () => null,
   head: () => ({
-    meta: [{ title: "CG Boulevard Apartment Ledger Portal" }],
+    meta: [{ title: "CG BoulevardPulse Portal" }],
   }),
 });

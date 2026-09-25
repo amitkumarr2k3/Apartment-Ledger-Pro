@@ -87,7 +87,7 @@ function otpEmailHtml(otp: string, appUrl: string): string {
   return `
 <!DOCTYPE html><html><body style="font-family:sans-serif;max-width:480px;margin:40px auto;color:#1a1a1a">
   <h2 style="margin-bottom:4px">Your sign-in code</h2>
-  <p style="color:#555;margin-top:0">Use this code to sign in to Apartment Ledger Portal.</p>
+  <p style="color:#555;margin-top:0">Use this code to sign in to BoulevardPulse Portal.</p>
   <div style="background:#f4f4f5;border-radius:8px;padding:24px;text-align:center;margin:24px 0">
     <span style="font-size:40px;letter-spacing:10px;font-family:monospace;font-weight:700">${otp}</span>
   </div>
@@ -98,7 +98,7 @@ function otpEmailHtml(otp: string, appUrl: string): string {
   <p>
     Regards,<br>
     <strong>CG Boulevard Treasurer</strong><br>
-    Apartment Ledger Portal Administration
+    BoulevardPulse Portal Administration
   </p>
 </div>
 </body></html>`;
@@ -151,7 +151,7 @@ async function issueOtp(app: FastifyInstance, email: string): Promise<void> {
     await transporter.sendMail({
       from: `"CG Boulevard Treasurer" <${FROM_EMAIL}>`,
       to: lower,
-      subject: "Resident CG Boulevard Ledger Portal OTP Service",
+      subject: "Resident CG BoulevardPulse Portal OTP Service",
       text: `Your sign-in code is ${otp} — valid for 15 minutes. Do not share this code.`,
       html: otpEmailHtml(otp, appUrl),
     });

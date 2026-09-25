@@ -1,4 +1,4 @@
-# Deploy Apartment Ledger Pro to a Single Azure VM (Simple Docker Compose)
+# Deploy CG BoulevardPulse to a Single Azure VM (Simple Docker Compose)
 
 **This is your existing `docker-compose.yml` running on one Linux VM instead of your
 laptop — same containers (db, api, ssr, web, mailhog), same commands. No registries,
