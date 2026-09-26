@@ -21,7 +21,7 @@ type Head = "expense" | "income";
 
 function Page() {
   return (
-    <PortalShell title="Head-wise drill-down (Admin)" reqIds="RD-10 → RD-15" persona="admin">
+    <PortalShell title="Head-wise drill-down (Admin)" persona="admin">
       <Inner />
     </PortalShell>
   );
@@ -102,7 +102,7 @@ function Inner() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base capitalize">{head} categories</CardTitle>
-            <CardDescription>RD-10 · Select a category to see vendor breakdown</CardDescription>
+            <CardDescription>Select a category to see vendor breakdown</CardDescription>
           </CardHeader>
           <CardContent className="divide-y divide-border">
             {[...tree]
@@ -130,7 +130,7 @@ function Inner() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base">{category.name} · Vendors</CardTitle>
-            <CardDescription>RD-11 · Click a vendor to see line items</CardDescription>
+            <CardDescription>Click a vendor to see line items</CardDescription>
           </CardHeader>
           <CardContent className="divide-y divide-border">
             {[...category.vendors]
@@ -162,7 +162,7 @@ function Inner() {
           <Card>
             <CardHeader>
               <CardTitle className="text-base">{vendor.name} · Monthly trend</CardTitle>
-              <CardDescription>RD-15 · Total vendor spend per month before drilling into items</CardDescription>
+              <CardDescription>Total vendor spend per month before drilling into items</CardDescription>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={220}>
@@ -179,7 +179,7 @@ function Inner() {
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Line items</CardTitle>
-              <CardDescription>RD-12 · Absent months show as ₹0</CardDescription>
+              <CardDescription>Absent months show as ₹0</CardDescription>
             </CardHeader>
             <CardContent className="divide-y divide-border">
               {[...vendor.items]
@@ -210,7 +210,7 @@ function Inner() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base">{line.name} · Monthly trend</CardTitle>
-            <CardDescription>RD-13 · Selected-period bar chart · Absent months = ₹0</CardDescription>
+            <CardDescription>Selected-period bar chart · Absent months = ₹0</CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>

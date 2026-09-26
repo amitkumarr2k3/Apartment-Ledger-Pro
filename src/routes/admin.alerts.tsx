@@ -56,7 +56,7 @@ function Page() {
   // come to see the complete expense picture, not just the top flagged
   // items.
   return (
-    <PortalShell title="Cost trend & anomaly alerts" reqIds="AD-01 · AD-02 · AD-03 · AD-04 · AD-05" persona="admin">
+    <PortalShell title="Cost trend & anomaly alerts" persona="admin">
       <Inner />
     </PortalShell>
   );
@@ -100,7 +100,7 @@ function Inner() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-rose-500" /> Cost alerts · AD-01
+            <AlertTriangle className="h-4 w-4 text-rose-500" /> Cost alerts
           </CardTitle>
           <CardDescription>Categories with spend increase &gt; 15% vs prior period</CardDescription>
         </CardHeader>
@@ -128,7 +128,7 @@ function Inner() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Sudden spike anomalies · AD-02</CardTitle>
+          <CardTitle className="text-base">Sudden spike anomalies</CardTitle>
           <CardDescription>Month spend &gt; 2× average of previous 3 months</CardDescription>
         </CardHeader>
         <CardContent>
@@ -159,7 +159,7 @@ function Inner() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
-              <CardTitle className="text-base">Category trend · AD-03</CardTitle>
+              <CardTitle className="text-base">Category trend</CardTitle>
               <CardDescription>Selected-period spend with 3-month moving average</CardDescription>
             </div>
             <Select value={activeName ?? undefined} onValueChange={setSelected}>
@@ -210,7 +210,7 @@ function Inner() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Month-over-month change · AD-04</CardTitle>
+          <CardTitle className="text-base">Month-over-month change</CardTitle>
           <CardDescription>Colour-coded: green (down), amber (±15%), red (up &gt;15%)</CardDescription>
         </CardHeader>
         <CardContent>

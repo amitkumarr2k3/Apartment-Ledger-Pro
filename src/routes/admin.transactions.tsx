@@ -42,7 +42,7 @@ const emptyDraft: Draft = {
 
 function Page() {
   return (
-    <PortalShell title="Transactions" reqIds="AC-01 · AC-02 · AC-03 · AC-04 · AC-05" persona="admin">
+    <PortalShell title="Transactions" persona="admin">
       <Inner />
     </PortalShell>
   );

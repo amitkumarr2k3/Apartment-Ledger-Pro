@@ -20,6 +20,16 @@ dist-ssr/
 .nitro/
 .tanstack/
 
+# --- Large release/archive artifacts accidentally sitting at repo root ---
+*.tar
+*.tgz
+*.zip
+release-*.tar.sha256
+
+# --- Backup exports not needed for image builds ---
+backups/
+scripts/backups/
+
 # --- Backend service (has its own build context: ./backend) ---
 backend/
 

@@ -80,7 +80,7 @@ type Draft = { email: string; name: string; flat: string; role: "resident" | "ad
 function Page() {
   const showMock = useShowMockData();
   return (
-    <PortalShell title="Residents & Whitelist" reqIds="AC-10 · AC-11 · AC-12 · AC-13" persona="admin">
+    <PortalShell title="Residents & Whitelist" persona="admin">
       {showMock ? <MockView /> : <LiveView />}
     </PortalShell>
   );

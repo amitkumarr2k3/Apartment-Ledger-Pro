@@ -111,7 +111,7 @@ function Page() {
   const sessions = sessionsData?.sessions ?? [];
 
   return (
-    <PortalShell title="ETL Integration" reqIds="AC-53 · AC-54 · AC-55" persona="admin">
+    <PortalShell title="ETL Integration" persona="admin">
       <div className="space-y-6">
         {/* Header */}
         <div>

@@ -20,7 +20,7 @@ export const Route = createFileRoute("/admin/vendors")({
 
 function Page() {
   return (
-    <PortalShell title="Vendor & service provider analysis" reqIds="AD-10 → AD-14" persona="admin">
+    <PortalShell title="Vendor & service provider analysis" persona="admin">
       <Inner />
     </PortalShell>
   );
@@ -143,7 +143,7 @@ function Inner() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">
-            {vendorHead === "expense" ? "Vendor ranking · AD-10, AD-13, AD-14" : "Income vendor ranking"}
+            {vendorHead === "expense" ? "Vendor ranking" : "Income vendor ranking"}
           </CardTitle>
           <CardDescription>{rankingNote}</CardDescription>
         </CardHeader>
@@ -206,7 +206,7 @@ function Inner() {
           <Card className="lg:col-span-2">
             <CardHeader>
               <CardTitle className="text-base">{vendorObj.name} · monthly trend</CardTitle>
-              <CardDescription>AD-11 · Steady rise pattern shows here</CardDescription>
+              <CardDescription>Steady rise pattern shows here</CardDescription>
             </CardHeader>
             <CardContent>
               {view === "chart" ? (
@@ -244,7 +244,7 @@ function Inner() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Line items · AD-12</CardTitle>
+              <CardTitle className="text-base">Line items</CardTitle>
               <CardDescription>Vendor breakdown</CardDescription>
             </CardHeader>
             <CardContent>

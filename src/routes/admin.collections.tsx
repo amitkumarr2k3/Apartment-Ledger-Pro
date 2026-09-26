@@ -17,7 +17,7 @@ export const Route = createFileRoute("/admin/collections")({
 
 function Page() {
   return (
-    <PortalShell title="Collection performance (aggregate)" reqIds="AD-20 → AD-24" persona="admin">
+    <PortalShell title="Collection performance (aggregate)" persona="admin">
       <Inner />
     </PortalShell>
   );
@@ -100,7 +100,7 @@ function Inner() {
       {sharpDrops.length > 0 && (
         <Alert className="border-amber-500/40 bg-amber-500/5">
           <AlertTriangle className="h-4 w-4 text-amber-600" />
-          <AlertTitle>Collection volatility · AD-21</AlertTitle>
+          <AlertTitle>Collection volatility</AlertTitle>
           <AlertDescription>
             Sharp drop{sharpDrops.length > 1 ? "s" : ""} detected in:{" "}
             {sharpDrops.map((d) => `${d.month} (${pct(d.change)})`).join(", ")}
@@ -115,7 +115,7 @@ function Inner() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Monthly collection: Actual vs Expected</CardTitle>
-          <CardDescription>AD-20, AD-24 · Aggregate (uploaded data only)</CardDescription>
+          <CardDescription>Aggregate (uploaded data only)</CardDescription>
         </CardHeader>
         <CardContent>
           {view === "chart" ? (
@@ -179,7 +179,7 @@ function Inner() {
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Cumulative net movement · AD-23</CardTitle>
+            <CardTitle className="text-base">Cumulative net movement</CardTitle>
             <CardDescription>Running collections − expenses over the period</CardDescription>
           </CardHeader>
           <CardContent>
@@ -218,7 +218,7 @@ function Inner() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Quarterly pattern · AD-22</CardTitle>
+            <CardTitle className="text-base">Quarterly pattern</CardTitle>
             <CardDescription>Identify seasonal pressure periods</CardDescription>
           </CardHeader>
           <CardContent>

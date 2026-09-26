@@ -45,7 +45,7 @@ function derive(
 
 function Page() {
   return (
-    <PortalShell title="Action needed" reqIds="AD-40 · AD-41 · AD-42 · AD-43" persona="admin">
+    <PortalShell title="Action needed" persona="admin">
       <Inner />
     </PortalShell>
   );
@@ -208,7 +208,7 @@ function Inner() {
       <Card className="border-rose-500/30">
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-rose-500" /> Top 5 items needing attention · AD-41
+            <AlertTriangle className="h-4 w-4 text-rose-500" /> Top 5 items needing attention
           </CardTitle>
           {/* FIX (2026-08-15): description now genuinely matches what the
               code computes -- previously said "income drops" but the code
@@ -258,7 +258,7 @@ function Inner() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-4">
             <div>
-              <CardTitle className="text-base">Projection · {risingCat.name} · AD-40</CardTitle>
+              <CardTitle className="text-base">Projection · {risingCat.name}</CardTitle>
               <CardDescription>{activeProjectionMeta.reason}</CardDescription>
             </div>
             {projectionCandidates.length > 1 && (
@@ -317,7 +317,7 @@ function Inner() {
       {!risingCat && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Projection · AD-40</CardTitle>
+            <CardTitle className="text-base">Projection</CardTitle>
             <CardDescription>No flagged category available for projection in the selected period</CardDescription>
           </CardHeader>
           <CardContent>
@@ -339,7 +339,7 @@ function Inner() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-cyan-500" /> Above-average spend this month · AD-42
+              <TrendingUp className="h-4 w-4 text-cyan-500" /> Above-average spend this month
             </CardTitle>
             <CardDescription>
               Categories currently spending noticeably more than their own period average — worth watching, not necessarily alarming

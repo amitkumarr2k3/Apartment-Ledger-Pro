@@ -180,14 +180,14 @@ function Page() {
   // avoids the hydration mismatch that was crashing this page.
   if (!mounted) {
     return (
-      <PortalShell title="Dashboard Controls" reqIds="AC-30 \u00B7 AC-31 \u00B7 AC-32" persona="admin">
+      <PortalShell title="Dashboard Controls" persona="admin">
         <p className="text-sm text-muted-foreground py-8 text-center">Loading\u2026</p>
       </PortalShell>
     );
   }
 
   return (
-    <PortalShell title="Dashboard Controls" reqIds="AC-30 \u00B7 AC-31 \u00B7 AC-32" persona="admin">
+    <PortalShell title="Dashboard Controls" persona="admin">
       <Card>
         <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>

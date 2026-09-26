@@ -247,7 +247,7 @@ function Page() {
 
 
   return (
-    <PortalShell title="CSV Imports" reqIds="AC-50 · AC-51 · AC-52" persona="admin">
+    <PortalShell title="CSV Imports" persona="admin">
       <Tabs defaultValue="new">
         <TabsList>
           <TabsTrigger value="new">New import</TabsTrigger>

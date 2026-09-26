@@ -99,7 +99,7 @@ function Page() {
   // Audit trail is only meaningful when authenticated — never fall back to mock.
   if (showMock) {
     return (
-      <PortalShell title="Audit Trail" reqIds="AC-40 · AC-41" persona="admin">
+      <PortalShell title="Audit Trail" persona="admin">
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
@@ -116,7 +116,7 @@ function Page() {
   }
 
   return (
-    <PortalShell title="Audit Trail" reqIds="AC-40 · AC-41" persona="admin">
+    <PortalShell title="Audit Trail" persona="admin">
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-emerald-500" /> Immutable activity log</CardTitle>

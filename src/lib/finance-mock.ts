@@ -265,17 +265,17 @@ export const navSections: NavSection[] = [
     tone: "admin" as const,
     group: "dashboards" as const,
     items: [
-      { to: "/admin/actions", label: "Action Needed", req: "AD-40 → AD-43" , icon: "🚨"},
-      { to: "/admin/alerts", label: "Cost Alerts & Trends", req: "AD-01 → AD-05" , icon: "📈"},
-      { to: "/admin/vendors", label: "Vendor Insights", req: "AD-10 → AD-14" , icon: "🏢"},
-      { to: "/admin/collections", label: "Collections", req: "AD-20 → AD-24" , icon: "💵"},
-      { to: "/admin/income", label: "Income Optimisation", req: "AD-30 → AD-33" , icon: "💡"},
+      { to: "/admin/actions", label: "Action Needed", icon: "🚨"},
+      { to: "/admin/alerts", label: "Cost Alerts & Trends", icon: "📈"},
+      { to: "/admin/vendors", label: "Vendor Insights", icon: "🏢"},
+      { to: "/admin/collections", label: "Collections", icon: "💵"},
+      { to: "/admin/income", label: "Income Optimisation", icon: "💡"},
       // Moved here from the Resident nav -- full unrestricted Heads ->
       // Categories -> Vendors -> Line items depth, admin/superadmin only.
       // The Resident nav's own "Head Drill-down" now points to a separate,
       // structurally simpler page that stops at a category's combined
       // chart (see resident/drilldown.tsx).
-      { to: "/admin/drilldown", label: "Head Drill-down", req: "RD-10 → RD-15" , icon: "🔍"},
+      { to: "/admin/drilldown", label: "Head Drill-down", icon: "🔍"},
     ],
   },
   {
@@ -283,12 +283,12 @@ export const navSections: NavSection[] = [
     tone: "admin" as const,
     group: "controls" as const,
     items: [
-      { to: "/admin/transactions", label: "Transactions (CRUD)", req: "AC-01 → AC-05" , icon: "🧾"},
-      { to: "/admin/residents", label: "Residents & Whitelist", req: "AC-10 → AC-13" , icon: "👥"},
-      { to: "/admin/settings", label: "Dashboard Controls", req: "AC-30 → AC-32" , icon: "⚙️"},
-      { to: "/admin/audit", label: "Audit Trail", req: "AC-40 → AC-41" , icon: "🛡️"},
-      { to: "/admin/imports", label: "CSV Imports", req: "AC-50 → AC-52" , icon: "📥"},
-      { to: "/admin/etl", label: "ETL Integration", req: "AC-53 → AC-55" , icon: "🔄"},
+      { to: "/admin/transactions", label: "Transactions (CRUD)", icon: "🧾"},
+      { to: "/admin/residents", label: "Residents & Whitelist", icon: "👥"},
+      { to: "/admin/settings", label: "Dashboard Controls", icon: "⚙️"},
+      { to: "/admin/audit", label: "Audit Trail", icon: "🛡️"},
+      { to: "/admin/imports", label: "CSV Imports", icon: "📥"},
+      { to: "/admin/etl", label: "ETL Integration", icon: "🔄"},
     ],
   },
 ];

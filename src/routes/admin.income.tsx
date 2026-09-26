@@ -18,7 +18,7 @@ export const Route = createFileRoute("/admin/income")({
 
 function Page() {
   return (
-    <PortalShell title="Income optimisation insights" reqIds="AD-30 · AD-31 · AD-32 · AD-33" persona="admin">
+    <PortalShell title="Income optimisation insights" persona="admin">
       <Inner />
     </PortalShell>
   );
@@ -54,7 +54,7 @@ function Inner() {
   ).sort((a, b) => b.total - a.total);
   const totalIncome = rows.reduce((s, r) => s + r.total, 0);
 
-  // AD-31: expense-to-income ratio per month.
+  // Expense-to-income ratio per month.
   // Income is derived from income sources (already ex-tax), while expense
   // continues to use monthly totals.
   //
@@ -97,10 +97,10 @@ function Inner() {
 
   return (
     <>
-      {/* AD-30 */}
+      {/* income sources breakdown */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Income sources breakdown · AD-30</CardTitle>
+          <CardTitle className="text-base">Income sources breakdown</CardTitle>
           <CardDescription>Category, amount, and share of total income</CardDescription>
         </CardHeader>
         <CardContent>
@@ -138,10 +138,10 @@ function Inner() {
       </Card>
 
       <div className="grid gap-4 lg:grid-cols-3">
-        {/* AD-31 */}
+        {/* expense / income ratio trend */}
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle className="text-base">Expense / Income ratio trend · AD-31</CardTitle>
+            <CardTitle className="text-base">Expense / Income ratio trend</CardTitle>
             <CardDescription>% of income spent on expenses per month (lower is healthier)</CardDescription>
           </CardHeader>
           <CardContent>
@@ -178,10 +178,10 @@ function Inner() {
           </CardContent>
         </Card>
 
-        {/* AD-32 */}
+        {/* irregular sources */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Irregular sources · AD-32</CardTitle>
+            <CardTitle className="text-base">Irregular sources</CardTitle>
             <CardDescription>Present in some months, absent in others</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
@@ -196,7 +196,7 @@ function Inner() {
         </Card>
       </div>
 
-      {/* AD-33 */}
+      {/* income ideas */}
       {/* FIX (2026-08-15): this card claimed "(persisted in Settings)" but
           the Textarea had no onChange/save handler at all -- anything typed
           here vanished on refresh, and the "ideas" shown were hardcoded
@@ -208,7 +208,7 @@ function Inner() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
-            <Lightbulb className="h-4 w-4 text-amber-500" /> Income ideas · AD-33
+            <Lightbulb className="h-4 w-4 text-amber-500" /> Income ideas
           </CardTitle>
           <CardDescription>
             Scratchpad for brainstorming — not saved between sessions yet. Copy anything worth keeping elsewhere.
