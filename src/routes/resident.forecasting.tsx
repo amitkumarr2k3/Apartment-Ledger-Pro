@@ -69,7 +69,7 @@ export const Route = createFileRoute("/resident/forecasting")({
 
 function Page() {
   return (
-    <PortalShell title="Forecasting" reqIds="RD-50 → RD-54" persona="resident" showPeriodSelector={false}>
+    <PortalShell title="Forecasting" persona="resident">
       <Inner />
     </PortalShell>
   );

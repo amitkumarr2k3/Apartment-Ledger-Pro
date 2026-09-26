@@ -15,7 +15,7 @@ export const Route = createFileRoute("/resident/cashflow")({
 
 function Page() {
   return (
-    <PortalShell title="Community cashflow health" reqIds="RD-20 · RD-21 · RD-22 · RD-23" persona="resident">
+    <PortalShell title="Community cashflow health" persona="resident">
       <Inner />
     </PortalShell>
   );
@@ -79,7 +79,7 @@ function Inner() {
   // the FOLLOWING month (e.g. the entry dated 1-Aug is the closing/cumulative
   // outstanding as of the end of July) -- it already IS the running total,
   // no addition needed, just a one-month shift. "Current Month Unpaid
-  // Maintenance" is restricted to Income Visibility's RD-32 chart ONLY and
+  // Maintenance" is restricted to Income Visibility's maintenance chart ONLY and
   // must not be read here at all.
   const isPreviousArrearsBF = (s: string) => (s || "").trim().toLowerCase() === "previous arrears brought forward";
   const liabilityLineItemRawMonthly = (matchLineItem: (name: string) => boolean): number[] => {
@@ -175,14 +175,14 @@ function Inner() {
 
       <Alert>
         <Info className="h-4 w-4" />
-        <AlertDescription>RD-23 · Aggregate community-level view only. No individual flat-wise tracking.</AlertDescription>
+        <AlertDescription>Aggregate community-level view only. No individual flat-wise tracking.</AlertDescription>
       </Alert>
 
       <div className="grid gap-4 md:grid-cols-3">
-        {/* RD-20 */}
+        {/* expense / income */}
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription className="text-xs uppercase tracking-wider">Expense / Income · RD-20</CardDescription>
+            <CardDescription className="text-xs uppercase tracking-wider">Expense / Income</CardDescription>
             <CardTitle className="text-4xl font-mono">{ratio.toFixed(0)}%</CardTitle>
           </CardHeader>
           <CardContent>
@@ -192,10 +192,10 @@ function Inner() {
             </div>
           </CardContent>
         </Card>
-        {/* RD-22 */}
+        {/* surplus months */}
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription className="text-xs uppercase tracking-wider">Surplus months · RD-22</CardDescription>
+            <CardDescription className="text-xs uppercase tracking-wider">Surplus months</CardDescription>
             <CardTitle className="text-4xl font-mono text-emerald-600">{surplus}</CardTitle>
           </CardHeader>
           <CardContent>
@@ -204,7 +204,7 @@ function Inner() {
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription className="text-xs uppercase tracking-wider">Deficit months · RD-22</CardDescription>
+            <CardDescription className="text-xs uppercase tracking-wider">Deficit months</CardDescription>
             <CardTitle className="text-4xl font-mono text-rose-600">{deficit}</CardTitle>
           </CardHeader>
           <CardContent>
@@ -252,7 +252,7 @@ function Inner() {
         </Card>
       </div>
 
-      {/* RD-21 -- redesigned to eliminate cross-page duplication. The previous
+      {/* redesigned to eliminate cross-page duplication. The previous
           version re-plotted "Actual/Expected Collection" here too, which is
           MAINTENANCE-ONLY data that Income Visibility already owns entirely.
           This chart now shows what Cashflow Health should uniquely own: the
@@ -265,7 +265,7 @@ function Inner() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Monthly trend · total income, expense &amp; outstanding dues</CardTitle>
-          <CardDescription>RD-21 · Total income here includes ALL income sources, not maintenance alone -- see Income Visibility for the maintenance-specific breakdown</CardDescription>
+          <CardDescription>Total income here includes ALL income sources, not maintenance alone -- see Income Visibility for the maintenance-specific breakdown</CardDescription>
         </CardHeader>
         <CardContent>
           {view === "chart" ? (

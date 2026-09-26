@@ -20,7 +20,7 @@ type Head = "expense" | "income";
 
 function Page() {
   return (
-    <PortalShell title="Head-wise drill-down" reqIds="RD-10 · RD-15" persona="resident">
+    <PortalShell title="Head-wise drill-down" persona="resident">
       <Inner />
     </PortalShell>
   );
@@ -97,7 +97,7 @@ function Inner() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base capitalize">{head} categories</CardTitle>
-            <CardDescription>RD-10 · Select a category to see its combined monthly trend</CardDescription>
+            <CardDescription>Select a category to see its combined monthly trend</CardDescription>
           </CardHeader>
           <CardContent className="divide-y divide-border">
             {[...tree]
@@ -126,7 +126,7 @@ function Inner() {
           <CardHeader>
             <CardTitle className="text-base">{category.name} · Combined monthly trend</CardTitle>
             <CardDescription>
-              RD-15 · Sum of all {category.vendors.length} vendor{category.vendors.length > 1 ? "s" : ""} under this category, per month, for the selected range — this is the final level of detail available here
+              Sum of all {category.vendors.length} vendor{category.vendors.length > 1 ? "s" : ""} under this category, per month, for the selected range — this is the final level of detail available here
             </CardDescription>
           </CardHeader>
           <CardContent>

@@ -17,7 +17,7 @@ const COLORS = ["var(--color-chart-1)", "var(--color-chart-2)", "var(--color-cha
 
 function Page() {
   return (
-    <PortalShell title="Income visibility" reqIds="RD-30 · RD-31 · RD-32" persona="resident">
+    <PortalShell title="Income visibility" persona="resident">
       <Inner />
     </PortalShell>
   );
@@ -59,7 +59,7 @@ function Inner() {
         .flatMap((c) => c.vendors.flatMap((v) => v.items.map((i) => i.monthly))),
     ),
   );
-  // RD-32 is the ONE designated place "Current Month Unpaid Maintenance" is
+  // This is the ONE designated place "Current Month Unpaid Maintenance" is
   // allowed to appear. Filter at the line-item level (not just the category
   // level) so "Previous Arrears Brought Forward" -- which now recurs every
   // month and would otherwise massively distort this figure -- is excluded.
@@ -109,10 +109,10 @@ function Inner() {
   return (
     <>
       <div className="grid gap-4 lg:grid-cols-3 items-start">
-        {/* RD-30 */}
+        {/* income sources */}
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle className="text-base">Income sources · RD-30</CardTitle>
+            <CardTitle className="text-base">Income sources</CardTitle>
             <CardDescription>Maintenance separated out, remaining income sorted by contribution</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -152,10 +152,10 @@ function Inner() {
           </CardContent>
         </Card>
 
-        {/* RD-31 */}
+        {/* expense / income */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Expense / Income · RD-31</CardTitle>
+            <CardTitle className="text-base">Expense / Income</CardTitle>
             <CardDescription>Same calculation as overview</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -172,7 +172,7 @@ function Inner() {
         </Card>
       </div>
 
-      {/* RD-32 -- split into two focused, side-by-side charts instead of one
+      {/* split into two focused, side-by-side charts instead of one
           dense 4-legend/dual-axis chart. "Collected vs Unpaid" stays a pure
           rupee comparison; "Recovery Rate Trend" is its own %-only chart,
           which also structurally prevents the currency/percentage tooltip
@@ -180,7 +180,7 @@ function Inner() {
           left in the same chart for a shared formatter to get confused by. */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Maintenance collection vs outstanding · RD-32</CardTitle>
+          <CardTitle className="text-base">Maintenance collection vs outstanding</CardTitle>
           <CardDescription>Shows recovery, arrears, and the unpaid maintenance gap for the selected period</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

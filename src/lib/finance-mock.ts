@@ -243,18 +243,21 @@ export const momChanges = expenseTree.map((c) => {
 
 // Nav structure — Admin is split into "Dashboards" (analytics) and
 // "Controls" (administrative CRUD/audit) so the two surfaces are separate.
-export const navSections = [
+export type NavItem = { to: string; label: string; icon?: string; req?: string };
+export type NavSection = { label: string; tone: "resident" | "admin"; group: "dashboards" | "controls"; items: NavItem[] };
+
+export const navSections: NavSection[] = [
   {
     label: "Resident",
     tone: "resident" as const,
     group: "dashboards" as const,
     items: [
-      { to: "/resident/overview", label: "Overview", req: "RD-01 → RD-05" , icon: "🏠"},
-      { to: "/resident/drilldown", label: "Head Drill-down", req: "RD-10 → RD-15" , icon: "🔍"},
-      { to: "/resident/cashflow", label: "Cashflow Health", req: "RD-20 → RD-23" , icon: "💧"},
-      { to: "/resident/income", label: "Income Visibility", req: "RD-30 → RD-32" , icon: "💰"},
-      { to: "/resident/balance", label: "Opening & Closing", req: "RD-40 → RD-44" , icon: "🏦"},
-      { to: "/resident/forecasting", label: "Forecasting", req: "RD-50 → RD-54" , icon: "🔮"},
+      { to: "/resident/overview", label: "Overview", icon: "🏠"},
+      { to: "/resident/drilldown", label: "Head Drill-down", icon: "🔍"},
+      { to: "/resident/cashflow", label: "Cashflow Health", icon: "💧"},
+      { to: "/resident/income", label: "Income Visibility", icon: "💰"},
+      { to: "/resident/balance", label: "Opening & Closing", icon: "🏦"},
+      { to: "/resident/forecasting", label: "Forecasting", icon: "🔮"},
     ],
   },
   {

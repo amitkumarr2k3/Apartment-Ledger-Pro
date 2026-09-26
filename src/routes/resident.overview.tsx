@@ -28,7 +28,7 @@ export const Route = createFileRoute("/resident/overview")({
 
 function Page() {
   return (
-    <PortalShell title="Overview" reqIds="RD-01 · RD-02 · RD-03 · RD-04 · RD-05" persona="resident">
+    <PortalShell title="Overview" persona="resident">
       <Inner />
     </PortalShell>
   );
@@ -224,7 +224,7 @@ function Inner() {
   // the FOLLOWING month (e.g. the entry dated 1-Aug is the closing/cumulative
   // outstanding as of the end of July) -- it already IS the running total,
   // no addition needed. "Current Month Unpaid Maintenance" is restricted to
-  // Income Visibility's RD-32 chart ONLY and must not be read here at all.
+  // Income Visibility's maintenance chart ONLY and must not be read here at all.
   const isPreviousArrearsBF = (s: string) => (s || "").trim().toLowerCase() === "previous arrears brought forward";
   const liabilityLineItemRawMonthly = (matchLineItem: (name: string) => boolean): number[] => {
     let result: number[] = [];
@@ -244,7 +244,7 @@ function Inner() {
   // "Current Month Unpaid Maintenance" -- used ONLY for the Total Expected
   // Income card below, displayed there as "Outstanding Receivables" (sum
   // across the selected period, alongside Total Received Income and
-  // Opening Balance). This is a distinct, additive use from RD-32's Income
+  // Opening Balance). This is a distinct, additive use from the income
   // Visibility chart and does not change that chart's behavior at all.
   const isCurrentMonthUnpaidMaintenance = (s: string) => (s || "").trim().toLowerCase() === "current month unpaid maintenance";
   const currentMonthUnpaidRawMonthly = liabilityLineItemRawMonthly(isCurrentMonthUnpaidMaintenance);
@@ -554,12 +554,12 @@ function Inner() {
       )}
 
       <div className="grid gap-4 lg:grid-cols-3">
-        {/* RD-05 community income */}
+        {/* community income */}
         {isWidgetVisible("overview.top5Income") && (
         <Card className={topCardsClass}>
           <CardHeader>
             <CardTitle className="text-base">Top 5 income sources (excluding maintenance paid from residents)</CardTitle>
-            <CardDescription>RD-05 · Click any income category to drill down</CardDescription>
+            <CardDescription>Click any income category to drill down</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 flex-1 overflow-hidden">
             {top5Income.length === 0 ? (
@@ -610,12 +610,12 @@ function Inner() {
         </Card>
         )}
 
-        {/* RD-02 top 5 — drill-through */}
+        {/* top 5 — drill-through */}
         {isWidgetVisible("overview.top5Expenses") && (
         <Card className={topCardsClass}>
           <CardHeader>
             <CardTitle className="text-base">Top 5 expense categories</CardTitle>
-            <CardDescription>RD-02 · Click any expense category to drill down</CardDescription>
+            <CardDescription>Click any expense category to drill down</CardDescription>
           </CardHeader>
           <CardContent className="flex-1 overflow-hidden">
             {top5.length === 0 ? (

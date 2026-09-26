@@ -19,7 +19,7 @@ export const Route = createFileRoute("/resident/balance")({
 
 function Page() {
   return (
-    <PortalShell title="Opening & closing balance" reqIds="RD-40 → RD-44" persona="resident">
+    <PortalShell title="Opening & closing balance" persona="resident">
       <Inner />
     </PortalShell>
   );
@@ -134,18 +134,18 @@ function Inner() {
   return (
     <>
 
-      {/* RD-40 balance strip */}
+      {/* balance strip */}
       {isWidgetVisible("balance.strip") && (
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Balance strip · RD-40, RD-42</CardTitle>
+          <CardTitle className="text-base">Balance strip</CardTitle>
           <CardDescription>Opening at start of range → net movement → closing at end of range</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
             {/* If historical carry-forward is incomplete and opening computes
                 to a negative value, show N/A instead of a misleading amount. */}
-            <StripCell label="Opening balance" value={hasOpeningGap ? "N/A" : inr(rangeOpening)} muted note="RD-42" />
+            <StripCell label="Opening balance" value={hasOpeningGap ? "N/A" : inr(rangeOpening)} muted />
             <StripCell label="Total income" value={inr(totalIncome)} tone="emerald" />
             <StripCell label="Total expense" value={inr(totalExpense)} tone="rose" />
             <StripCell label={net >= 0 ? "Net Operating Surplus" : "Net Operating Deficit"} value={inr(net)} tone={net >= 0 ? "emerald" : "rose"} />
@@ -223,11 +223,11 @@ function Inner() {
       </Alert>
 
 
-      {/* RD-43 mini table */}
+      {/* mini table */}
       {isWidgetVisible("balance.continuity") && (
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Month-by-month continuity · RD-43</CardTitle>
+          <CardTitle className="text-base">Month-by-month continuity</CardTitle>
           <CardDescription>Opening + income − expense = closing, rolled forward per month</CardDescription>
         </CardHeader>
         <CardContent>

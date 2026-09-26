@@ -482,7 +482,7 @@ function SidebarNav({
                           {it.icon && <span aria-hidden="true">{it.icon}</span>}
                           <span>{it.label}</span>
                         </div>
-                        <div className="text-[10px] font-mono opacity-70">{it.req}</div>
+                        {it.req && <div className="text-[10px] font-mono opacity-70">{it.req}</div>}
                       </Link>
                     </li>
                   );
@@ -514,13 +514,13 @@ function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenChange: (
             {s.items.map((it) => (
               <CommandItem
                 key={it.to}
-                value={`${s.label} ${it.label} ${it.req}`}
+                value={`${s.label} ${it.label} ${it.req ?? ""}`}
                 onSelect={() => go({ to: it.to, search: ((prev: any) => ({ period: prev.period, view: prev.view })) as any })}
               >
                 <span className={`mr-2 h-2 w-2 rounded-full ${s.tone === "resident" ? "bg-cyan-500" : "bg-violet-500"}`} />
                 {it.icon && <span className="mr-1.5" aria-hidden="true">{it.icon}</span>}
                 <span>{it.label}</span>
-                <span className="ml-auto text-[10px] font-mono opacity-60">{it.req}</span>
+                {it.req && <span className="ml-auto text-[10px] font-mono opacity-60">{it.req}</span>}
               </CommandItem>
             ))}
           </CommandGroup>
@@ -569,13 +569,13 @@ function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenChange: (
 
 export function PortalShell({
   title,
-  reqIds,
+  reqIds = "",
   persona,
   children,
   showViewToggle = true,
 }: {
   title: string;
-  reqIds: string;
+  reqIds?: string;
   persona: "resident" | "admin";
   children: ReactNode;
   showViewToggle?: boolean;
@@ -898,10 +898,12 @@ export function PortalShell({
             ))}
           </nav>
         </header>
-        <div className="print-header hidden">
-          <h1 className="text-2xl font-semibold">{title}</h1>
-          <p className="text-sm text-muted-foreground font-mono">{reqIds} · {periodCtx.label}</p>
-        </div>
+        {(reqIds || title) && (
+          <div className="print-header hidden">
+            <h1 className="text-2xl font-semibold">{title}</h1>
+            {reqIds && <p className="text-sm text-muted-foreground font-mono">{reqIds} · {periodCtx.label}</p>}
+          </div>
+        )}
         <div className="p-4 sm:p-6 xl:p-8 space-y-6 w-full max-w-[1680px] mx-auto">{children}</div>
       </main>
     </div>
