@@ -16,15 +16,16 @@ For a full implementation-level walkthrough (component interactions, runtime seq
                      │  RBAC · CSV · Audit  │
                      └──────────┬───────────┘
                                 │
-                     ┌──────────▼───────────┐         ┌────────────────┐
-                     │  db  (Postgres 16)   │         │  mailhog       │
-                     │  + materialised views│         │  captures OTP  │
-                     └──────────────────────┘         └────────────────┘
+                     ┌──────────▼───────────┐
+                     │  db  (Postgres 16)   │
+                     │  + materialised views│
+                     └──────────────────────┘
 ```
 
-All four services run under a single `docker compose up`. Data persists in a
-named `pgdata` volume. In production, replace `mailhog` with a real SMTP relay
-and put nginx behind a TLS terminator (Caddy / Traefik / a managed LB).
+All services run under a single `docker compose up`. Data persists in a
+named `pgdata` volume. OTP emails are delivered through Gmail SMTP (default)
+or Resend; put nginx behind a TLS terminator (Caddy / Traefik / a managed LB)
+for production.
 
 ## Frontend
 

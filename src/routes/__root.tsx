@@ -15,7 +15,6 @@ import { z } from "zod";
 import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
-import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Toaster } from "@/components/ui/sonner";
 import { getSession, canAccess, signOut } from "@/lib/session";
 import { AUTH_ENABLED } from "@/lib/feature-flags";
@@ -144,9 +143,6 @@ function NotFoundComponent() {
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   console.error(error);
   const router = useRouter();
-  useEffect(() => {
-    reportLovableError(error, { boundary: "tanstack_root_error_component" });
-  }, [error]);
 
   // A failed dynamic import of a route's JS chunk (stale build, see the
   // vite:preloadError handler in RootComponent) surfaces here as a plain
@@ -242,8 +238,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:title", content: "CG BoulevardPulse Portal" },
       { name: "twitter:description", content: "Unified finance dashboards for residents and admins with secure OTP access, audit tracking, and insights across collections, expenses, and cashflow." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/9bd5624d-5aaf-45a3-b3ed-271beacb5f0c/id-preview-bfc9bbc8--5f4910d9-cc7e-478e-a2c6-2827c8a63769.lovable.app-1783860026025.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/9bd5624d-5aaf-45a3-b3ed-271beacb5f0c/id-preview-bfc9bbc8--5f4910d9-cc7e-478e-a2c6-2827c8a63769.lovable.app-1783860026025.png" },
     ],
     links: [
       {

@@ -10,7 +10,6 @@
 // EMAIL_PROVIDER controls which sender backend is used:
 //   gmail  (default) → smtp.gmail.com with SMTP_USER / SMTP_PASS
 //   resend            → smtp.resend.com with RESEND_API_KEY
-//   mailhog           → local dev inbox on localhost:1025
 //
 // This keeps both Gmail (cost-efficient, no domain needed) and Resend
 // (production-ready domain sender) implementations available.
@@ -35,8 +34,6 @@ import { loadUserByEmail, setAuthCookie } from "../auth";
 // ── Mailer ────────────────────────────────────────────────────────────────────
 const EMAIL_PROVIDER = (process.env.EMAIL_PROVIDER ?? "gmail").toLowerCase();
 const RESEND_API_KEY = process.env.RESEND_API_KEY ?? "";
-const SMTP_HOST      = process.env.SMTP_HOST ?? "mailhog";
-const SMTP_PORT      = Number(process.env.SMTP_PORT ?? 1025);
 const SMTP_USER      = process.env.SMTP_USER || "";
 const SMTP_PASS      = process.env.SMTP_PASS || "";
 const FROM_EMAIL     = process.env.FROM_EMAIL || SMTP_USER || "no-reply@apartment-finance.local";
@@ -54,21 +51,15 @@ function createTransport() {
     };
   }
 
-  if (EMAIL_PROVIDER === "gmail") {
-    return {
-      provider: "gmail",
-      transport: nodemailer.createTransport({
-        host: "smtp.gmail.com",
-        port: 465,
-        secure: true,
-        auth: { user: SMTP_USER, pass: SMTP_PASS },
-      }),
-    };
-  }
-
+  // gmail is the default provider
   return {
-    provider: "mailhog",
-    transport: nodemailer.createTransport({ host: SMTP_HOST, port: SMTP_PORT, secure: false }),
+    provider: "gmail",
+    transport: nodemailer.createTransport({
+      host: "smtp.gmail.com",
+      port: 465,
+      secure: true,
+      auth: { user: SMTP_USER, pass: SMTP_PASS },
+    }),
   };
 }
 
@@ -159,7 +150,7 @@ async function issueOtp(app: FastifyInstance, email: string): Promise<void> {
     app.log.info({ email: lower, hash_prefix: otpHash.slice(0, 8) }, "otp issued and emailed");
   } catch (err) {
     app.log.warn({ email: lower, err }, "otp email delivery failed");
-    // Still mark as issued — user can try again or retrieve from MailHog in dev
+    // Still mark as issued — user can request a new OTP once delivery is fixed
   }
 }
 

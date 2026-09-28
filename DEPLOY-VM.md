@@ -1,7 +1,7 @@
 # Deploy CG BoulevardPulse to a Single Azure VM (Simple Docker Compose)
 
 **This is your existing `docker-compose.yml` running on one Linux VM instead of your
-laptop — same containers (db, api, ssr, web, mailhog), same commands. No registries,
+laptop — same containers (db, api, ssr, web), same commands. No registries,
 no Kubernetes, no serverless. Simplest possible path to a public URL.**
 
 - **Cost:** ~$15–30/month depending on VM size (see Part 1).
@@ -55,8 +55,8 @@ This section lists exactly what matters in each changed file and what you must d
 
 ## Part 1 — Create the VM (Azure Portal — no CLI needed)
 
-Pick a size based on your traffic. This stack runs 6 containers (db, api, ssr, web,
-mailhog, plus one-off migrate/seed), so give it enough RAM to build images comfortably:
+Pick a size based on your traffic. This stack runs 5 containers (db, api, ssr, web,
+plus one-off migrate/seed), so give it enough RAM to build images comfortably:
 
 | Size | vCPU | RAM | Approx. cost (Central India) | Notes |
 |---|---|---|---|---|
@@ -184,7 +184,6 @@ This creates a tar containing:
 - `apf-ssr:2026.09.08`
 - `apf-web:2026.09.08`
 - `postgres:16-alpine`
-- `mailhog/mailhog:latest`
 
 #### C2. Copy only deployment artifacts to VM
 
@@ -260,8 +259,9 @@ DATABASE_URL=******db:5432/apartment_finance
 JWT_SECRET=<paste output of: openssl rand -base64 48>
 SUPERADMIN_EMAIL=admin@example.com
 SUPERADMIN_PASSWORD=<pick a strong password>
-SMTP_HOST=mailhog
-SMTP_PORT=1025
+EMAIL_PROVIDER=gmail
+SMTP_USER=<your-gmail-address>
+SMTP_PASS=<your-gmail-app-password>
 APP_URL=http://<VM_PUBLIC_IP>
 CORS_ORIGIN=http://<VM_PUBLIC_IP>
 COOKIE_SECURE=false
@@ -277,11 +277,10 @@ NODE_ENV=production
 DOMAIN=<YOUR_DOMAIN>
 ```
 
-> **Note on email/OTP login:** `mailhog` only captures emails locally — it does **not**
-> deliver real emails to residents. It's fine to start with (superadmin password login
-> still works via the UI without OTP), but for residents to actually receive OTP codes
-> you'll eventually want a real SMTP provider (e.g. free tiers from Brevo or Mailjet).
-> That's a config-only change later (`SMTP_HOST`/`SMTP_PORT` + optional auth) — not
+> **Note on email/OTP login:** OTP codes are delivered via Gmail SMTP (default) or
+> Resend. Superadmin password login still works via the UI without OTP. For
+> residents to receive OTP codes, set `EMAIL_PROVIDER`, `SMTP_USER`/`SMTP_PASS`
+> (Gmail app password) or `RESEND_API_KEY` in `.env` — a config-only change, not
 > needed to get the app running today.
 
 ---

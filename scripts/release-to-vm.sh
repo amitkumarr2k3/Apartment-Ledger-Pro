@@ -157,7 +157,7 @@ if [[ "$MODE" == "prod" ]]; then
 fi
 
 if [[ "$SKIP_BUILD" != "true" ]]; then
-  echo "[1/6] Building + packaging images locally..."
+  echo "[1/7] Building + packaging images locally..."
   ./scripts/build-release-images.sh "$TAG" "$RELEASE_TAR"
 else
   if [[ ! -f "$RELEASE_TAR" ]]; then
@@ -166,12 +166,12 @@ else
   fi
 fi
 
-echo "[2/6] Preparing remote directory..."
+echo "[2/7] Preparing remote directory..."
 ssh "${SSH_OPTS[@]}" "$HOST" "mkdir -p \"\$HOME/$REMOTE_DIR\""
 ssh "${SSH_OPTS[@]}" "$HOST" "sudo mkdir -p \"\$HOME/$REMOTE_DIR/web/templates-https\" \"\$HOME/$REMOTE_DIR/ETL/config\" \"\$HOME/$REMOTE_DIR/ETL/input\" \"\$HOME/$REMOTE_DIR/ETL/output\" \"\$HOME/$REMOTE_DIR/web\" \"\$HOME/$REMOTE_DIR/hk_scripts\""
 ssh "${SSH_OPTS[@]}" "$HOST" "sudo chown -R azureuser:azureuser \"\$HOME/$REMOTE_DIR\""
 
-echo "[3/6] Copying image bundle + runtime files..."
+echo "[3/7] Copying image bundle + runtime files..."
 scp "${SSH_OPTS[@]}" "$RELEASE_TAR" "$HOST:~/$REMOTE_DIR/$RELEASE_TAR"
 if [[ -f "${RELEASE_TAR}.sha256" ]]; then
   scp "${SSH_OPTS[@]}" "${RELEASE_TAR}.sha256" "$HOST:~/$REMOTE_DIR/${RELEASE_TAR}.sha256"
@@ -193,13 +193,16 @@ rsync -a --checksum --no-owner --no-group -e "$RSYNC_SSH_CMD" "scripts/db-cleanu
 rsync -a --checksum --no-owner --no-group -e "$RSYNC_SSH_CMD" "scripts/vm_housekeeping.sh" "$HOST:~/$REMOTE_DIR/hk_scripts/"
 scp "${SSH_OPTS[@]}" "$ENV_FILE" "$HOST:~/$REMOTE_DIR/.env"
 
-echo "[4/6] Loading images on VM..."
+echo "[4/7] Loading images on VM..."
 ssh "${SSH_OPTS[@]}" "$HOST" "cd \"\$HOME/$REMOTE_DIR\" && docker load -i \"$RELEASE_TAR\""
 
-echo "[5/6] Starting stack on VM (mode=$MODE)..."
-ssh "${SSH_OPTS[@]}" "$HOST" "cd \"\$HOME/$REMOTE_DIR\" && if COMPOSE_PROJECT_NAME=\"$PROJECT_NAME\" APP_IMAGE_TAG=\"$TAG\" docker compose $COMPOSE_ARGS ps --status running -q db | grep -q .; then echo 'DB service is running -> updating app services only (api, ssr, web)'; COMPOSE_PROJECT_NAME=\"$PROJECT_NAME\" APP_IMAGE_TAG=\"$TAG\" docker compose $COMPOSE_ARGS up -d --no-deps api ssr web; else echo 'DB missing or stopped -> bringing full stack up'; COMPOSE_PROJECT_NAME=\"$PROJECT_NAME\" APP_IMAGE_TAG=\"$TAG\" docker compose $COMPOSE_ARGS up -d; fi"
+echo "[5/7] Removing leftover MailHog container/image (no longer used)..."
+ssh "${SSH_OPTS[@]}" "$HOST" "docker rm -f \$(docker ps -aq --filter 'name=mailhog') 2>/dev/null; docker rmi -f \$(docker images -q 'mailhog/mailhog') 2>/dev/null; true"
 
-echo "[6/6] Deployment status"
+echo "[6/7] Starting stack on VM (mode=$MODE)..."
+ssh "${SSH_OPTS[@]}" "$HOST" "cd \"\$HOME/$REMOTE_DIR\" && if COMPOSE_PROJECT_NAME=\"$PROJECT_NAME\" APP_IMAGE_TAG=\"$TAG\" docker compose $COMPOSE_ARGS ps --status running -q db | grep -q .; then echo 'DB service is running -> updating app services only (api, ssr, web)'; COMPOSE_PROJECT_NAME=\"$PROJECT_NAME\" APP_IMAGE_TAG=\"$TAG\" docker compose $COMPOSE_ARGS up -d --no-deps --remove-orphans api ssr web; else echo 'DB missing or stopped -> bringing full stack up'; COMPOSE_PROJECT_NAME=\"$PROJECT_NAME\" APP_IMAGE_TAG=\"$TAG\" docker compose $COMPOSE_ARGS up -d --remove-orphans; fi"
+
+echo "[7/7] Deployment status"
 ssh "${SSH_OPTS[@]}" "$HOST" "cd \"\$HOME/$REMOTE_DIR\" && COMPOSE_PROJECT_NAME=\"$PROJECT_NAME\" APP_IMAGE_TAG=\"$TAG\" docker compose $COMPOSE_ARGS ps"
 
 echo

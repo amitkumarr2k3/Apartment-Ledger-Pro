@@ -130,7 +130,7 @@ az containerapp create `
     APP_URL=https://<web-app-fqdn-from-part-7>
 ```
 
-> **Important — SMTP**: `mailhog` (used locally for OTP emails) doesn't exist in production. Use a free-tier real SMTP provider for OTP login emails — e.g. **Brevo (Sendinblue) free tier: 300 emails/day free**, or **Mailjet free tier: 200/day**. Sign up, get SMTP host/port/user/pass, and add `SMTP_HOST`, `SMTP_PORT` as shown, plus check `backend/src/routes/auth.ts` — you may need to add `SMTP_USER`/`SMTP_PASS` auth env vars and a matching code tweak if your provider requires auth (current code has no auth config).
+> **Important — SMTP**: this project sends OTP login emails via Gmail SMTP (default) or Resend (see `backend/src/routes/auth.ts`, `EMAIL_PROVIDER`). For production, set `EMAIL_PROVIDER`, `SMTP_USER`/`SMTP_PASS` (Gmail app password) or `RESEND_API_KEY` in your environment.
 
 Generate a strong `JWT_SECRET`:
 ```powershell

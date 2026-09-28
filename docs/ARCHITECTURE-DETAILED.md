@@ -12,7 +12,7 @@ flowchart LR
     S[ssr container\nNode SSR app]
     A[api container\nFastify + route modules]
     D[(Postgres 16\nSystem of record)]
-    M[Mail Transport\nGmail SMTP / Resend SMTP / MailHog]
+    M[Mail Transport\nGmail SMTP / Resend SMTP]
     E[ETL runtime\nPython transform.py + ETL folders]
 
     U -->|HTTPS/HTTP| W
@@ -34,7 +34,7 @@ flowchart LR
 | API service | backend/src/server.ts + route modules | Auth, RBAC, dashboards, admin CRUD, imports, ETL orchestration, assistant | db, SMTP provider, ETL files |
 | Database | postgres:16-alpine | Persistent data, auth whitelist, OTP hashes, transactions, rollups, audit | volume pgdata |
 | ETL processing | ETL/ + backend/src/etl.ts | Receives uploaded source files, runs Python transform, imports transactions | filesystem + db |
-| OTP mail provider | backend/src/routes/auth.ts | Delivers OTP email through Gmail/Resend/MailHog transport | SMTP credentials or MailHog service |
+| OTP mail provider | backend/src/routes/auth.ts | Delivers OTP email through Gmail/Resend transport | SMTP credentials |
 
 ## 3. Runtime Startup Sequence
 
@@ -130,7 +130,6 @@ Provider is selected by EMAIL_PROVIDER in backend/src/routes/auth.ts:
 
 - gmail: smtp.gmail.com:465 with SMTP_USER + SMTP_PASS.
 - resend: smtp.resend.com:465 with RESEND_API_KEY.
-- mailhog: SMTP_HOST/SMTP_PORT (default host mailhog, port 1025).
 
 ### 6.2 OTP Generation and Storage
 
@@ -161,12 +160,6 @@ sequenceDiagram
     API->>DB: audit login event
     API-->>B: set apf_token cookie + user payload
 ```
-
-### 6.4 MailHog Decision Guidance
-
-- If EMAIL_PROVIDER=gmail with valid SMTP_USER/SMTP_PASS, MailHog is not required for OTP delivery.
-- MailHog remains useful for local testing where you do not want to send real emails.
-- In production or Gmail-only environments, MailHog service can be omitted from Compose variants.
 
 ## 7. Data Architecture
 

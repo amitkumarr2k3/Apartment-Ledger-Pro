@@ -22,17 +22,13 @@ docker build -f web/Dockerfile --target ssr -t "apf-ssr:${TAG}" .
 echo "[3/5] Building web image..."
 docker build -f web/Dockerfile --target web -t "apf-web:${TAG}" .
 
-echo "[4/5] Pulling infra images to include in bundle..."
+echo "[4/4] Pulling infra images and saving bundle..."
 docker pull postgres:16-alpine
-docker pull mailhog/mailhog:latest
-
-echo "[5/5] Saving all images to ${OUT} ..."
 docker save \
   "apf-backend:${TAG}" \
   "apf-ssr:${TAG}" \
   "apf-web:${TAG}" \
   "postgres:16-alpine" \
-  "mailhog/mailhog:latest" \
   -o "${OUT}"
 
 if command -v sha256sum >/dev/null 2>&1; then

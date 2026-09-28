@@ -47,7 +47,7 @@ This builds and packs:
 - backend image
 - ssr image
 - web image
-- postgres and mailhog base images
+- postgres base image
 
 ### 2. Copy bundle + runtime files to VM
 
@@ -112,7 +112,7 @@ make release-vm HOST=azureuser@<VM_IP> KEY=~/.ssh/apf_vm TAG=2026.09.08 MODE=pro
 ### 1. Prerequisites
 
 - Docker Desktop 4.30+ **or** `bun` 1.1+ (for the frontend-only preview).
-- Ports free on the host: `80` (web, configurable via `WEB_PORT`), `8035` (MailHog UI), `1035` (SMTP), `5442` (Postgres), `4010` (API). Container-internal ports (80/8025/1025/5432/4000) are unchanged, so nothing inside the compose network needs reconfiguring.
+- Ports free on the host: `80` (web, configurable via `WEB_PORT`), `5442` (Postgres), `4010` (API). Container-internal ports (80/5432/4000) are unchanged, so nothing inside the compose network needs reconfiguring.
 
 ### 2. Environment variables
 
@@ -125,7 +125,7 @@ cp .env.example .env
 | `DATABASE_URL` | Postgres connection used by API + migrator | `postgres://apf:apf@db:5432/apartment_finance` |
 | `JWT_SECRET` | Signs session tokens issued after OTP verification | dev value — **rotate for prod** |
 | `SUPERADMIN_EMAIL` | Bootstrap admin whitelisted on first migration | `admin@example.com` |
-| `SMTP_HOST` / `SMTP_PORT` | Where OTP emails go (MailHog in dev, container port) | `mailhog` / `1025` |
+| `SMTP_USER` / `SMTP_PASS` | Gmail account used to send OTP emails | none — required |
 | `APP_URL` | Absolute URL used inside OTP emails | `http://localhost` |
 | `WEB_PORT` | Host port mapped to nginx container port 80 | `80` |
 | `NODE_ENV` | Runtime mode for backend safety checks | `development` |
@@ -135,9 +135,8 @@ cp .env.example .env
 ### 3. Boot the full stack (Docker)
 
 ```bash
-make up-local                             # db, api, web, mailhog, migrate, seed, ssr
+make up-local                             # db, api, web, migrate, seed, ssr
 open http://localhost                     # portal (or :WEB_PORT if changed)
-open http://localhost:8035                # MailHog inbox for OTPs
 ```
 
 If your logs show either `Cannot find module '/app/dist/server.js'` or
@@ -198,7 +197,7 @@ When enabled:
 
 1. Open `http://localhost/login` (or `http://localhost:<WEB_PORT>/login`).
 2. Enter a whitelisted email (`admin@example.com`, `treasurer@example.com`, or `resident@example.com`).
-3. Open MailHog at `http://localhost:8035` and copy the 6-digit OTP.
+3. Check the inbox of the whitelisted Gmail address for the 6-digit OTP.
 4. Paste it back → the app stores a JWT in `localStorage` and the route guards let you in.
 5. Residents are blocked from `/admin/*` by the client `RouteGuard` **and** by the API role check.
 
@@ -281,7 +280,7 @@ Interpret the two status codes together:
 
 The same script runs in `.github/workflows/compose-smoke.yml` on every PR
 and push to `main`. When it fails, the workflow uploads `compose-logs/`
-(per-service logs for `api`, `web`, `db`, `migrate`, `mailhog`, plus a
+(per-service logs for `api`, `web`, `db`, `migrate`, plus a
 combined `all-services.log` and `docker compose ps`) as a build artifact
 named `compose-logs-<run-id>-<attempt>`, retained for 14 days.
 
@@ -396,7 +395,7 @@ see the coverage matrix in [`docs/API-REFERENCE.md`](docs/API-REFERENCE.md#cover
 | React frontend (19 routes, unified shell, ⌘K, deep-links) | ✅ |
 | Frontend RouteGuard + role gating | ✅ |
 | Auth feature flag (`src/lib/feature-flags.ts → AUTH_ENABLED`) | ✅ off in prototype |
-| Docker compose (db, api, web, mailhog, migrate) | ✅ |
+| Docker compose (db, api, web, migrate) | ✅ |
 | Vitest tests: RBAC, importer, rollups | ✅ |
 | Playwright responsive regression script | ✅ |
 

@@ -15,11 +15,6 @@ services:
       timeout: 3s
       retries: 20
 
-  mailhog:
-    image: mailhog/mailhog:latest
-    restart: unless-stopped
-    ports: ["1035:1025", "8035:8025"]
-
   migrate:
     build: ./backend
     command: ["sh", "./docker-entrypoint.sh", "migrate"]
@@ -60,7 +55,7 @@ services:
       # commit it directly into this file.
       GEMINI_API_KEY: ${GEMINI_API_KEY}
       # ── Email / OTP ────────────────────────────────────────────────────────
-      # Choose provider: gmail (default), resend, or mailhog
+      # Choose provider: gmail (default) or resend
       EMAIL_PROVIDER: ${EMAIL_PROVIDER:-gmail}
 
       # Gmail SMTP (default)
@@ -76,11 +71,6 @@ services:
       RESEND_API_KEY: ${RESEND_API_KEY}
       #FROM_EMAIL: "onboarding@resend.dev"
       #FROM_EMAIL: "noreply@yourdomain.com"
-
-      # MailHog local dev fallback
-      # Set EMAIL_PROVIDER: mailhog to use local inbox at http://localhost:8035
-      # SMTP_HOST: mailhog
-      # SMTP_PORT: 1025
       # ───────────────────────────────────────────────────────────────────────
       APP_URL: ${APP_URL:-http://localhost}
       SUPERADMIN_EMAIL: ${SUPERADMIN_EMAIL:-admin@example.com}

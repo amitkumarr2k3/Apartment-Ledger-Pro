@@ -49,7 +49,6 @@ Containers:
 | `migrate` | custom | Applies SQL migrations + optional seed on boot |
 | `api` | custom (Node 20 + Fastify) | REST API on `:4000` |
 | `web` | custom (Nginx + built Vite) | Serves static UI, reverse-proxies `/api/*` |
-| `mailhog` | `mailhog/mailhog` | Local SMTP for magic-link OTPs |
 
 ---
 
@@ -61,10 +60,9 @@ Containers:
 cp .env.example .env
 docker compose up -d --build
 open http://localhost:8090
-# MailHog inbox for OTPs: http://localhost:8035
 ```
 
-Superadmin email defaults to `admin@example.com`. Log in → check MailHog → paste OTP.
+Superadmin email defaults to `admin@example.com`. Log in → check the whitelisted Gmail inbox → paste OTP.
 
 ### 3.2 Production hardening (checklist)
 

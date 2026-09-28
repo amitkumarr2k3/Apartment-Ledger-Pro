@@ -1,28 +1,32 @@
 .PHONY: up up-local up-prod up-images down down-local down-prod down-images logs logs-local logs-prod logs-images psql seed test reset smoke csv-samples db-backup db-cleanup api-check image-pack image-load release-vm
 
 up:
-	docker compose up -d --build
+	docker compose up -d --build --remove-orphans
 
 up-local:
-	docker compose -f docker-compose.yml up -d --build
+	docker compose -f docker-compose.yml up -d --build --remove-orphans
 
 up-prod:
-	docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.https.yml up -d --build
+	docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.https.yml up -d --build --remove-orphans
 
 up-images:
-	docker compose -f docker-compose.yml -f docker-compose.images.yml up -d
+	docker compose -f docker-compose.yml -f docker-compose.images.yml up -d --remove-orphans
 
 down:
-	docker compose down
+	docker compose down --remove-orphans
+	@docker rm -f $$(docker ps -aq --filter name=mailhog) 2>/dev/null; docker rmi -f $$(docker images -q mailhog/mailhog) 2>/dev/null; true
 
 down-local:
-	docker compose -f docker-compose.yml down
+	docker compose -f docker-compose.yml down --remove-orphans
+	@docker rm -f $$(docker ps -aq --filter name=mailhog) 2>/dev/null; docker rmi -f $$(docker images -q mailhog/mailhog) 2>/dev/null; true
 
 down-prod:
-	docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.https.yml down
+	docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.https.yml down --remove-orphans
+	@docker rm -f $$(docker ps -aq --filter name=mailhog) 2>/dev/null; docker rmi -f $$(docker images -q mailhog/mailhog) 2>/dev/null; true
 
 down-images:
-	docker compose -f docker-compose.yml -f docker-compose.images.yml down
+	docker compose -f docker-compose.yml -f docker-compose.images.yml down --remove-orphans
+	@docker rm -f $$(docker ps -aq --filter name=mailhog) 2>/dev/null; docker rmi -f $$(docker images -q mailhog/mailhog) 2>/dev/null; true
 
 logs:
 	docker compose logs -f api
@@ -46,8 +50,9 @@ test:
 	docker compose -f docker-compose.yml -f docker-compose.test.yml run --rm test
 
 reset:
-	docker compose down -v
-	docker compose up -d --build
+	docker compose down -v --remove-orphans
+	@docker rm -f $$(docker ps -aq --filter name=mailhog) 2>/dev/null; docker rmi -f $$(docker images -q mailhog/mailhog) 2>/dev/null; true
+	docker compose up -d --build --remove-orphans
 
 smoke:
 	./scripts/smoke-test.sh
