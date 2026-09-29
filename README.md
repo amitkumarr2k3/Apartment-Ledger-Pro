@@ -3,6 +3,10 @@
 Self-hosted, Docker-based portal for apartment communities.
 Postgres system of record, Fastify API, React/TanStack frontend, seeded demo data.
 
+## License
+
+Code in this repository, to the extent its copyright holders can license it, is available under the [PolyForm Noncommercial License 1.0.0](LICENSE). Non-commercial use, modification, and redistribution are permitted under its terms; commercial use requires separate written permission from the relevant copyright holders. Contact the repository owner through GitHub about commercial licensing. Third-party dependencies and materials retain their own licenses and rights.
+
 - **Two personas** — Resident (read-only dashboards) and Admin (dashboards + controls).
 - **Admin controls** are separated from admin dashboards: analytics live under _Admin · Dashboards_, administrative CRUD/audit under _Admin · Controls_.
 - **Auth is OTP-based** (no magic links). Only whitelisted emails receive a 6-digit code.
