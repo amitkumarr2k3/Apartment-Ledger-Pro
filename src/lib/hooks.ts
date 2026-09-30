@@ -4,7 +4,6 @@
 // In authenticated mode they must not mask DB cleanup/API errors with mock data.
 import { useQuery } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
-import { getSession } from "@/lib/session";
 import * as mock from "@/lib/finance-mock";
 import * as api from "@/lib/api";
 
@@ -85,20 +84,9 @@ export function useWidgetVisibility(dashboardKey: string) {
   useEffect(() => { setMounted(true); }, []);
   const { data: settings = [] } = useDashboardSettings();
 
-  // FIX (2026-08-15): Dashboard Controls restrictions apply ONLY to actual
-  // residents. Admins/superadmins always see the full dashboard regardless
-  // of what's hidden for residents -- by design decision, since limiting an
-  // admin's own visibility into their own community's data serves no real
-  // purpose, and "Preview as resident" is meant for checking layout/UX, not
-  // for literally hiding data from an admin viewing their own session.
-  // getSession() safely returns null during SSR/before mount (matching the
-  // `mounted` guard above), so this doesn't reintroduce a hydration risk.
-  const session = mounted ? getSession() : null;
-  const isAdminOrAbove = session?.role === "admin" || session?.role === "superadmin";
-
   const row = settings.find((s) => s.dashboard_key === dashboardKey);
-  const dashboardEnabled = !mounted || isAdminOrAbove ? true : (row?.enabled ?? true);
-  const hiddenWidgets = !mounted || isAdminOrAbove ? [] : (row?.hidden_widgets ?? []);
+  const dashboardEnabled = !mounted ? true : (row?.enabled ?? true);
+  const hiddenWidgets = !mounted ? [] : (row?.hidden_widgets ?? []);
   const isWidgetVisible = (widgetId: string) => dashboardEnabled && !hiddenWidgets.includes(widgetId);
   return { dashboardEnabled, hiddenWidgets, isWidgetVisible };
 }

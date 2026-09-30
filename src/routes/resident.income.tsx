@@ -5,7 +5,7 @@ import { Link } from "@tanstack/react-router";
 import { Bar, BarChart, CartesianGrid, Cell, ComposedChart, LabelList, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend } from "recharts";
 import { SmartTooltipContent, getTooltipTrigger } from "@/components/smart-tooltip";
 import { inr, categoryMonthly, total, sumMonthly } from "@/lib/finance-mock";
-import { useIncomeTree, useMonthlyTotals } from "@/lib/hooks";
+import { useIncomeTree, useMonthlyTotals, useWidgetVisibility } from "@/lib/hooks";
 import { filterReportableIncomeCategories, isMaintenanceOutstandingCategory } from "@/lib/income-utils";
 
 export const Route = createFileRoute("/resident/income")({
@@ -24,6 +24,7 @@ function Page() {
 }
 
 function Inner() {
+  const { isWidgetVisible } = useWidgetVisibility("resident.income");
   const { data: incomeTree = [] } = useIncomeTree();
   const { data: monthlyTotals = [] } = useMonthlyTotals();
   const { sliceMonthly, labels, view } = usePeriod();
@@ -110,7 +111,7 @@ function Inner() {
     <>
       <div className="grid gap-4 lg:grid-cols-3 items-start">
         {/* income sources */}
-        <Card className="lg:col-span-2">
+        {isWidgetVisible("income.sourcesBreakdown") && <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle className="text-base">Income sources</CardTitle>
             <CardDescription>Maintenance separated out, remaining income sorted by contribution</CardDescription>
@@ -150,10 +151,10 @@ function Inner() {
               </>
             )}
           </CardContent>
-        </Card>
+        </Card>}
 
         {/* expense / income */}
-        <Card>
+        {isWidgetVisible("income.expenseRatio") && <Card>
           <CardHeader>
             <CardTitle className="text-base">Expense / Income</CardTitle>
             <CardDescription>Same calculation as overview</CardDescription>
@@ -169,7 +170,7 @@ function Inner() {
               <div className="flex justify-between border-t border-border pt-1 mt-1"><span>{totalIncome >= totalExpense ? "Surplus" : "Deficit"}</span><span className="font-mono">{inr(Math.abs(totalIncome - totalExpense))}</span></div>
             </div>
           </CardContent>
-        </Card>
+        </Card>}
       </div>
 
       {/* split into two focused, side-by-side charts instead of one
@@ -178,13 +179,13 @@ function Inner() {
           which also structurally prevents the currency/percentage tooltip
           mixing bug from ever resurfacing here -- there's no rupee series
           left in the same chart for a shared formatter to get confused by. */}
-      <Card>
+      {(isWidgetVisible("income.collectedVsUnpaid") || isWidgetVisible("income.recoveryRateTrend")) && <Card>
         <CardHeader>
           <CardTitle className="text-base">Maintenance collection vs outstanding</CardTitle>
           <CardDescription>Shows recovery, arrears, and the unpaid maintenance gap for the selected period</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid gap-3 md:grid-cols-4">
+          {isWidgetVisible("income.collectedVsUnpaid") && <div className="grid gap-3 md:grid-cols-4">
             <div className="rounded-md border border-border p-3">
               <div className="text-xs text-muted-foreground uppercase tracking-wider">Collected maintenance</div>
               <div className="text-xl font-mono">{inr(totalMaintenanceCollected)}</div>
@@ -201,12 +202,12 @@ function Inner() {
               <div className="text-xs text-muted-foreground uppercase tracking-wider">Months with dues</div>
               <div className="text-xl font-mono">{arrearsMonths}</div>
             </div>
-          </div>
+          </div>}
 
           {view === "chart" ? (
             <div className="grid gap-4 lg:grid-cols-2">
               {/* Left: pure rupee comparison -- collected vs unpaid vs target, one axis, 3 legends */}
-              <div>
+              {isWidgetVisible("income.collectedVsUnpaid") && <div>
                 <div className="text-sm font-medium mb-1">Collected vs Outstanding Receivables</div>
                 <div className="text-xs text-muted-foreground mb-2">Are we hitting the per-sqft target, and how big is the unpaid gap?</div>
                 <ResponsiveContainer width="100%" height={260}>
@@ -221,13 +222,13 @@ function Inner() {
                     <Line type="monotone" dataKey="expectedCollection" name="Expected Collection" stroke="var(--color-chart-4, #a855f7)" strokeWidth={2} strokeDasharray="4 2" dot={false} />
                   </ComposedChart>
                 </ResponsiveContainer>
-              </div>
+              </div>}
 
               {/* Right: recovery % ALONE on its own 0-100% axis -- no currency
                   series sharing this chart, so there's nothing for a tooltip
                   formatter to mix up. A reference line at 90% gives an
                   at-a-glance "healthy" benchmark instead of just a bare line. */}
-              <div>
+              {isWidgetVisible("income.recoveryRateTrend") && <div>
                 <div className="text-sm font-medium mb-1">Recovery rate trend</div>
                 <div className="text-xs text-muted-foreground mb-2">Month-by-month collection efficiency, vs. the 90% healthy benchmark</div>
                 <ResponsiveContainer width="100%" height={260}>
@@ -240,35 +241,31 @@ function Inner() {
                     <Line type="monotone" dataKey="recoveryPct" name="Recovery Rate" stroke="var(--color-chart-2)" strokeWidth={2} dot={false} />
                   </LineChart>
                 </ResponsiveContainer>
-              </div>
+              </div>}
             </div>
           ) : (
             <div className="space-y-3">
-              <div className="rounded-md border border-border overflow-hidden">
+              {(isWidgetVisible("income.collectedVsUnpaid") || isWidgetVisible("income.recoveryRateTrend")) && <div className="rounded-md border border-border overflow-hidden">
                 <table className="w-full text-sm">
                   <thead className="bg-muted/40">
                     <tr>
                       <th className="text-left p-2">Month</th>
-                      <th className="text-right p-2">Collected Maintenance</th>
-                      <th className="text-right p-2">Expected Collection</th>
-                      <th className="text-right p-2">Outstanding Receivables</th>
-                      <th className="text-right p-2">Recovery Rate</th>
+                      {isWidgetVisible("income.collectedVsUnpaid") && <><th className="text-right p-2">Collected Maintenance</th><th className="text-right p-2">Expected Collection</th><th className="text-right p-2">Outstanding Receivables</th></>}
+                      {isWidgetVisible("income.recoveryRateTrend") && <th className="text-right p-2">Recovery Rate</th>}
                     </tr>
                   </thead>
                   <tbody>
                     {monthlyMaintenanceData.map((m) => (
                       <tr key={m.month} className="border-t border-border">
                         <td className="p-2">{m.month}</td>
-                        <td className="p-2 text-right font-mono">{inr(m.collected)}</td>
-                        <td className="p-2 text-right font-mono">{inr(m.expectedCollection)}</td>
-                        <td className="p-2 text-right font-mono">{inr(m.outstanding)}</td>
-                        <td className="p-2 text-right font-mono">{m.recoveryPct.toFixed(1)}%</td>
+                        {isWidgetVisible("income.collectedVsUnpaid") && <><td className="p-2 text-right font-mono">{inr(m.collected)}</td><td className="p-2 text-right font-mono">{inr(m.expectedCollection)}</td><td className="p-2 text-right font-mono">{inr(m.outstanding)}</td></>}
+                        {isWidgetVisible("income.recoveryRateTrend") && <td className="p-2 text-right font-mono">{m.recoveryPct.toFixed(1)}%</td>}
                       </tr>
                     ))}
                   </tbody>
                 </table>
-              </div>
-              <div className="grid gap-3 md:grid-cols-2">
+              </div>}
+              {isWidgetVisible("income.recoveryRateTrend") && <div className="grid gap-3 md:grid-cols-2">
                 <div className="rounded-md border border-border p-3 bg-muted/20">
                   <div className="text-xs uppercase tracking-wider text-muted-foreground">Insight</div>
                   <div className="mt-1 text-sm">
@@ -281,11 +278,11 @@ function Inner() {
                     A rising red bar with a falling recovery line indicates collection slippage and helps identify the months needing follow-up.
                   </div>
                 </div>
-              </div>
+              </div>}
             </div>
           )}
         </CardContent>
-      </Card>
+      </Card>}
     </>
   );
 }

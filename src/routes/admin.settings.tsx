@@ -44,10 +44,15 @@ const DASHBOARD_DEFS: DashboardDef[] = [
     key: "resident.overview",
     label: "Resident \u00B7 Overview",
     widgets: [
+      { id: "overview.summaryHeadline", label: "Summary: At a glance" },
+      { id: "overview.summaryNet", label: "Summary: Net position" },
+      { id: "overview.summaryCollection", label: "Summary: Collection progress" },
+      { id: "overview.summaryIncomeExpense", label: "Summary: Income vs expense" },
+      { id: "overview.summaryReserves", label: "Summary: Reserves and bank balance" },
       { id: "overview.auditedReport", label: "Audited Report (superadmin uploads; residents/admin view only)" },
       { id: "overview.collectionHealth", label: "Collection Health (Expected Collection, Collected Maintenance, Outstanding Dues, Other Income)" },
-      { id: "overview.financialPosition", label: "Society Financial Position (Total Income/Expense, Net Surplus, Recovery Rate)" },
-      { id: "overview.financialStrength", label: "Long-Term Financial Strength (Corpus, Contingency Cash, Bank Balance, Expense/Income Ratio)" },
+      { id: "overview.financialPosition", label: "Society Financial Position (Opening Balance, Expected/Received Income, Expense, Net Surplus)" },
+      { id: "overview.financialStrength", label: "Long-Term Financial Strength (Corpus, Contingency Cash, Bank Balance, Maintenance Rate Trend)" },
       { id: "overview.top5Expenses", label: "Top 5 expense categories" },
       { id: "overview.top5Income", label: "Top 5 income sources (excluding maintenance)" },
       { id: "overview.top5Vendors", label: "Top 5 vendors by expense" },
@@ -59,7 +64,6 @@ const DASHBOARD_DEFS: DashboardDef[] = [
     widgets: [
       { id: "cashflow.summaryCards", label: "Expense/Income, Surplus months, Deficit months summary" },
       { id: "cashflow.performanceVsTarget", label: "Collection performance vs target + Best/worst month" },
-      { id: "cashflow.maintenanceRateTrend", label: "Maintenance rate trend (per-sqft rate sparkline for the selected range)" },
       { id: "cashflow.monthlyTrendChart", label: "Monthly trend chart (total income, expense & outstanding dues -- NOT maintenance-specific, see Income Visibility for that)" },
     ],
   },
@@ -247,7 +251,7 @@ function Page() {
                               <div className="font-medium">{w.label}</div>
                               <div className="text-[11px] font-mono text-muted-foreground">{w.id}</div>
                             </div>
-                            <Switch checked={shown} onCheckedChange={() => toggleWidget(def.key, w.id)} disabled={!row.enabled} />
+                            <Switch checked={row.enabled && shown} onCheckedChange={() => toggleWidget(def.key, w.id)} disabled={!row.enabled} />
                           </li>
                         );
                       })}

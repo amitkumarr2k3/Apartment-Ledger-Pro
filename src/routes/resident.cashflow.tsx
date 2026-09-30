@@ -5,7 +5,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { SmartTooltipContent, getTooltipTrigger } from "@/components/smart-tooltip";
 import { inr, categoryMonthly } from "@/lib/finance-mock";
-import { useMonthlyTotals, useIncomeTree } from "@/lib/hooks";
+import { useMonthlyTotals, useIncomeTree, useWidgetVisibility } from "@/lib/hooks";
 import { Info, TrendingDown, TrendingUp, Award, AlertOctagon } from "lucide-react";
 
 export const Route = createFileRoute("/resident/cashflow")({
@@ -25,6 +25,7 @@ const TOTAL_SQFT = 701591;
 
 function Inner() {
   const { sliceMonthly, view, labels = [] } = usePeriod();
+  const { isWidgetVisible } = useWidgetVisibility("resident.cashflow");
   const { data: monthlyTotals = [] } = useMonthlyTotals();
   const { data: incomeTree = [] } = useIncomeTree();
   const safeIncomeTree = incomeTree || [];
@@ -178,7 +179,7 @@ function Inner() {
         <AlertDescription>Aggregate community-level view only. No individual flat-wise tracking.</AlertDescription>
       </Alert>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      {isWidgetVisible("cashflow.summaryCards") && <div className="grid gap-4 md:grid-cols-3">
         {/* expense / income */}
         <Card>
           <CardHeader className="pb-2">
@@ -211,13 +212,13 @@ function Inner() {
             <p className="text-xs text-muted-foreground">months where expense exceeded collection</p>
           </CardContent>
         </Card>
-      </div>
+      </div>}
 
       {/* NEW INSIGHTS: Expected-vs-Actual variance + best/worst month callouts.
           Per Sqft Rate trend moved to Overview's Long-Term Financial
           Strength section (replacing the old Expense/Income Ratio card),
           so it isn't duplicated across two dashboards anymore. */}
-      <div className="grid gap-4 md:grid-cols-2">
+      {isWidgetVisible("cashflow.performanceVsTarget") && <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader className="pb-2">
             <CardDescription className="text-xs uppercase tracking-wider">Collection performance vs target</CardDescription>
@@ -250,7 +251,7 @@ function Inner() {
             )}
           </CardContent>
         </Card>
-      </div>
+      </div>}
 
       {/* redesigned to eliminate cross-page duplication. The previous
           version re-plotted "Actual/Expected Collection" here too, which is
@@ -262,7 +263,7 @@ function Inner() {
           duplicates Income Visibility's maintenance-collection detail.
           Per Sqft Rate moved to a compact stat card above (a rate that
           barely moves month to month doesn't need its own chart+axis). */}
-      <Card>
+      {isWidgetVisible("cashflow.monthlyTrendChart") && <Card>
         <CardHeader>
           <CardTitle className="text-base">Monthly trend · total income, expense &amp; outstanding dues</CardTitle>
           <CardDescription>Total income here includes ALL income sources, not maintenance alone -- see Income Visibility for the maintenance-specific breakdown</CardDescription>
@@ -306,7 +307,7 @@ function Inner() {
             </div>
           )}
         </CardContent>
-      </Card>
+      </Card>}
     </>
 
   );

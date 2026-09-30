@@ -382,21 +382,27 @@ function Inner() {
   // Shared scale for the Income vs Expense comparison bars in the Summary
   // tab, so both bars are visually proportionate to each other.
   const maxIncomeExpense = Math.max(totalIncome, totalExpense, 1);
+  const firstVisibleTab = [
+    { value: "summary", widgets: ["overview.summaryHeadline", "overview.summaryNet", "overview.summaryCollection", "overview.summaryIncomeExpense", "overview.summaryReserves"] },
+    { value: "collections", widgets: ["overview.collectionHealth", "overview.financialPosition", "overview.top5Income", "overview.top5Expenses", "overview.top5Vendors"] },
+    { value: "reserves", widgets: ["overview.financialStrength"] },
+    { value: "documents", widgets: ["overview.auditedReport"] },
+  ].find((tab) => tab.widgets.some(isWidgetVisible))?.value ?? "summary";
 
   return (
     <div className="space-y-4">
-      <Tabs defaultValue="summary" className="w-full">
+      <Tabs key={firstVisibleTab} defaultValue={firstVisibleTab} className="w-full">
         <TabsList className="flex-wrap h-auto">
-          <TabsTrigger value="summary" className="gap-1.5"><Home className="h-4 w-4" />Summary</TabsTrigger>
-          <TabsTrigger value="collections" className="gap-1.5"><Wallet className="h-4 w-4" />Collections &amp; Spending</TabsTrigger>
-          <TabsTrigger value="reserves" className="gap-1.5"><ShieldCheck className="h-4 w-4" />Reserves &amp; Long-term</TabsTrigger>
-          <TabsTrigger value="documents" className="gap-1.5"><FileCheck2 className="h-4 w-4" />Audited Report</TabsTrigger>
+          {["overview.summaryHeadline", "overview.summaryNet", "overview.summaryCollection", "overview.summaryIncomeExpense", "overview.summaryReserves"].some(isWidgetVisible) && <TabsTrigger value="summary" className="gap-1.5"><Home className="h-4 w-4" />Summary</TabsTrigger>}
+          {["overview.collectionHealth", "overview.financialPosition", "overview.top5Income", "overview.top5Expenses", "overview.top5Vendors"].some(isWidgetVisible) && <TabsTrigger value="collections" className="gap-1.5"><Wallet className="h-4 w-4" />Collections &amp; Spending</TabsTrigger>}
+          {isWidgetVisible("overview.financialStrength") && <TabsTrigger value="reserves" className="gap-1.5"><ShieldCheck className="h-4 w-4" />Reserves &amp; Long-term</TabsTrigger>}
+          {isWidgetVisible("overview.auditedReport") && <TabsTrigger value="documents" className="gap-1.5"><FileCheck2 className="h-4 w-4" />Audited Report</TabsTrigger>}
         </TabsList>
 
       <TabsContent value="summary" className="space-y-4 mt-4">
         {/* Plain-English headline -- readable in 5 seconds, no scanning
             required. */}
-        <div className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm">
+        {isWidgetVisible("overview.summaryHeadline") && <div className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm">
           <div className="flex items-center gap-2 mb-3">
             <div className={`h-2.5 w-2.5 rounded-full ${netSurplus >= 0 ? "bg-emerald-500" : "bg-red-500"}`} />
             <span className="text-xs font-bold uppercase tracking-wider text-slate-500">At a glance &middot; {periodLabel}</span>
@@ -404,13 +410,13 @@ function Inner() {
           <p className="text-base sm:text-lg text-slate-800 leading-relaxed">
             {atAGlanceSummary}
           </p>
-        </div>
+        </div>}
 
         {/* Three compact visuals instead of ~9 flat number tiles -- every
             number below is still shown, just as a label on a bar/hero
             stat instead of a standalone card. */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="rounded-xl border border-slate-200 bg-white p-5 flex flex-col items-center justify-center text-center">
+          {isWidgetVisible("overview.summaryNet") && <div className="rounded-xl border border-slate-200 bg-white p-5 flex flex-col items-center justify-center text-center">
             <HeroStat
               label="Net Position"
               value={inr(Math.abs(netSurplus))}
@@ -419,9 +425,9 @@ function Inner() {
               icon={netSurplus >= 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
               hero
             />
-          </div>
+          </div>}
 
-          <div className="rounded-xl border border-slate-200 bg-white p-5">
+          {isWidgetVisible("overview.summaryCollection") && <div className="rounded-xl border border-slate-200 bg-white p-5">
             <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-3">Collection Progress</div>
             <ProgressBar
               label="Maintenance collected"
@@ -433,20 +439,20 @@ function Inner() {
             <div className="text-[11px] text-amber-600 font-medium mt-3">
               {inr(cumulativeOutstandingDue)} outstanding from residents (all-time)
             </div>
-          </div>
+          </div>}
 
-          <div className="rounded-xl border border-slate-200 bg-white p-5">
+          {isWidgetVisible("overview.summaryIncomeExpense") && <div className="rounded-xl border border-slate-200 bg-white p-5">
             <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-3">Income vs Expense &middot; {periodLabel}</div>
             <ComparisonBar label="Received" value={totalIncome} max={maxIncomeExpense} tone="emerald" />
             <ComparisonBar label="Expense" value={totalExpense} max={maxIncomeExpense} tone="rose" />
-          </div>
+          </div>}
         </div>
 
         {/* Reserves at a glance -- same composition-bar language already
             used on the Bank Balance card in the Reserves tab, just
             surfaced here too since "do we have money saved up" is a
             top-of-mind question for most residents. */}
-        <div className="rounded-xl border border-slate-200 bg-white p-5">
+        {isWidgetVisible("overview.summaryReserves") && <div className="rounded-xl border border-slate-200 bg-white p-5">
           <div className="flex items-center justify-between mb-3">
             <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Reserves &middot; Bank Balance</div>
             <div className="text-sm font-bold text-slate-900">{inr(bankBalance)}</div>
@@ -460,7 +466,7 @@ function Inner() {
             <span>Corpus (accumulated) <span className="font-medium text-orange-600">{corpusValue}</span></span>
             <span><span className="text-yellow-600 font-medium">Unrestricted</span> {inr(unrestrictedCash)} &#9679;</span>
           </div>
-        </div>
+        </div>}
       </TabsContent>
 
       <TabsContent value="collections" className="space-y-4 mt-4">

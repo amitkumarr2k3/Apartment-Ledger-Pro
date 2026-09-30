@@ -2,6 +2,7 @@ import { Link, useRouterState, useNavigate, useSearch } from "@tanstack/react-ro
 import { createContext, useContext, useEffect, useMemo, useState, useRef, type ReactNode } from "react";
 import { navSections, monthlyTotals, months12, inr, expenseTree, incomeTree } from "@/lib/finance-mock";
 import { getSession, signOut, type Session } from "@/lib/session";
+import { useDashboardSettings } from "@/lib/hooks";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -498,7 +499,7 @@ function SidebarNav({
 
 
 // ⌘K palette — jump to any screen, head, category, or vendor
-function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
+function CommandPalette({ open, onOpenChange, sections }: { open: boolean; onOpenChange: (v: boolean) => void; sections: typeof navSections }) {
   const navigate = useNavigate();
   const go = (opts: Parameters<typeof navigate>[0]) => {
     onOpenChange(false);
@@ -509,7 +510,7 @@ function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenChange: (
       <CommandInput placeholder="Jump to a screen, head, category, or vendor…" />
       <CommandList>
         <CommandEmpty>No matches.</CommandEmpty>
-        {navSections.map((s) => (
+        {sections.map((s) => (
           <CommandGroup key={s.label} heading={s.label}>
             {s.items.map((it) => (
               <CommandItem
@@ -673,9 +674,14 @@ export function PortalShell({
   // *dashboards* still work for plain admins.
   const isSuperAdmin = session?.role === "superadmin";
   const isAdmin = session?.role === "admin" || isSuperAdmin;
-  const visibleNavSections = isAdmin
+  const { data: dashboardSettings, isPending: settingsPending } = useDashboardSettings();
+  const availableNavSections = isAdmin
     ? navSections.filter((s) => s.group !== "controls" || isSuperAdmin)
     : navSections.filter((s) => s.tone === "resident");
+  const visibleNavSections = availableNavSections.map((section) => section.tone === "resident"
+    ? { ...section, items: section.items.filter((item) =>
+      dashboardSettings?.find((row) => row.dashboard_key === item.to.slice(1).replace("/", "."))?.enabled !== false) }
+    : section);
 
   const currentViewLabel = navSections.flatMap((s) => s.items).find((it) => it.to === pathname)?.label ?? title;
 
@@ -685,14 +691,20 @@ export function PortalShell({
     ? "border-cyan-500 text-cyan-700 dark:text-cyan-400"
     : "border-violet-500 text-violet-700 dark:text-violet-400";
 
-  const residentFirst = navSections.find((s) => s.tone === "resident")?.items[0]?.to ?? "/";
+  const residentFirst = visibleNavSections.find((s) => s.tone === "resident")?.items[0]?.to;
   const adminFirst = navSections.find((s) => s.tone === "admin")?.items[0]?.to ?? "/";
+  const unavailableResidentPage = persona === "resident" && !settingsPending &&
+    !visibleNavSections.some((section) => section.tone === "resident" && section.items.some((item) => item.to === pathname));
+  useEffect(() => {
+    if (unavailableResidentPage && residentFirst) navigate({ to: residentFirst, replace: true });
+  }, [unavailableResidentPage, residentFirst, navigate]);
   const switchPersona = (next: "resident" | "admin") => {
     if (next === persona) return;
     if (next === "admin" && !isAdmin) return; // guard: residents cannot become admin
     const currentIdx = personaItems.findIndex((it) => it.to === pathname);
-    const otherItems = navSections.filter((s) => s.tone === next).flatMap((s) => s.items);
+    const otherItems = visibleNavSections.filter((s) => s.tone === next).flatMap((s) => s.items);
     const target = otherItems[currentIdx]?.to ?? (next === "resident" ? residentFirst : adminFirst);
+    if (!target) return;
     navigate({ to: target as string, search: ((prev: any) => ({ period: prev.period, view: prev.view })) as any });
   };
 
@@ -704,7 +716,7 @@ export function PortalShell({
   return (
     <Ctx.Provider value={periodCtx}>
     <TooltipProvider delayDuration={200}>
-    <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
+    <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} sections={visibleNavSections} />
     <div className="min-h-screen bg-background text-foreground">
       <aside className="hidden lg:flex lg:flex-col fixed inset-y-0 left-0 w-64 border-r border-border bg-card overflow-y-auto no-print">
         <SidebarNav pathname={pathname} persona={persona} switchPersona={switchPersona} session={session} visibleSections={visibleNavSections} />
@@ -904,7 +916,9 @@ export function PortalShell({
             {reqIds && <p className="text-sm text-muted-foreground font-mono">{reqIds} · {periodCtx.label}</p>}
           </div>
         )}
-        <div className="p-4 sm:p-6 xl:p-8 space-y-6 w-full max-w-[1680px] mx-auto">{children}</div>
+        <div className="p-4 sm:p-6 xl:p-8 space-y-6 w-full max-w-[1680px] mx-auto">
+          {persona === "resident" && settingsPending ? "Loading dashboards..." : unavailableResidentPage ? "No resident dashboards are available." : children}
+        </div>
       </main>
     </div>
 
