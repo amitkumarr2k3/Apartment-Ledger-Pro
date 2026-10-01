@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { PortalShell } from "@/components/portal-shell";
+import { useStoredAuth } from "@/lib/hooks";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -41,7 +42,7 @@ function Page() {
   const queryClient = useQueryClient();
   const [uploadedFiles, setUploadedFiles] = useState<{ file: File; kind: string }[]>([]);
   const [isUploading, setIsUploading] = useState(false);
-  const hasToken = typeof window !== "undefined" && !!window.localStorage.getItem("apf.session");
+  const hasToken = useStoredAuth();
 
   // Fetch ETL sessions — disabled during SSR (no localStorage on server)
   const { data: sessionsData, isLoading: isLoadingSessions } = useQuery({

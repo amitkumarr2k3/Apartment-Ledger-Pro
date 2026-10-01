@@ -3,7 +3,7 @@
 // API hooks normalise backend rows into the shapes the prototype screens use.
 // In authenticated mode they must not mask DB cleanup/API errors with mock data.
 import { useQuery } from "@tanstack/react-query";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useSyncExternalStore } from "react";
 import * as mock from "@/lib/finance-mock";
 import * as api from "@/lib/api";
 
@@ -20,9 +20,10 @@ export type DashboardSettingRow = {
 };
 
 export function useDashboardSettings() {
+  const authed = useStoredAuth();
   return useQuery({
     queryKey: ["dashboard-settings", authCacheKey()],
-    enabled: hasStoredAuth(),
+    enabled: authed,
     queryFn: async (): Promise<DashboardSettingRow[]> => {
       try {
         const r = await fetch("/api/admin/settings/dashboards", authHeaders());
@@ -102,9 +103,10 @@ export type AuditedReport = {
 };
 
 export function useAuditedReports() {
+  const authed = useStoredAuth();
   return useQuery({
     queryKey: ["audited-reports", authCacheKey()],
-    enabled: hasStoredAuth(),
+    enabled: authed,
     queryFn: async (): Promise<AuditedReport[]> => {
       try {
         const r = await fetch("/api/reports", authHeaders());
@@ -174,8 +176,10 @@ export async function fetchAuditedReportFileUrl(id: string): Promise<string | nu
 
 // ---- vendor ranking ----
 export function useVendorRanking() {
+  const authed = useStoredAuth();
   return useQuery({
     queryKey: ["vendor-ranking", authCacheKey()],
+    enabled: authed,
     queryFn: async () => {
       const rows: any[] = await api.getVendorRanking();
       if (!Array.isArray(rows)) return [];
@@ -242,11 +246,26 @@ function hasStoredAuth(): boolean {
     && !!window.localStorage.getItem("apf.session");
 }
 
+function subscribeToSession(onChange: () => void) {
+  window.addEventListener("apf-session-change", onChange);
+  window.addEventListener("storage", onChange);
+  return () => {
+    window.removeEventListener("apf-session-change", onChange);
+    window.removeEventListener("storage", onChange);
+  };
+}
+
+// False during SSR and hydration, so queries start after hydration and never cause a markup mismatch.
+export function useStoredAuth(): boolean {
+  return useSyncExternalStore(subscribeToSession, hasStoredAuth, () => false);
+}
+
 // ---- resident.overview ----
 export function useMonthlyTotals() {
+  const authed = useStoredAuth();
   return useQuery({
     queryKey: ["monthly-totals", authCacheKey()],
-    enabled: hasStoredAuth(),
+    enabled: authed,
     queryFn: async () => {
       const raw = await api.getMonthlyTotals();
       if (looksLikeBackendMonthly(raw as any[])) {
@@ -264,9 +283,10 @@ export function useMonthlyTotals() {
 }
 
 export function useBalanceStrip() {
+  const authed = useStoredAuth();
   return useQuery({
     queryKey: ["balance-strip", authCacheKey()],
-    enabled: hasStoredAuth(),
+    enabled: authed,
     queryFn: async () => {
       const r: any = await api.getBalanceStrip();
       if (r && "opening" in r && "closing" in r) {
@@ -287,9 +307,10 @@ export function useBalanceStrip() {
 }
 
 export function useIncomeCategoryTotals() {
+  const authed = useStoredAuth();
   return useQuery({
     queryKey: ["income-cat-totals", authCacheKey()],
-    enabled: hasStoredAuth(),
+    enabled: authed,
     queryFn: async () => {
       const r: any[] = await api.getIncomeCategoryTotals();
       if (hasPaiseTotal(r)) {
@@ -302,9 +323,10 @@ export function useIncomeCategoryTotals() {
 }
 
 export function useExpenseCategoryTotals() {
+  const authed = useStoredAuth();
   return useQuery({
     queryKey: ["expense-cat-totals", authCacheKey()],
-    enabled: hasStoredAuth(),
+    enabled: authed,
     queryFn: async () => {
       const r: any[] = await api.getExpenseCategoryTotals();
       if (hasPaiseTotal(r)) {
@@ -320,9 +342,10 @@ export function useExpenseCategoryTotals() {
 // Backend /income/tree returns flat rows {category, vendor, line_item, month, amount(paise)}.
 // We re-nest into the mock's Category[] shape so admin.income can stay the same.
 export function useIncomeTree() {
+  const authed = useStoredAuth();
   return useQuery({
     queryKey: ["income-tree", authCacheKey()],
-    enabled: hasStoredAuth(),
+    enabled: authed,
     queryFn: async () => {
       try {
         const r = await fetch("/api/income/tree", authHeaders());
@@ -341,9 +364,10 @@ export function useIncomeTree() {
 // Same shape as useIncomeTree but for expenses. Backend /expenses/tree
 // returns the same flat row shape (adds `head` column we ignore).
 export function useExpenseTree() {
+  const authed = useStoredAuth();
   return useQuery({
     queryKey: ["expense-tree", authCacheKey()],
-    enabled: hasStoredAuth(),
+    enabled: authed,
     queryFn: async () => {
       try {
         const r = await fetch("/api/expenses/tree", authHeaders());
@@ -372,9 +396,10 @@ export type AdminTxnRow = mock.TxnRow & {
 
 // ---- admin.transactions ----
 export function useAdminTransactions() {
+  const authed = useStoredAuth();
   return useQuery({
     queryKey: ["admin-transactions", authCacheKey()],
-    enabled: hasStoredAuth(),
+    enabled: authed,
     queryFn: async (): Promise<AdminTxnRow[]> => {
       try {
         // FIX (2026-08-15): confirmed against backend/src/routes/admin.transactions.ts:

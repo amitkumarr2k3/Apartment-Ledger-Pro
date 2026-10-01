@@ -111,6 +111,21 @@ make release-vm HOST=azureuser@<VM_IP> KEY=~/.ssh/apf_vm TAG=2026.09.08 MODE=pro
 `MODE=local` uses only `docker-compose.yml` + `docker-compose.images.yml`.
 `MODE=prod` additionally includes `docker-compose.prod.yml` + `docker-compose.https.yml`.
 
+## Automated tests
+
+Run everything before pushing (CI runs the same on every push/PR):
+
+```bash
+npm test            # all three suites below
+npm run test:unit   # fast logic + dashboard-controls contract tests (src/**/*.test.ts)
+npm run test:api    # backend routes, auth and RBAC with an in-memory DB stand-in (backend/test)
+npm run test:e2e    # browser tests against the production build with mocked API (e2e/)
+```
+
+- First-time setup for browser tests: `npx playwright install chromium`.
+- On failure, open the report with `npx playwright show-report` (screenshots and traces included).
+- New pages added to the navigation are smoke-tested automatically; new dashboard widgets must be listed in `src/routes/admin.settings.tsx` and gated with `isWidgetVisible(...)`, or the contract test fails.
+
 ## Local setup — exact steps
 
 ### 1. Prerequisites

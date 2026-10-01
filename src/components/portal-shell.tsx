@@ -656,8 +656,11 @@ export function PortalShell({
 
   // ── Session-driven RBAC: residents never see admin sections. Admins see both
   // and can flip persona via the sidebar toggle to preview the resident view.
-  const [session, setSession] = useState<Session | null>(() => (typeof window !== "undefined" ? getSession() : null));
+  // Starts null on both server and client so hydration matches; the effect loads the real session.
+  const [session, setSession] = useState<Session | null>(null);
+  const [mounted, setMounted] = useState(false);
   useEffect(() => {
+    setMounted(true);
     const refresh = () => setSession(getSession());
     refresh();
     window.addEventListener("apf-session-change", refresh);
@@ -674,7 +677,9 @@ export function PortalShell({
   // *dashboards* still work for plain admins.
   const isSuperAdmin = session?.role === "superadmin";
   const isAdmin = session?.role === "admin" || isSuperAdmin;
-  const { data: dashboardSettings, isPending: settingsPending } = useDashboardSettings();
+  const { data: remoteDashboardSettings, isLoading: settingsLoading } = useDashboardSettings();
+  const dashboardSettings = mounted ? remoteDashboardSettings : undefined;
+  const settingsPending = mounted && settingsLoading;
   const availableNavSections = isAdmin
     ? navSections.filter((s) => s.group !== "controls" || isSuperAdmin)
     : navSections.filter((s) => s.tone === "resident");
@@ -693,7 +698,7 @@ export function PortalShell({
 
   const residentFirst = visibleNavSections.find((s) => s.tone === "resident")?.items[0]?.to;
   const adminFirst = navSections.find((s) => s.tone === "admin")?.items[0]?.to ?? "/";
-  const unavailableResidentPage = persona === "resident" && !settingsPending &&
+  const unavailableResidentPage = mounted && persona === "resident" && !settingsPending &&
     !visibleNavSections.some((section) => section.tone === "resident" && section.items.some((item) => item.to === pathname));
   useEffect(() => {
     if (unavailableResidentPage && residentFirst) navigate({ to: residentFirst, replace: true });

@@ -15,6 +15,10 @@ dist-ssr
 .tanstack/**
 .nitro
 *.local
+test-results/
+playwright-report/
+blob-report/
+coverage/
 ETL/transform_v.2.py
 ETL/transform_v0.1.py
 ETL/output/*
