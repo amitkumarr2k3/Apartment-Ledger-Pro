@@ -393,7 +393,7 @@ function SidebarNav({
   session: Session | null;
   visibleSections: typeof navSections;
 }) {
-  const isAdmin = session?.role === "admin";
+  const isAdmin = session?.role === "admin" || session?.role === "superadmin";
   return (
     <>
       <div className="p-6 mb-2 border-b border-border space-y-4">
@@ -678,8 +678,10 @@ export function PortalShell({
   const isSuperAdmin = session?.role === "superadmin";
   const isAdmin = session?.role === "admin" || isSuperAdmin;
   const { data: remoteDashboardSettings, isLoading: settingsLoading } = useDashboardSettings();
-  const dashboardSettings = mounted ? remoteDashboardSettings : undefined;
-  const settingsPending = mounted && settingsLoading;
+  // Dashboard Controls restrict residents only; admins and superadmins always see every resident dashboard.
+  const residentRestricted = mounted && session?.role === "resident";
+  const dashboardSettings = residentRestricted ? remoteDashboardSettings : undefined;
+  const settingsPending = residentRestricted && settingsLoading;
   const availableNavSections = isAdmin
     ? navSections.filter((s) => s.group !== "controls" || isSuperAdmin)
     : navSections.filter((s) => s.tone === "resident");
@@ -698,7 +700,9 @@ export function PortalShell({
 
   const residentFirst = visibleNavSections.find((s) => s.tone === "resident")?.items[0]?.to;
   const adminFirst = navSections.find((s) => s.tone === "admin")?.items[0]?.to ?? "/";
-  const unavailableResidentPage = mounted && persona === "resident" && !settingsPending &&
+  // Only for /resident/* URLs: during navigation away, the outgoing resident shell briefly sees the new path.
+  const unavailableResidentPage = residentRestricted && persona === "resident" && !settingsPending &&
+    pathname.startsWith("/resident/") &&
     !visibleNavSections.some((section) => section.tone === "resident" && section.items.some((item) => item.to === pathname));
   useEffect(() => {
     if (unavailableResidentPage && residentFirst) navigate({ to: residentFirst, replace: true });

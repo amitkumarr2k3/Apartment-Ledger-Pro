@@ -4,6 +4,7 @@
 // In authenticated mode they must not mask DB cleanup/API errors with mock data.
 import { useQuery } from "@tanstack/react-query";
 import { useState, useEffect, useSyncExternalStore } from "react";
+import { getSession } from "@/lib/session";
 import * as mock from "@/lib/finance-mock";
 import * as api from "@/lib/api";
 
@@ -85,9 +86,11 @@ export function useWidgetVisibility(dashboardKey: string) {
   useEffect(() => { setMounted(true); }, []);
   const { data: settings = [] } = useDashboardSettings();
 
+  // Restrictions apply to residents only; admins and superadmins always see every widget.
+  const restricted = mounted && getSession()?.role === "resident";
   const row = settings.find((s) => s.dashboard_key === dashboardKey);
-  const dashboardEnabled = !mounted ? true : (row?.enabled ?? true);
-  const hiddenWidgets = !mounted ? [] : (row?.hidden_widgets ?? []);
+  const dashboardEnabled = !restricted ? true : (row?.enabled ?? true);
+  const hiddenWidgets = !restricted ? [] : (row?.hidden_widgets ?? []);
   const isWidgetVisible = (widgetId: string) => dashboardEnabled && !hiddenWidgets.includes(widgetId);
   return { dashboardEnabled, hiddenWidgets, isWidgetVisible };
 }

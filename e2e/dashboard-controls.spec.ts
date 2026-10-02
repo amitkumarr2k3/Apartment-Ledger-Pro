@@ -35,11 +35,12 @@ test.describe("dashboard controls: whole dashboards", () => {
     await expect(page.locator("main")).toContainText("No resident dashboards are available.");
   });
 
-  test("admin preview follows the same resident visibility", async ({ page }) => {
+  test("admin preview ignores resident restrictions", async ({ page }) => {
     await mockApi(page, withSetting(allResidentDashboards(), "resident.income", { enabled: false }));
     await signIn(page, "superadmin");
     await page.goto("/resident/income");
-    await expect(page).toHaveURL(/\/resident\/overview/);
+    await expect(page).toHaveURL(/\/resident\/income/);
+    await expect(page.getByText("Income sources", { exact: true })).toBeVisible();
   });
 });
 

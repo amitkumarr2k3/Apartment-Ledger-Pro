@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { navSections } from "./finance-mock";
 import { applySessionFromAuthResponse, canAccess, isAdminOrAbove } from "./session";
 
 describe("canAccess", () => {
@@ -24,6 +25,25 @@ describe("canAccess", () => {
       expect(canAccess(path, "resident")).toBe(false);
       expect(canAccess(path, "admin")).toBe(false);
       expect(canAccess(path, "superadmin")).toBe(true);
+    }
+  });
+
+  it("reserves every Admin Controls navigation page for superadmin", () => {
+    const controls = navSections.filter((s) => s.group === "controls").flatMap((s) => s.items);
+    expect(controls.length).toBeGreaterThan(0);
+    for (const { to } of controls) {
+      expect(canAccess(to, "resident"), to).toBe(false);
+      expect(canAccess(to, "admin"), to).toBe(false);
+      expect(canAccess(to, "superadmin"), to).toBe(true);
+    }
+  });
+
+  it("lets admins and superadmins open every admin dashboard, but not residents", () => {
+    const dashboards = navSections.filter((s) => s.tone === "admin" && s.group === "dashboards").flatMap((s) => s.items);
+    for (const { to } of dashboards) {
+      expect(canAccess(to, "resident"), to).toBe(false);
+      expect(canAccess(to, "admin"), to).toBe(true);
+      expect(canAccess(to, "superadmin"), to).toBe(true);
     }
   });
 });

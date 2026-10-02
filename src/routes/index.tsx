@@ -1,5 +1,5 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
-import { getSession } from "@/lib/session";
+import { getSession, isAdminOrAbove } from "@/lib/session";
 
 // This route used to render a full "landing directory" page -- a sitemap-
 // style grid listing every dashboard, useful during early development but
@@ -25,7 +25,7 @@ export const Route = createFileRoute("/")({
     if (typeof window === "undefined") return;
     const session = getSession();
     if (session) {
-      throw redirect({ to: session.role === "admin" ? "/admin/actions" : "/resident/overview", replace: true });
+      throw redirect({ to: isAdminOrAbove(session.role) ? "/admin/actions" : "/resident/overview", replace: true });
     }
     throw redirect({ to: "/login", replace: true });
   },

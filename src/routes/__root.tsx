@@ -16,7 +16,7 @@ import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { Toaster } from "@/components/ui/sonner";
-import { getSession, canAccess, signOut } from "@/lib/session";
+import { getSession, canAccess, signOut, isAdminOrAbove } from "@/lib/session";
 import { AUTH_ENABLED } from "@/lib/feature-flags";
 
 // Public routes accessible without a session. Everything else requires OTP login.
@@ -88,7 +88,7 @@ function RouteGuard() {
     const check = () => {
       const session = getSession();
       if (session && pathname === "/") {
-        navigate({ to: session.role === "admin" ? "/admin/actions" : "/resident/overview", replace: true });
+        navigate({ to: isAdminOrAbove(session.role) ? "/admin/actions" : "/resident/overview", replace: true });
         return;
       }
       if (PUBLIC_PATHS.has(pathname)) return;
@@ -216,7 +216,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     const pathname = location.pathname;
 
     if (session && pathname === "/") {
-      throw redirect({ to: session.role === "admin" ? "/admin/actions" : "/resident/overview", replace: true });
+      throw redirect({ to: isAdminOrAbove(session.role) ? "/admin/actions" : "/resident/overview", replace: true });
     }
     if (PUBLIC_PATHS.has(pathname)) return;
     if (!session) {
