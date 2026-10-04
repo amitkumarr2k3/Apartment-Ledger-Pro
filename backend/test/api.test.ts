@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FastifyInstance } from "fastify";
+import { asksForDashboardFigure } from "../src/routes/assistant";
 
 // In-memory stand-in for Postgres so route, auth and RBAC wiring run without a database.
 const db = vi.hoisted(() => {
@@ -104,6 +105,25 @@ describe("dashboard data", () => {
     const res = await app.inject({ method: "GET", url: "/api/dashboard/balance-strip", headers: resident() });
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({ opening: 1000, income: 5000, expense: 3000, net: 2000, closing: 3000 });
+  });
+});
+
+describe("dashboard assistant", () => {
+  it("distinguishes figure requests from concept questions", () => {
+    expect(asksForDashboardFigure("How much are the outstanding receivables?")).toBe(true);
+    expect(asksForDashboardFigure("What does total income mean?")).toBe(false);
+  });
+
+  it("returns a local refusal for dashboard figure requests", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/assistant/ask",
+      headers: resident(),
+      payload: { question: "How much are the outstanding receivables?", currentView: "overview" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().answer).toContain("can't provide, retrieve, or calculate dashboard figures");
   });
 });
 

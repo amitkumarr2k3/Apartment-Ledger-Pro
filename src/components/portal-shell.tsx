@@ -242,6 +242,9 @@ function HelpChat({ persona, currentView, onClose }: { persona: "resident" | "ad
               </Button>
             </div>
             <p className="text-[10px] text-muted-foreground text-center leading-tight">
+              Live dashboard figures stay here; they are never sent to the external AI service. Your question, page name and guide text are.
+            </p>
+            <p className="text-[10px] text-muted-foreground text-center leading-tight">
               Beta feature, still learning -- thanks for testing!
             </p>
           </div>

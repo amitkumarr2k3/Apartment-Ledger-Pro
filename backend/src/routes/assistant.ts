@@ -12,6 +12,11 @@ const AskBody = z.object({
   currentView: z.string().optional(),
 });
 
+const directQuantityRequest = /\bhow (?:much|many)\b/i;
+const commandedFigureRequest = /\b(?:show|tell|give|provide|fetch|read|calculate|display)\s+(?:me\s+)?(?:the\s+)?(?:(?:current|latest|exact|total)\s+)?(?:amount|numeric value|value|figure|figures|number|total|balance|percentage|percent|rate|income|expenses?|collections?|receivables?|surplus|reserves?|corpus|maintenance)\b/i;
+const currentFigureRequest = /\bwhat(?:'s| is)\s+(?:the\s+)?(?:current|latest|exact|total)\s+(?:income|expenses?|collections?|receivables?|surplus|reserves?|corpus|maintenance|balance|net position)\b|\bwhat(?:'s| is)\s+(?:the\s+)?(?:amount|numeric value|value|figure|figures|number|balance|percentage|percent|rate)\b/i;
+const currencyAmount = /(?:₹|\brs\.?\s*\d|\binr\s*\d|\d[\d,]*(?:\.\d+)?\s*(?:rupees|inr)\b)/i;
+
 function buildContext(currentView?: string): string {
   const pageText = currentView ? manualSections.pages[currentView] : undefined;
   return [
@@ -24,8 +29,15 @@ function buildContext(currentView?: string): string {
   ].filter(Boolean).join("\n\n");
 }
 
+export function asksForDashboardFigure(question: string): boolean {
+  return directQuantityRequest.test(question)
+    || commandedFigureRequest.test(question)
+    || currentFigureRequest.test(question)
+    || currencyAmount.test(question);
+}
+
 function buildPrompt(question: string, currentView: string | undefined, context: string): string {
-  return `You are Munshi, a helpful assistant embedded inside PulseLedger, a housing society finance dashboard for CG Boulevard. Answer the resident or admin's question using ONLY the manual excerpts provided below -- never invent a number, feature, or badge that isn't mentioned in them. Be concise (2-4 sentences, no preamble). If the excerpts genuinely don't cover the question, say so honestly and suggest they check with an admin or read the full user guide, rather than guessing.
+  return `You are Munshi, a helpful assistant embedded inside PulseLedger, a housing society finance dashboard for CG Boulevard. Answer using ONLY the manual excerpts below. You do not receive live dashboard figures: never claim to have read, retrieved, or calculated them. If the user asks for an actual dashboard amount, count, percentage, balance, or other figure, politely decline and offer to explain the metric or point them to where it appears in the dashboard. For conceptual questions, explain the idea plainly and directly using the excerpts. Never invent numbers, features, or badges. Be concise (2-4 sentences, answer directly without a preamble). If the excerpts do not cover a concept, say so and suggest checking with an admin or the full user guide rather than guessing.
 
 MANUAL EXCERPTS:
 ${context}
@@ -45,6 +57,12 @@ export async function routes(app: FastifyInstance) {
     const body = AskBody.parse(req.body);
     const question = body.question.trim();
     const currentView = body.currentView;
+
+    if (asksForDashboardFigure(question)) {
+      return {
+        answer: "Sorry, I can't provide, retrieve, or calculate dashboard figures. They stay in the dashboard and are not sent to Munshi's AI service. I can explain what a metric means or help you find it on the dashboard.",
+      };
+    }
 
     if (!GEMINI_API_KEY) {
       app.log.warn("GEMINI_API_KEY not set -- assistant is unconfigured");
