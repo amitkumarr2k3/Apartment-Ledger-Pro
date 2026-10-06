@@ -20,7 +20,7 @@ jobs:
         with: { node-version: 20 }
       - name: Install
         working-directory: backend
-        run: npm install
+        run: npm ci
       - name: Build
         working-directory: backend
         run: npx tsc -p tsconfig.json
