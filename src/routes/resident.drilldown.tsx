@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { Tooltip, Bar, BarChart, CartesianGrid, ResponsiveContainer, XAxis, YAxis } from "recharts";
 import { SmartTooltipContent, getTooltipTrigger } from "@/components/smart-tooltip";
+import { ProcurementInfo } from "@/components/procurement-info";
 import {
   inr, categoryMonthly, total,
 } from "@/lib/finance-mock";
@@ -80,8 +81,9 @@ function Inner() {
               <button className="hover:text-foreground capitalize" onClick={() => update({ category: null })}>{head}</button>
             </BreadcrumbItem></>)}
           {category && (<><BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <span className="text-foreground">{category.name}</span>
+            <BreadcrumbItem className="min-w-0">
+              <span className="min-w-0 break-words text-foreground">{category.name}</span>
+              <ProcurementInfo name={category.name} persona="resident" />
             </BreadcrumbItem></>)}
         </BreadcrumbList>
       </Breadcrumb>
@@ -105,16 +107,19 @@ function Inner() {
               .map((c) => {
               const t = total(sliceMonthly(categoryMonthly(c)));
               return (
-                <button key={c.name} onClick={() => update({ category: c.name })} className="w-full flex items-center justify-between py-3 text-left hover:bg-accent/40 -mx-4 px-4 rounded">
-                  <div>
-                    <div className="font-medium">{c.name}</div>
-                    <div className="text-xs text-muted-foreground">{c.vendors.length} vendor{c.vendors.length > 1 ? "s" : ""}</div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="font-mono text-sm">{inr(t)}</span>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                </button>
+                <div key={c.name} className="flex min-w-0 items-center gap-2 hover:bg-accent/40 -mx-4 px-4 rounded">
+                  <button onClick={() => update({ category: c.name })} className="min-w-0 flex-1 flex items-center justify-between gap-3 py-3 text-left">
+                    <div className="min-w-0">
+                      <div className="break-words font-medium">{c.name}</div>
+                      <div className="text-xs text-muted-foreground">{c.vendors.length} vendor{c.vendors.length > 1 ? "s" : ""}</div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-3">
+                      <span className="font-mono text-sm">{inr(t)}</span>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                  </button>
+                  <ProcurementInfo name={c.name} persona="resident" />
+                </div>
               );
             })}
           </CardContent>
@@ -124,7 +129,11 @@ function Inner() {
       {category && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">{category.name} · Combined monthly trend</CardTitle>
+            <CardTitle className="flex min-w-0 flex-wrap items-center gap-2 text-base">
+              <span className="min-w-0 break-words">{category.name}</span>
+              <ProcurementInfo name={category.name} persona="resident" />
+              <span>· Combined monthly trend</span>
+            </CardTitle>
             <CardDescription>
               Sum of all {category.vendors.length} vendor{category.vendors.length > 1 ? "s" : ""} under this category, per month, for the selected range — this is the final level of detail available here
             </CardDescription>

@@ -11,6 +11,7 @@ import { AlertTriangle, ArrowRight, TrendingUp } from "lucide-react";
 import { NoDbData } from "@/components/mock-gate";
 import { useExpenseTree, useIncomeTree, useMonthlyTotals } from "@/lib/hooks";
 import { filterReportableIncomeCategories, sumMaintenanceChargeMonthly } from "@/lib/income-utils";
+import { ProcurementInfo } from "@/components/procurement-info";
 
 export const Route = createFileRoute("/admin/actions")({
   component: Page,
@@ -77,10 +78,10 @@ function Inner() {
   // dashboard's own detection logic (mirrored here, not reinvented) and
   // ranks them together by Amount.
   const risingItems = momChanges.filter((c) => c.periodChange > 15).map((c) => ({
-    kind: "Rising cost", label: c.category, detail: `${pct(c.periodChange)} vs prior period`, to: "/admin/alerts", amount: c.current,
+    kind: "Rising cost", category: c.category, label: c.category, detail: `${pct(c.periodChange)} vs prior period`, to: "/admin/alerts", amount: c.current,
   }));
   const anomalyItems = anomalies.map((a) => ({
-    kind: "Anomaly", label: a.category, detail: `Current ${inr(a.cur)} · ${a.ratio.toFixed(1)}× 3-mo avg`, to: "/admin/alerts", amount: a.cur,
+    kind: "Anomaly", category: a.category, label: a.category, detail: `Current ${inr(a.cur)} · ${a.ratio.toFixed(1)}× 3-mo avg`, to: "/admin/alerts", amount: a.cur,
   }));
 
   // Income drops / irregular sources -- mirrors Income Optimisation's own
@@ -104,7 +105,7 @@ function Inner() {
   );
   const incomeDropItems = incomeRows.filter((r) => r.dropped || r.irregular).map((r) => ({
     kind: r.dropped ? "Income drop" : "Income irregular",
-    label: r.source, detail: `${r.category} · ${r.active}/${labels.length} months active`, to: "/admin/income", amount: r.total,
+    category: r.category, label: r.source, detail: `${r.category} · ${r.active}/${labels.length} months active`, to: "/admin/income", amount: r.total,
   }));
 
   // Collection gaps -- mirrors Collections' sharp-drop detection, using the
@@ -121,7 +122,7 @@ function Inner() {
     return { ...m, change };
   });
   const collectionGapItems = collectionData.filter((d) => d.change < -10).map((d) => ({
-    kind: "Collection gap", label: `${d.month} collection`, detail: `${pct(d.change, 1)} vs prior month`, to: "/admin/collections", amount: d.collection,
+    kind: "Collection gap", category: null, label: `${d.month} collection`, detail: `${pct(d.change, 1)} vs prior month`, to: "/admin/collections", amount: d.collection,
   }));
 
   // Vendor spend spikes -- mirrors Vendor Insights' own >20%-change flag.
@@ -137,7 +138,7 @@ function Inner() {
     };
   })).filter((v) => v.total > 0);
   const vendorSpikeItems = vendorRanking.filter((v) => v.changePct > 20).map((v) => ({
-    kind: "Vendor spike", label: v.vendor, detail: `${v.category} · ${pct(v.changePct, 1)} vs prior period`, to: "/admin/vendors", amount: v.total,
+    kind: "Vendor spike", category: v.category, label: v.vendor, detail: `${v.category} · ${pct(v.changePct, 1)} vs prior period`, to: "/admin/vendors", amount: v.total,
   }));
 
   const actions = [...anomalyItems, ...risingItems, ...incomeDropItems, ...collectionGapItems, ...vendorSpikeItems]
@@ -219,58 +220,68 @@ function Inner() {
           <CardDescription>Highest-priority flagged items across every dashboard — expense anomalies, rising costs, income drops, collection gaps, and vendor spend spikes</CardDescription>
         </CardHeader>
         <CardContent className="divide-y divide-border">
-          {actions.length === 0 && <p className="text-sm text-muted-foreground py-3">Nothing flagged. All categories look healthy.</p>}
+          {actions.length === 0 && (
+            <p className="text-sm text-muted-foreground py-3">Nothing flagged. All categories look healthy.</p>
+          )}
           {actions.map((a, i) => (
-            <Link
-              key={i}
-              to={a.to}
-              // FIX (2026-08-15): this was the ONE link in the app missing
-              // search-param preservation -- every other cross-dashboard
-              // link (nav tabs, "Drill" links on Vendor Insights/Cost
-              // Alerts) spreads {...prev} so period/view survive
-              // navigation. This one was a bare path string, so clicking
-              // any "Top 5 items needing attention" row silently reset the
-              // period filter to the default on arrival -- and since the
-              // tab bar itself correctly preserves "whatever the current
-              // period is," that reset value then propagated to every
-              // subsequent page you visited afterward, making it look like
-              // your original selection had vanished entirely.
-              search={(((prev: any) => ({ ...prev })) as any)}
-              className="flex items-center justify-between py-3 group hover:bg-accent/40 -mx-4 px-4 rounded"
-            >
-              <div className="flex items-center gap-4">
-                <span className="text-xs font-mono w-6 text-muted-foreground">#{i + 1}</span>
-                <div>
-                  <div className="font-medium flex items-center gap-2">
-                    {a.label}
-                    <Badge variant="outline" className="text-[10px]">{a.kind}</Badge>
+            <div key={i} className="flex min-w-0 items-center gap-2">
+              <Link
+                to={a.to}
+                // FIX (2026-08-15): this was the ONE link in the app missing
+                // search-param preservation -- every other cross-dashboard
+                // link (nav tabs, "Drill" links on Vendor Insights/Cost
+                // Alerts) spreads {...prev} so period/view survive
+                // navigation. This one was a bare path string, so clicking
+                // any "Top 5 items needing attention" row silently reset the
+                // period filter to the default on arrival -- and since the
+                // tab bar itself correctly preserves "whatever the current
+                // period is," that reset value then propagated to every
+                // subsequent page you visited afterward, making it look like
+                // your original selection had vanished entirely.
+                search={((prev: any) => ({ ...prev })) as any}
+                className="flex min-w-0 flex-1 items-center justify-between py-3 group hover:bg-accent/40 -mx-4 px-4 rounded"
+              >
+                <div className="flex min-w-0 items-center gap-4">
+                  <span className="text-xs font-mono w-6 text-muted-foreground">#{i + 1}</span>
+                  <div className="min-w-0">
+                    <div className="font-medium flex flex-wrap items-center gap-2">
+                      <span className="min-w-0 break-words">{a.label}</span>
+                      <Badge variant="outline" className="text-[10px]">{a.kind}</Badge>
+                    </div>
+                    <div className="text-xs text-muted-foreground">{a.detail}</div>
                   </div>
-                  <div className="text-xs text-muted-foreground">{a.detail}</div>
                 </div>
-              </div>
-              <ArrowRight className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" />
-            </Link>
+                <ArrowRight className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" />
+              </Link>
+              {a.category && <ProcurementInfo name={a.category} persona="admin" />}
+              {a.label !== a.category && <ProcurementInfo name={a.label} persona="admin" />}
+            </div>
           ))}
         </CardContent>
       </Card>
 
       {risingCat && activeProjectionMeta && (
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-4">
-            <div>
-              <CardTitle className="text-base">Projection · {risingCat.name}</CardTitle>
+          <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <CardTitle className="break-words text-base">Projection · {risingCat.name}</CardTitle>
               <CardDescription>{activeProjectionMeta.reason}</CardDescription>
             </div>
-            {projectionCandidates.length > 1 && (
-              <Select value={activeProjectionName ?? undefined} onValueChange={setSelectedProjection}>
-                <SelectTrigger className="w-[250px]"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {projectionCandidates.map((candidate) => (
-                    <SelectItem key={candidate.category} value={candidate.category}>{candidate.category}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
+            <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto">
+              {projectionCandidates.length > 1 && (
+                <Select value={activeProjectionName ?? undefined} onValueChange={setSelectedProjection}>
+                  <SelectTrigger className="w-full min-w-0 flex-1 sm:w-[250px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {projectionCandidates.map((candidate) => (
+                      <SelectItem key={candidate.category} value={candidate.category}>{candidate.category}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              <ProcurementInfo name={risingCat.name} persona="admin" />
+            </div>
           </CardHeader>
           <CardContent>
             {view === "chart" ? (
@@ -352,7 +363,10 @@ function Inner() {
             {aboveAverageSpend.map((s) => (
               <div key={s.category} className="p-3 rounded-md border border-cyan-500/30 bg-cyan-500/5 text-sm">
                 <div className="flex items-center justify-between">
-                  <span className="font-medium">{s.category}</span>
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="min-w-0 break-words font-medium">{s.category}</span>
+                    <ProcurementInfo name={s.category} persona="admin" />
+                  </div>
                   <Badge variant="outline" className="text-[10px]">{s.ratio.toFixed(1)}× avg</Badge>
                 </div>
                 <div className="text-xs text-muted-foreground mt-1">

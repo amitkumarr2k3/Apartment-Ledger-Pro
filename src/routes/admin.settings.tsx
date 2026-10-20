@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { PortalShell } from "@/components/portal-shell";
+import { ProcurementSettings } from "@/components/procurement-settings";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
@@ -206,6 +207,8 @@ function Page() {
           </div>
         </CardHeader>
       </Card>
+
+      <ProcurementSettings />
 
       <div className="grid gap-4 lg:grid-cols-2 mt-4">
         {DASHBOARD_DEFS.map((def) => {

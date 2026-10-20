@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Link } from "@tanstack/react-router";
 import { Bar, BarChart, CartesianGrid, Cell, ComposedChart, LabelList, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend } from "recharts";
 import { SmartTooltipContent, getTooltipTrigger } from "@/components/smart-tooltip";
+import { ProcurementInfo } from "@/components/procurement-info";
 import { inr, categoryMonthly, total, sumMonthly } from "@/lib/finance-mock";
 import { useIncomeTree, useMonthlyTotals, useWidgetVisibility } from "@/lib/hooks";
 import { filterReportableIncomeCategories, isMaintenanceOutstandingCategory } from "@/lib/income-utils";
@@ -117,17 +118,20 @@ function Inner() {
             <CardDescription>Maintenance separated out, remaining income sorted by contribution</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="flex min-w-0 items-center gap-2">
             <Link
               to="/resident/drilldown"
               search={(((prev: any) => ({ ...prev, head: "income", category: "Maintenance Collections", vendor: undefined, line: undefined })) as any)}
-              className="flex items-center justify-between p-3 rounded-md bg-cyan-500/5 border border-cyan-500/20 hover:bg-cyan-500/10 transition-colors"
+              className="flex min-w-0 flex-1 items-center justify-between gap-2 p-3 rounded-md bg-cyan-500/5 border border-cyan-500/20 hover:bg-cyan-500/10 transition-colors"
             >
-              <div>
-                <div className="text-sm font-medium">Maintenance Collections</div>
+              <div className="min-w-0">
+                <div className="break-words text-sm font-medium">Maintenance Collections</div>
                 <div className="text-xs text-muted-foreground">Flat dues · {maintenancePct.toFixed(1)}% of total income</div>
               </div>
-              <span className="font-mono text-sm">{inr(maintenanceValue)}</span>
+              <span className="shrink-0 font-mono text-sm">{inr(maintenanceValue)}</span>
             </Link>
+            <ProcurementInfo name="Maintenance Collections" persona="resident" />
+            </div>
 
             {otherIncomeRows.length > 0 && (
               <>
@@ -148,6 +152,14 @@ function Inner() {
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
+                <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                  {otherIncomeRows.map((r) => (
+                    <span key={r.name} className="inline-flex min-w-0 items-center gap-1">
+                      <span className="min-w-0 break-words">{r.name}</span>
+                      <ProcurementInfo name={r.name} persona="resident" />
+                    </span>
+                  ))}
+                </div>
               </>
             )}
           </CardContent>

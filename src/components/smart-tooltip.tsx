@@ -1,4 +1,5 @@
 import * as React from "react";
+import { ProcurementInfo } from "@/components/procurement-info";
 
 /**
  * Returns the correct Recharts `<Tooltip trigger>` for this device:
@@ -51,6 +52,7 @@ export function SmartTooltipContent({
   const isTouch =
     typeof window !== "undefined" &&
     window.matchMedia("(hover: none), (pointer: coarse)").matches;
+  const persona = typeof window !== "undefined" && window.location.pathname.startsWith("/admin") ? "admin" : "resident";
 
   if (!active || !payload || payload.length === 0) return null;
   const title = labelFormatter
@@ -59,9 +61,11 @@ export function SmartTooltipContent({
       ? `${labelPrefix} · ${label ?? ""}`
       : String(label ?? "");
   return (
-    <div className="min-w-[10rem] rounded-md border border-border bg-popover/95 px-3 py-2 text-popover-foreground shadow-md backdrop-blur">
-      <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-        {title}
+    <div style={{ pointerEvents: "auto" }} className="min-w-[10rem] max-w-[calc(100vw-2rem)] rounded-md border border-border bg-popover/95 px-3 py-2 text-popover-foreground shadow-md backdrop-blur">
+      <div className="mb-1 flex flex-wrap items-center gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        <span className="min-w-0 break-words">{title}</span>
+        {typeof label === "string" && <ProcurementInfo name={label} persona={persona} />}
+        {title !== label && <ProcurementInfo name={title} persona={persona} />}
       </div>
       <ul className="space-y-1">
         {payload.map((p, i) => {
@@ -71,13 +75,14 @@ export function SmartTooltipContent({
               key={`${p.dataKey ?? p.name ?? i}-${i}`}
               className="flex items-center justify-between gap-4 text-sm"
             >
-              <span className="flex items-center gap-2 text-muted-foreground">
+              <span className="flex min-w-0 flex-wrap items-center gap-2 text-muted-foreground">
                 <span
                   aria-hidden
                   className="inline-block h-2.5 w-2.5 rounded-sm"
                   style={{ background: color }}
                 />
-                {p.name ?? p.dataKey}
+                <span className="min-w-0 break-words">{p.name ?? p.dataKey}</span>
+                {typeof (p.name ?? p.dataKey) === "string" && <ProcurementInfo name={String(p.name ?? p.dataKey)} persona={persona} />}
               </span>
               <span className="font-mono tabular-nums text-foreground">
                 {valueFormatter(Number(p.value ?? NaN), typeof p.name === "string" ? p.name : (typeof p.dataKey === "string" ? p.dataKey : undefined))}

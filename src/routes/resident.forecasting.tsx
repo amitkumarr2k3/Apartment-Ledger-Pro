@@ -15,6 +15,7 @@ import {
   PieChart, Pie, Cell,
 } from "recharts";
 import { SmartTooltipContent, getTooltipTrigger } from "@/components/smart-tooltip";
+import { ProcurementInfo } from "@/components/procurement-info";
 import { inr, categoryMonthly, months12, type Category } from "@/lib/finance-mock";
 import { useBalanceStrip, useMonthlyTotals, useIncomeTree, useExpenseTree, useWidgetVisibility } from "@/lib/hooks";
 import { Info, Settings2, ChevronDown, ChevronUp, RotateCcw } from "lucide-react";
@@ -759,6 +760,7 @@ function Inner() {
                   <LeverRow
                     key={lv.name}
                     label={lv.name}
+                    category
                     sub={"Baseline " + inr(lv.baseline) + "/mo (avg of " + lv.monthsUsed + " month" + (lv.monthsUsed === 1 ? "" : "s") + " with data)"}
                     value={lv.pct}
                     onChange={(v) => setIncomeCategoryPct((p) => ({ ...p, [lv.name]: v }))}
@@ -784,6 +786,7 @@ function Inner() {
                   <LeverRow
                     key={lv.name}
                     label={lv.name}
+                    category
                     sub={"Baseline " + inr(lv.baseline) + "/mo (avg of " + lv.monthsUsed + " month" + (lv.monthsUsed === 1 ? "" : "s") + " with data)"}
                     value={lv.pct}
                     onChange={(v) => setExpenseCategoryPct((p) => ({ ...p, [lv.name]: v }))}
@@ -892,13 +895,15 @@ function Inner() {
                       <Pie data={mixData} dataKey="value" nameKey="name" innerRadius={55} outerRadius={85} paddingAngle={2}>
                         {mixData.map((d, i) => <Cell key={i} fill={d.color} />)}
                       </Pie>
-                      <Tooltip formatter={(v: number) => inr(v)} />
+                      <Tooltip trigger={getTooltipTrigger()} content={<SmartTooltipContent valueFormatter={(v) => inr(v)} />} />
                     </PieChart>
                   </ResponsiveContainer>
                   <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2 text-[11px] text-muted-foreground">
                     {mixData.map((d) => (
-                      <span key={d.name} className="flex items-center gap-1">
-                        <span className="w-2 h-2 rounded-sm inline-block" style={{ background: d.color }} />{d.name}
+                      <span key={d.name} className="flex min-w-0 items-center gap-1">
+                        <span className="w-2 h-2 shrink-0 rounded-sm inline-block" style={{ background: d.color }} />
+                        <span className="min-w-0 break-words">{d.name}</span>
+                        <ProcurementInfo name={d.name} persona="resident" />
                       </span>
                     ))}
                   </div>
@@ -949,9 +954,12 @@ function Inner() {
                   <span className="font-mono">{inr(maintenanceForecastTotal)}</span>
                 </div>
                 {incomeCalcRows.map((r) => (
-                  <div key={r.name} className="flex justify-between p-2">
-                    <span>{r.name} — {inr(r.baseline)}/mo baseline {r.pct >= 0 ? "+" : ""}{r.pct}% × {forecastMonthsCount} forecast month{forecastMonthsCount === 1 ? "" : "s"}</span>
-                    <span className="font-mono">{inr(r.total)}</span>
+                  <div key={r.name} className="flex min-w-0 justify-between gap-2 p-2">
+                    <span className="min-w-0 break-words">
+                      {r.name} <ProcurementInfo name={r.name} persona="resident" />
+                      {" — "}{inr(r.baseline)}/mo baseline {r.pct >= 0 ? "+" : ""}{r.pct}% × {forecastMonthsCount} forecast month{forecastMonthsCount === 1 ? "" : "s"}
+                    </span>
+                    <span className="shrink-0 font-mono">{inr(r.total)}</span>
                   </div>
                 ))}
                 <div className="flex justify-between p-2 text-muted-foreground">
@@ -974,9 +982,12 @@ function Inner() {
                   <span className="font-mono">{inr(actualExpenseTotal)}</span>
                 </div>
                 {expenseCalcRows.map((r) => (
-                  <div key={r.name} className="flex justify-between p-2">
-                    <span>{r.name} — {inr(r.baseline)}/mo baseline {r.pct >= 0 ? "+" : ""}{r.pct}% + {inflationPct}% inflation × {forecastMonthsCount} forecast month{forecastMonthsCount === 1 ? "" : "s"}</span>
-                    <span className="font-mono">{inr(r.total)}</span>
+                  <div key={r.name} className="flex min-w-0 justify-between gap-2 p-2">
+                    <span className="min-w-0 break-words">
+                      {r.name} <ProcurementInfo name={r.name} persona="resident" />
+                      {" — "}{inr(r.baseline)}/mo baseline {r.pct >= 0 ? "+" : ""}{r.pct}% + {inflationPct}% inflation × {forecastMonthsCount} forecast month{forecastMonthsCount === 1 ? "" : "s"}
+                    </span>
+                    <span className="shrink-0 font-mono">{inr(r.total)}</span>
                   </div>
                 ))}
                 {unknownExpense !== 0 && (
@@ -1035,11 +1046,12 @@ function Inner() {
 // a "Changed" tag next to the label, a tick mark on the track showing
 // exactly where standard sits, and a caption spelling out the gap.
 function LeverRow({
-  label, sub, value, onChange, min, max, step, display, defaultValue, formatValue,
+  label, sub, value, onChange, min, max, step, display, defaultValue, formatValue, category,
 }: {
   label: string; sub?: string; value: number; onChange: (v: number) => void;
   min: number; max: number; step: number; display: string;
   defaultValue?: number; formatValue?: (v: number) => string;
+  category?: boolean;
 }) {
   const hasDefault = defaultValue !== undefined && Number.isFinite(defaultValue);
   const isChanged = hasDefault && Math.abs(value - (defaultValue as number)) > 1e-9;
@@ -1049,8 +1061,9 @@ function LeverRow({
   return (
     <div>
       <div className="flex justify-between items-center gap-2">
-        <label className="text-sm font-medium flex items-center gap-1.5 min-w-0">
-          <span className="truncate">{label}</span>
+        <div className="text-sm font-medium flex items-center gap-1.5 min-w-0">
+          <span className="min-w-0 break-words">{label}</span>
+          {category && <ProcurementInfo name={label} persona="resident" />}
           {isChanged && (
             <span
               className="shrink-0 inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-300 rounded-full px-1.5 py-0.5"
@@ -1059,7 +1072,7 @@ function LeverRow({
               <span className="h-1.5 w-1.5 rounded-full bg-amber-500" /> Changed
             </span>
           )}
-        </label>
+        </div>
         <span className={"font-bold text-sm shrink-0 " + (value < 0 ? "text-rose-600" : value > 0 ? "text-emerald-600" : "")}>{display}</span>
       </div>
       <div className="relative mt-1.5">

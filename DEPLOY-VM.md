@@ -354,11 +354,13 @@ in with `SUPERADMIN_EMAIL` / `SUPERADMIN_PASSWORD` from your `.env`.
   ```
 - **Database backups:** reuse the script already in this repo —
   ```bash
-  ./scripts/db-cleanup.sh --backup-only
+  cd ~/deploy
+  ./hk_scripts/db-cleanup.sh --backup-only
   ```
-  This writes a `.sql.gz` dump to `scripts/backups/`. Copy backups off the VM
-  periodically (e.g. `scp` to your laptop, or upload to Azure Blob Storage) since
-  they currently only live on the VM's disk.
+  This writes a `.sql.gz` dump to `hk_scripts/backups/`. The script resolves the
+  Compose project from `~/deploy` even when invoked from `hk_scripts/`. Copy
+  backups off the VM periodically (e.g. `scp` to your laptop, or upload to Azure
+  Blob Storage) since they otherwise only live on the VM's disk.
 
 ---
 

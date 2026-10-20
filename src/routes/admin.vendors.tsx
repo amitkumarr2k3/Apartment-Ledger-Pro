@@ -12,6 +12,7 @@ import { TrendingUp, ChevronRight, ExternalLink, PieChart } from "lucide-react";
 import { NoDbData } from "@/components/mock-gate";
 import { useExpenseTree, useIncomeTree } from "@/lib/hooks";
 import { filterReportableIncomeCategories } from "@/lib/income-utils";
+import { ProcurementInfo } from "@/components/procurement-info";
 
 export const Route = createFileRoute("/admin/vendors")({
   component: Page,
@@ -165,8 +166,18 @@ function Inner() {
                 const flagged = v.changePct > 20;
                 return (
                   <TableRow key={v.key} className={activeVendor === v.key ? "bg-accent/40" : ""}>
-                    <TableCell className="font-medium">{v.vendor}</TableCell>
-                    <TableCell className="text-muted-foreground">{v.category}</TableCell>
+                    <TableCell>
+                      <div className="flex min-w-0 items-center gap-2 font-medium">
+                        <span className="min-w-0 break-words">{v.vendor}</span>
+                        <ProcurementInfo name={v.vendor} persona="admin" />
+                      </div>
+                    </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          <div className="flex min-w-0 items-center gap-2">
+                            <span className="min-w-0 break-words">{v.category}</span>
+                            <ProcurementInfo name={v.category} persona="admin" />
+                          </div>
+                        </TableCell>
                     <TableCell><Badge variant="outline" className="text-[10px]">{v.kind}</Badge></TableCell>
                     <TableCell className="text-right font-mono">{inr(v.total)}</TableCell>
                     <TableCell className="text-right">
@@ -205,7 +216,11 @@ function Inner() {
         <div className="grid gap-4 lg:grid-cols-3">
           <Card className="lg:col-span-2">
             <CardHeader>
-              <CardTitle className="text-base">{vendorObj.name} · monthly trend</CardTitle>
+              <CardTitle className="flex min-w-0 flex-wrap items-center gap-2 text-base">
+                <span className="min-w-0 break-words">{vendorObj.name}</span>
+                <ProcurementInfo name={vendorObj.name} persona="admin" />
+                <span>· monthly trend</span>
+              </CardTitle>
               <CardDescription>Steady rise pattern shows here</CardDescription>
             </CardHeader>
             <CardContent>
@@ -255,8 +270,11 @@ function Inner() {
                   .map((it) => ({ it, t: total(sliceMonthly(it.monthly)) }))
                   .sort((a, b) => b.t - a.t)
                   .map(({ it, t }) => (
-                    <li key={it.name} className="flex justify-between border-b border-border pb-2 last:border-none">
-                      <span>{it.name}</span>
+                    <li key={it.name} className="flex min-w-0 items-center justify-between gap-2 border-b border-border pb-2 last:border-none">
+                      <span className="flex min-w-0 items-center gap-1">
+                        <span className="min-w-0 break-words">{it.name}</span>
+                        <ProcurementInfo name={it.name} persona="admin" />
+                      </span>
                       <span className="font-mono">{inr(t)}</span>
                     </li>
                   ))}

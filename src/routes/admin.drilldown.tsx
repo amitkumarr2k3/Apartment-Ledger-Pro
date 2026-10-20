@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { Tooltip, Bar, BarChart, CartesianGrid, ResponsiveContainer, XAxis, YAxis, Legend } from "recharts";
 import { SmartTooltipContent, getTooltipTrigger } from "@/components/smart-tooltip";
+import { ProcurementInfo } from "@/components/procurement-info";
 import {
   inr, categoryMonthly, vendorMonthly, total,
 } from "@/lib/finance-mock";
@@ -79,15 +80,20 @@ function Inner() {
               <button className="hover:text-foreground capitalize" onClick={() => update({ category: null, vendor: null, line: null })}>{head}</button>
             </BreadcrumbItem></>)}
           {category && (<><BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <button className="hover:text-foreground" onClick={() => update({ vendor: null, line: null })}>{category.name}</button>
+            <BreadcrumbItem className="min-w-0">
+              <button className="min-w-0 break-words text-left hover:text-foreground" onClick={() => update({ vendor: null, line: null })}>{category.name}</button>
+              <ProcurementInfo name={category.name} persona="admin" />
             </BreadcrumbItem></>)}
           {vendor && (<><BreadcrumbSeparator />
             <BreadcrumbItem>
               <button className="hover:text-foreground" onClick={() => update({ line: null })}>{vendor.name}</button>
+              <ProcurementInfo name={vendor.name} persona="admin" />
             </BreadcrumbItem></>)}
           {line && (<><BreadcrumbSeparator />
-            <BreadcrumbItem><BreadcrumbPage>{line.name}</BreadcrumbPage></BreadcrumbItem></>)}
+            <BreadcrumbItem>
+              <BreadcrumbPage>{line.name}</BreadcrumbPage>
+              <ProcurementInfo name={line.name} persona="admin" />
+            </BreadcrumbItem></>)}
         </BreadcrumbList>
       </Breadcrumb>
 
@@ -110,16 +116,19 @@ function Inner() {
               .map((c) => {
               const t = total(sliceMonthly(categoryMonthly(c)));
               return (
-                <button key={c.name} onClick={() => update({ category: c.name })} className="w-full flex items-center justify-between py-3 text-left hover:bg-accent/40 -mx-4 px-4 rounded">
-                  <div>
-                    <div className="font-medium">{c.name}</div>
-                    <div className="text-xs text-muted-foreground">{c.vendors.length} vendor{c.vendors.length > 1 ? "s" : ""}</div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="font-mono text-sm">{inr(t)}</span>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                </button>
+                <div key={c.name} className="flex min-w-0 items-center gap-2 hover:bg-accent/40 -mx-4 px-4 rounded">
+                  <button onClick={() => update({ category: c.name })} className="min-w-0 flex-1 flex items-center justify-between gap-3 py-3 text-left">
+                    <div className="min-w-0">
+                      <div className="break-words font-medium">{c.name}</div>
+                      <div className="text-xs text-muted-foreground">{c.vendors.length} vendor{c.vendors.length > 1 ? "s" : ""}</div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-3">
+                      <span className="font-mono text-sm">{inr(t)}</span>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                  </button>
+                  <ProcurementInfo name={c.name} persona="admin" />
+                </div>
               );
             })}
           </CardContent>
@@ -129,7 +138,11 @@ function Inner() {
       {category && !vendor && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">{category.name} · Vendors</CardTitle>
+            <CardTitle className="flex min-w-0 flex-wrap items-center gap-2 text-base">
+              <span className="min-w-0 break-words">{category.name}</span>
+              <ProcurementInfo name={category.name} persona="admin" />
+              <span>· Vendors</span>
+            </CardTitle>
             <CardDescription>Click a vendor to see line items</CardDescription>
           </CardHeader>
           <CardContent className="divide-y divide-border">
@@ -138,19 +151,22 @@ function Inner() {
               .map((v) => {
               const t = total(sliceMonthly(vendorMonthly(v)));
               return (
-                <button key={v.name} onClick={() => update({ vendor: v.name })} className="w-full flex items-center justify-between py-3 text-left hover:bg-accent/40 -mx-4 px-4 rounded">
-                  <div>
-                    <div className="font-medium flex items-center gap-2">
-                      {v.name}
-                      <Badge variant="outline" className="text-[10px]">{v.kind}</Badge>
+                <div key={v.name} className="flex min-w-0 items-center gap-2 hover:bg-accent/40 -mx-4 px-4 rounded">
+                  <button onClick={() => update({ vendor: v.name })} className="min-w-0 flex-1 flex items-center justify-between gap-3 py-3 text-left">
+                    <div className="min-w-0">
+                      <div className="font-medium flex flex-wrap items-center gap-2 break-words">
+                        {v.name}
+                        <Badge variant="outline" className="text-[10px]">{v.kind}</Badge>
+                      </div>
+                      <div className="text-xs text-muted-foreground">{v.items.length} line item{v.items.length > 1 ? "s" : ""}</div>
                     </div>
-                    <div className="text-xs text-muted-foreground">{v.items.length} line item{v.items.length > 1 ? "s" : ""}</div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="font-mono text-sm">{inr(t)}</span>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                </button>
+                    <div className="flex shrink-0 items-center gap-3">
+                      <span className="font-mono text-sm">{inr(t)}</span>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                  </button>
+                  <ProcurementInfo name={v.name} persona="admin" />
+                </div>
               );
             })}
           </CardContent>
@@ -161,7 +177,11 @@ function Inner() {
         <>
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">{vendor.name} · Monthly trend</CardTitle>
+              <CardTitle className="flex min-w-0 flex-wrap items-center gap-2 text-base">
+                <span className="min-w-0 break-words">{vendor.name}</span>
+                <ProcurementInfo name={vendor.name} persona="admin" />
+                <span>· Monthly trend</span>
+              </CardTitle>
               <CardDescription>Total vendor spend per month before drilling into items</CardDescription>
             </CardHeader>
             <CardContent>
@@ -189,16 +209,19 @@ function Inner() {
                 const t = total(sliced);
                 const activeMonths = sliced.filter((n) => n > 0).length;
                 return (
-                  <button key={it.name} onClick={() => update({ line: it.name })} className="w-full flex items-center justify-between py-3 text-left hover:bg-accent/40 -mx-4 px-4 rounded">
-                    <div>
-                      <div className="font-medium">{it.name}</div>
-                      <div className="text-xs text-muted-foreground">Active in {activeMonths} of {labels.length} months</div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="font-mono text-sm">{inr(t)}</span>
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                  </button>
+                  <div key={it.name} className="flex min-w-0 items-center gap-2 hover:bg-accent/40 -mx-4 px-4 rounded">
+                    <button onClick={() => update({ line: it.name })} className="min-w-0 flex-1 flex items-center justify-between gap-3 py-3 text-left">
+                      <div className="min-w-0">
+                        <div className="break-words font-medium">{it.name}</div>
+                        <div className="text-xs text-muted-foreground">Active in {activeMonths} of {labels.length} months</div>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-3">
+                        <span className="font-mono text-sm">{inr(t)}</span>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                    </button>
+                    <ProcurementInfo name={it.name} persona="admin" />
+                  </div>
                 );
               })}
             </CardContent>
@@ -209,7 +232,11 @@ function Inner() {
       {line && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">{line.name} · Monthly trend</CardTitle>
+            <CardTitle className="flex min-w-0 flex-wrap items-center gap-2 text-base">
+              <span className="min-w-0 break-words">{line.name}</span>
+              <ProcurementInfo name={line.name} persona="admin" />
+              <span>· Monthly trend</span>
+            </CardTitle>
             <CardDescription>Selected-period bar chart · Absent months = ₹0</CardDescription>
           </CardHeader>
           <CardContent>

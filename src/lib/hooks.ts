@@ -20,6 +20,51 @@ export type DashboardSettingRow = {
   hidden_widgets: string[];
 };
 
+export type ExpenseInfoSettings = { procurementNames: string[] };
+export const defaultExpenseInfoSettings: ExpenseInfoSettings = {
+  procurementNames: ["One Time Operational Procurement"],
+};
+
+export function useExpenseInfoSettings() {
+  const sessionIdentity = useSyncExternalStore(
+    subscribeToSession,
+    expenseInfoSessionIdentity,
+    () => null,
+  );
+  return useQuery({
+    queryKey: ["expense-info-settings", sessionIdentity],
+    enabled: Boolean(sessionIdentity),
+    queryFn: async (): Promise<ExpenseInfoSettings> => {
+      const response = await fetch("/api/admin/settings/expense-info", authHeaders());
+      if (response.status === 401) api.handleUnauthorized();
+      if (!response.ok) throw new Error("Could not load expense information settings.");
+      const settings: ExpenseInfoSettings = await response.json();
+      if (!Array.isArray(settings.procurementNames) || !settings.procurementNames.every((name) => typeof name === "string")) {
+        throw new Error("Invalid expense information settings.");
+      }
+      return settings;
+    },
+    staleTime: 30_000,
+    gcTime: 0,
+  });
+}
+
+function expenseInfoSessionIdentity() {
+  return typeof window === "undefined" ? null : window.localStorage.getItem("apf.session");
+}
+
+export async function saveExpenseInfoSettings(procurementNames: string[]): Promise<ExpenseInfoSettings> {
+  const auth = authHeaders();
+  const response = await fetch("/api/admin/settings/expense-info", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...(auth.headers ?? {}) },
+    body: JSON.stringify({ procurementNames }),
+  });
+  if (response.status === 401) api.handleUnauthorized();
+  if (!response.ok) throw new Error("Could not save expense information settings. Please try again.");
+  return response.json();
+}
+
 export function useDashboardSettings() {
   const authed = useStoredAuth();
   return useQuery({

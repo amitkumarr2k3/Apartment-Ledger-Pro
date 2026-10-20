@@ -27,8 +27,8 @@ process.env.NODE_ENV = "test";
 const COMMUNITY = "11111111-1111-1111-1111-111111111111";
 let app: FastifyInstance;
 
-function cookieFor(roles: string[]) {
-  const token = app.jwt.sign({ sub: "user-1", email: `${roles[0] ?? "resident"}@example.com`, roles, cid: COMMUNITY });
+function cookieFor(roles: string[], communityId = COMMUNITY) {
+  const token = app.jwt.sign({ sub: "user-1", email: `${roles[0] ?? "resident"}@example.com`, roles, cid: communityId });
   return { cookie: `apf_token=${token}` };
 }
 
@@ -124,6 +124,103 @@ describe("dashboard assistant", () => {
 
     expect(res.statusCode).toBe(200);
     expect(res.json().answer).toContain("can't provide, retrieve, or calculate dashboard figures");
+  });
+});
+
+describe("procurement name settings", () => {
+  const url = "/api/admin/settings/expense-info";
+  const originalName = "One Time Operational Procurement";
+
+  for (const role of ["resident", "admin", "superadmin"]) {
+    it(`lets ${role} read the default mapping`, async () => {
+      const response = await app.inject({ method: "GET", url, headers: cookieFor([role]) });
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual({ procurementNames: [originalName] });
+      expect(db.query).toHaveBeenCalledWith(expect.stringContaining("WHERE community_id=$1"), [COMMUNITY]);
+    });
+  }
+
+  for (const method of ["GET", "PATCH"] as const) {
+    it(`rejects anonymous ${method}`, async () => {
+      const response = await app.inject({ method, url });
+      expect(response.statusCode).toBe(401);
+      expect(db.query).not.toHaveBeenCalled();
+      expect(db.withTx).not.toHaveBeenCalled();
+    });
+  }
+
+  for (const role of ["resident", "admin"]) {
+    it(`blocks ${role} from saving`, async () => {
+      const response = await app.inject({ method: "PATCH", url, headers: cookieFor([role]), payload: { procurementNames: ["Equipment"] } });
+      expect(response.statusCode).toBe(403);
+      expect(db.withTx).not.toHaveBeenCalled();
+    });
+  }
+
+  it("lets superadmin replace the original alias, normalizes names and audits the change", async () => {
+    db.txQuery.mockResolvedValueOnce({ rows: [{ procurement_names: [originalName] }] });
+    const response = await app.inject({
+      method: "PATCH", url, headers: superadmin(),
+      payload: { procurementNames: [" Equipment ", "equipment", "Capital Purchases"] },
+    });
+    const after = { procurementNames: ["Equipment", "Capital Purchases"] };
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual(after);
+    expect(db.txQuery).toHaveBeenCalledWith(expect.stringContaining("INSERT INTO expense_info_settings"), [COMMUNITY, after.procurementNames]);
+    const auditCall = db.txQuery.mock.calls.find(([sql]) => String(sql).includes("INSERT INTO audit_log"));
+    expect(auditCall).toBeDefined();
+    expect(auditCall![1]).toContain(COMMUNITY);
+    expect(auditCall![1]).toContain(JSON.stringify({ procurementNames: [originalName] }));
+    expect(auditCall![1]).toContain(JSON.stringify(after));
+  });
+
+  for (const payload of [
+    {}, { procurementNames: [] }, { procurementNames: [""] }, { procurementNames: ["  "] },
+    { procurementNames: [42] }, { procurementNames: null }, { procurementNames: "Equipment" },
+    { procurementNames: ["x".repeat(201)] }, { procurementNames: Array(51).fill("Equipment") },
+  ]) {
+    it(`rejects invalid input ${JSON.stringify(payload)}`, async () => {
+      const response = await app.inject({ method: "PATCH", url, headers: superadmin(), payload });
+      expect(response.statusCode).toBe(400);
+      expect(response.json().error).toBe("Invalid procurement names");
+      expect(db.withTx).not.toHaveBeenCalled();
+    });
+  }
+
+  it("accepts the name count and length limits", async () => {
+    const procurementNames = Array.from({ length: 50 }, (_, index) => `${index}`.padEnd(200, "x"));
+    const response = await app.inject({ method: "PATCH", url, headers: superadmin(), payload: { procurementNames } });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ procurementNames });
+  });
+
+  it("isolates persisted settings by the authenticated community, ignoring body scope", async () => {
+    const otherCommunity = "22222222-2222-2222-2222-222222222222";
+    const settings = new Map<string, string[]>();
+    db.query.mockImplementation(async (_sql, [communityId]) => ({
+      rows: settings.has(communityId) ? [{ procurement_names: settings.get(communityId) }] : [],
+    }));
+    db.txQuery.mockImplementation(async (sql, params) => {
+      if (String(sql).includes("INSERT INTO expense_info_settings")) settings.set(params[0], params[1]);
+      if (String(sql).includes("SELECT procurement_names")) {
+        return { rows: settings.has(params[0]) ? [{ procurement_names: settings.get(params[0]) }] : [] };
+      }
+      return { rows: [] };
+    });
+    for (const [communityId, name] of [[COMMUNITY, "Equipment"], [otherCommunity, "Capital"]]) {
+      const response = await app.inject({
+        method: "PATCH", url, headers: cookieFor(["superadmin"], communityId),
+        payload: { procurementNames: [name], community_id: "untrusted-community" },
+      });
+      expect(response.statusCode).toBe(200);
+      expect(db.txQuery).toHaveBeenCalledWith(expect.stringContaining("WHERE community_id=$1"), [communityId]);
+    }
+    for (const [communityId, name] of [[COMMUNITY, "Equipment"], [otherCommunity, "Capital"]]) {
+      const response = await app.inject({ method: "GET", url, headers: cookieFor(["resident"], communityId) });
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual({ procurementNames: [name] });
+      expect(db.query).toHaveBeenCalledWith(expect.stringContaining("WHERE community_id=$1"), [communityId]);
+    }
   });
 });
 

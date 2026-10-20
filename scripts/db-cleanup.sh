@@ -13,6 +13,12 @@
 #   scripts/db-cleanup.sh --full --yes              # danger: wipe EVERYTHING incl. users
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}")"
+DEPLOY_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$DEPLOY_DIR"
+export COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-apartment-ledger-pro}"
+
 CONFIRM=""
 DO_BACKUP=1
 DO_TRUNCATE=1
@@ -24,7 +30,7 @@ for arg in "$@"; do
     --no-backup)   DO_BACKUP=0 ;;
     --full)        MODE="full" ;;
     -h|--help)
-      grep -E '^#( |$)' "$0" | sed 's/^# \{0,1\}//'
+      grep -E '^#( |$)' "$SCRIPT_DIR/$SCRIPT_NAME" | sed 's/^# \{0,1\}//'
       exit 0 ;;
   esac
 done
@@ -33,7 +39,7 @@ DB_SVC="db"
 DB_USER="apf"
 DB_NAME="apartment_finance"
 STAMP="$(date +%Y%m%d-%H%M%S)"
-BACKUP_DIR="./backups"
+BACKUP_DIR="$SCRIPT_DIR/backups"
 BACKUP_FILE="${BACKUP_DIR}/apf-${STAMP}.sql.gz"
 
 if ! docker compose ps --status running "$DB_SVC" >/dev/null 2>&1; then

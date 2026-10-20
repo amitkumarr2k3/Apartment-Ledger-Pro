@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid } from "recharts";
 import { SmartTooltipContent, getTooltipTrigger } from "@/components/smart-tooltip";
+import { ProcurementInfo } from "@/components/procurement-info";
 import { inr, sumMonthly, total, months12 } from "@/lib/finance-mock";
 import { useIncomeTree, useMonthlyTotals } from "@/lib/hooks";
 import { filterReportableIncomeCategories } from "@/lib/income-utils";
@@ -117,7 +118,12 @@ function Inner() {
             <TableBody>
               {rows.map((r) => (
                 <TableRow key={r.source}>
-                  <TableCell className="text-muted-foreground">{r.category}</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    <span className="inline-flex min-w-0 items-center gap-1">
+                      <span className="min-w-0 break-words">{r.category}</span>
+                      <ProcurementInfo name={r.category} persona="admin" />
+                    </span>
+                  </TableCell>
                   <TableCell className="font-medium">{r.source}</TableCell>
                   <TableCell className="text-right font-mono">{inr(r.total)}</TableCell>
                   <TableCell className="text-right font-mono">{((r.total / totalIncome) * 100).toFixed(1)}%</TableCell>

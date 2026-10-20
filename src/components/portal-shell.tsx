@@ -1,8 +1,9 @@
 import { Link, useRouterState, useNavigate, useSearch } from "@tanstack/react-router";
 import { createContext, useContext, useEffect, useMemo, useState, useRef, type ReactNode } from "react";
-import { navSections, monthlyTotals, months12, inr, expenseTree, incomeTree } from "@/lib/finance-mock";
+import { navSections, monthlyTotals, months12, inr } from "@/lib/finance-mock";
 import { getSession, signOut, type Session } from "@/lib/session";
-import { useDashboardSettings } from "@/lib/hooks";
+import { useDashboardSettings, useExpenseTree, useIncomeTree } from "@/lib/hooks";
+import { ProcurementInfo } from "@/components/procurement-info";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -502,8 +503,11 @@ function SidebarNav({
 
 
 // ⌘K palette — jump to any screen, head, category, or vendor
-function CommandPalette({ open, onOpenChange, sections }: { open: boolean; onOpenChange: (v: boolean) => void; sections: typeof navSections }) {
+function CommandPalette({ open, onOpenChange, sections, persona }: { open: boolean; onOpenChange: (v: boolean) => void; sections: typeof navSections; persona: "resident" | "admin" }) {
   const navigate = useNavigate();
+  const { data: expenseTree = [] } = useExpenseTree();
+  const { data: incomeTree = [] } = useIncomeTree();
+  const drilldownPath = persona === "admin" ? "/admin/drilldown" : "/resident/drilldown";
   const go = (opts: Parameters<typeof navigate>[0]) => {
     onOpenChange(false);
     navigate(opts);
@@ -532,38 +536,56 @@ function CommandPalette({ open, onOpenChange, sections }: { open: boolean; onOpe
         <CommandSeparator />
         <CommandGroup heading="Drill into expense">
           {expenseTree.map((c) => (
+            <div key={`e-${c.name}`} className="hidden items-center gap-1 has-[[cmdk-item]]:flex">
             <CommandItem
-              key={`e-${c.name}`}
+              className="min-w-0 flex-1"
               value={`expense ${c.name}`}
-              onSelect={() => go({ to: "/resident/drilldown", search: ((prev: any) => ({ ...prev, head: "expense", category: c.name, vendor: undefined, line: undefined })) as any })}
+              onSelect={() => go({ to: drilldownPath, search: ((prev: any) => ({ ...prev, head: "expense", category: c.name, vendor: undefined, line: undefined })) as any })}
             >
               <span className="text-xs text-rose-500 mr-2">expense</span>
-              {c.name}
+              <span className="min-w-0 break-words">{c.name}</span>
             </CommandItem>
+            <span onKeyDown={(event) => { if (event.key === "Enter") event.stopPropagation(); }}>
+              <ProcurementInfo name={c.name} persona={persona} />
+            </span>
+            </div>
           ))}
         </CommandGroup>
         <CommandGroup heading="Drill into income">
           {incomeTree.map((c) => (
+            <div key={`i-${c.name}`} className="hidden items-center gap-1 has-[[cmdk-item]]:flex">
             <CommandItem
-              key={`i-${c.name}`}
+              className="min-w-0 flex-1"
               value={`income ${c.name}`}
-              onSelect={() => go({ to: "/resident/drilldown", search: ((prev: any) => ({ ...prev, head: "income", category: c.name, vendor: undefined, line: undefined })) as any })}
+              onSelect={() => go({ to: drilldownPath, search: ((prev: any) => ({ ...prev, head: "income", category: c.name, vendor: undefined, line: undefined })) as any })}
             >
               <span className="text-xs text-emerald-500 mr-2">income</span>
-              {c.name}
+              <span className="min-w-0 break-words">{c.name}</span>
             </CommandItem>
+            <span onKeyDown={(event) => { if (event.key === "Enter") event.stopPropagation(); }}>
+              <ProcurementInfo name={c.name} persona={persona} />
+            </span>
+            </div>
           ))}
         </CommandGroup>
         <CommandGroup heading="Vendors">
           {expenseTree.flatMap((c) => c.vendors.map((v) => ({ v, c }))).map(({ v, c }) => (
+            <div key={`${c.name}-${v.name}`} className="hidden items-center gap-1 has-[[cmdk-item]]:flex">
             <CommandItem
-              key={v.name}
+              className="min-w-0 flex-1 flex-wrap"
               value={`vendor ${v.name} ${c.name}`}
-              onSelect={() => go({ to: "/resident/drilldown", search: ((prev: any) => ({ ...prev, head: "expense", category: c.name, vendor: v.name, line: undefined })) as any })}
+              onSelect={() => go({ to: drilldownPath, search: ((prev: any) => ({ ...prev, head: "expense", category: c.name, vendor: v.name, line: undefined })) as any })}
             >
-              <span className="text-xs text-muted-foreground mr-2">{c.name}</span>
-              {v.name}
+              <span className="min-w-0 break-words text-xs text-muted-foreground mr-2">{c.name}</span>
+              <span className="min-w-0 break-words">{v.name}</span>
             </CommandItem>
+            <span onKeyDown={(event) => { if (event.key === "Enter") event.stopPropagation(); }}>
+              {v.name !== c.name && <ProcurementInfo name={v.name} persona={persona} />}
+            </span>
+            <span onKeyDown={(event) => { if (event.key === "Enter") event.stopPropagation(); }}>
+              <ProcurementInfo name={c.name} persona={persona} />
+            </span>
+            </div>
           ))}
         </CommandGroup>
       </CommandList>
@@ -728,7 +750,7 @@ export function PortalShell({
   return (
     <Ctx.Provider value={periodCtx}>
     <TooltipProvider delayDuration={200}>
-    <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} sections={visibleNavSections} />
+    <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} sections={visibleNavSections} persona={persona} />
     <div className="min-h-screen bg-background text-foreground">
       <aside className="hidden lg:flex lg:flex-col fixed inset-y-0 left-0 w-64 border-r border-border bg-card overflow-y-auto no-print">
         <SidebarNav pathname={pathname} persona={persona} switchPersona={switchPersona} session={session} visibleSections={visibleNavSections} />

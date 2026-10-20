@@ -76,6 +76,7 @@ export async function mockApi(page: Page, settings: DashboardSetting[] = []): Pr
     }
 
     const responses: Record<string, unknown> = {
+      "/api/admin/settings/expense-info": { procurementNames: ["One Time Operational Procurement"] },
       "/api/dashboard/monthly-totals": fixtures.monthlyTotals,
       "/api/dashboard/balance-strip": fixtures.balanceStrip,
       "/api/income/tree": fixtures.incomeTree,

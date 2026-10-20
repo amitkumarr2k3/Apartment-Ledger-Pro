@@ -11,6 +11,7 @@ import { inr, pct, categoryMonthly, total, type Category } from "@/lib/finance-m
 import { TrendingUp, TrendingDown, AlertTriangle } from "lucide-react";
 import { NoDbData } from "@/components/mock-gate";
 import { useExpenseTree } from "@/lib/hooks";
+import { ProcurementInfo } from "@/components/procurement-info";
 
 export const Route = createFileRoute("/admin/alerts")({
   component: Page,
@@ -105,23 +106,38 @@ function Inner() {
           <CardDescription>Categories with spend increase &gt; 15% vs prior period</CardDescription>
         </CardHeader>
         <CardContent className="space-y-2">
-          {rising.length === 0 && <p className="text-sm text-muted-foreground">No categories exceed the 15% threshold this period.</p>}
+          {rising.length === 0 && (
+            <p className="text-sm text-muted-foreground">No categories exceed the 15% threshold this period.</p>
+          )}
           {rising.map((r) => (
-            <Link
-              key={r.category}
-              to="/resident/drilldown"
-              search={(((prev: any) => ({ ...prev, head: "expense", category: r.category, vendor: undefined, line: undefined })) as any)}
-              className="flex items-center justify-between p-3 rounded-md border border-rose-500/30 bg-rose-500/5 hover:bg-rose-500/10 transition-colors"
-            >
-              <div className="flex items-center gap-3">
-                <TrendingUp className="h-4 w-4 text-rose-500" />
-                <div>
-                  <div className="font-medium">{r.category}</div>
-                  <div className="text-xs text-muted-foreground">Current {inr(r.current)} · prev avg {inr(Math.round((r.current) / (1 + r.periodChange / 100)))}</div>
+            <div key={r.category} className="flex min-w-0 items-center gap-2">
+              <Link
+                to="/resident/drilldown"
+                search={
+                  ((prev: any) => ({
+                    ...prev,
+                    head: "expense",
+                    category: r.category,
+                    vendor: undefined,
+                    line: undefined,
+                  })) as any
+                }
+                className="flex min-w-0 flex-1 items-center justify-between gap-2 p-3 rounded-md border border-rose-500/30 bg-rose-500/5 hover:bg-rose-500/10 transition-colors"
+              >
+                <div className="flex min-w-0 items-center gap-3">
+                  <TrendingUp className="h-4 w-4 text-rose-500" />
+                  <div className="min-w-0">
+                    <div className="font-medium break-words">{r.category}</div>
+                    <div className="text-xs text-muted-foreground">
+                      Current {inr(r.current)} · prev avg{" "}
+                      {inr(Math.round(r.current / (1 + r.periodChange / 100)))}
+                    </div>
+                  </div>
                 </div>
-              </div>
-              <Badge className="bg-rose-500/10 text-rose-600 border-rose-500/30" variant="outline">{pct(r.periodChange, 1)}</Badge>
-            </Link>
+                <Badge className="bg-rose-500/10 text-rose-600 border-rose-500/30" variant="outline">{pct(r.periodChange, 1)}</Badge>
+              </Link>
+              <ProcurementInfo name={r.category} persona="admin" />
+            </div>
           ))}
         </CardContent>
       </Card>
@@ -137,17 +153,26 @@ function Inner() {
           ) : (
             <ul className="space-y-2">
               {anomalies.map((a) => (
-                <li key={a.category}>
+                <li key={a.category} className="flex min-w-0 items-center gap-2">
                   <Link
                     to="/resident/drilldown"
-                    search={(((prev: any) => ({ ...prev, head: "expense", category: a.category, vendor: undefined, line: undefined })) as any)}
-                    className="flex items-center justify-between p-3 rounded-md border border-amber-500/30 bg-amber-500/5 text-sm hover:bg-amber-500/10 transition-colors"
+                    search={
+                      ((prev: any) => ({
+                        ...prev,
+                        head: "expense",
+                        category: a.category,
+                        vendor: undefined,
+                        line: undefined,
+                      })) as any
+                    }
+                    className="flex min-w-0 flex-1 items-center justify-between gap-2 p-3 rounded-md border border-amber-500/30 bg-amber-500/5 text-sm hover:bg-amber-500/10 transition-colors"
                   >
-                    <span className="font-medium">{a.category}</span>
+                    <span className="min-w-0 break-words font-medium">{a.category}</span>
                     <span className="text-muted-foreground">
                       {inr(a.cur)} vs 3-mo avg {inr(a.avg)} · <span className="text-amber-600 font-semibold">{a.ratio.toFixed(1)}×</span>
                     </span>
                   </Link>
+                  <ProcurementInfo name={a.category} persona="admin" />
                 </li>
               ))}
             </ul>
@@ -157,17 +182,24 @@ function Inner() {
 
       {cat && (
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
+          <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
               <CardTitle className="text-base">Category trend</CardTitle>
               <CardDescription>Selected-period spend with 3-month moving average</CardDescription>
             </div>
-            <Select value={activeName ?? undefined} onValueChange={setSelected}>
-              <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {categoriesWithSpend.map((c) => <SelectItem key={c.name} value={c.name}>{c.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto">
+              <Select value={activeName ?? undefined} onValueChange={setSelected}>
+                <SelectTrigger className="w-full min-w-0 flex-1 sm:w-[200px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {categoriesWithSpend.map((c) => (
+                    <SelectItem key={c.name} value={c.name}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <ProcurementInfo name={cat.name} persona="admin" />
+            </div>
           </CardHeader>
           <CardContent>
             {view === "chart" ? (
@@ -231,12 +263,21 @@ function Inner() {
                   "text-amber-600 bg-amber-500/10";
                 return (
                   <TableRow key={r.category}>
-                    <TableCell className="font-medium">{r.category}</TableCell>
+                    <TableCell className="font-medium">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <span className="min-w-0 break-words">{r.category}</span>
+                        <ProcurementInfo name={r.category} persona="admin" />
+                      </div>
+                    </TableCell>
                     <TableCell className="text-right font-mono">{inr(r.previous)}</TableCell>
                     <TableCell className="text-right font-mono">{inr(r.current)}</TableCell>
                     <TableCell className="text-right">
                       <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded font-mono text-xs ${tone}`}>
-                        {r.change >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                        {r.change >= 0 ? (
+                          <TrendingUp className="h-3 w-3" />
+                        ) : (
+                          <TrendingDown className="h-3 w-3" />
+                        )}
                         {pct(r.change, 1)}
                       </span>
                     </TableCell>

@@ -13,6 +13,7 @@ import {
   Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell, LabelList, LineChart, Line,
 } from "recharts";
 import { SmartTooltipContent, getTooltipTrigger } from "@/components/smart-tooltip";
+import { ProcurementInfo } from "@/components/procurement-info";
 import {
   inr, pct, categoryMonthly, total, vendorMonthly, sumMonthly,
 } from "@/lib/finance-mock";
@@ -593,14 +594,14 @@ function Inner() {
             ) : (
               <ul className="divide-y divide-border max-h-[240px] overflow-y-auto">
                 {top5Income.map((income) => (
-                  <li key={income.name}>
+                  <li key={income.name} className="flex min-w-0 items-center gap-2">
                     <Link
                       to="/resident/drilldown"
                       search={(((prev: any) => ({ ...prev, head: "income", category: income.name, vendor: undefined, line: undefined })) as any)}
-                      className="flex items-center justify-between py-3 -mx-4 px-4 hover:bg-accent/40 rounded transition-colors"
+                      className="flex min-w-0 flex-1 items-center justify-between gap-2 py-3 hover:bg-accent/40 rounded transition-colors"
                     >
-                      <div>
-                        <div className="font-medium">{income.name}</div>
+                      <div className="min-w-0">
+                        <div className="break-words font-medium">{income.name}</div>
                         <div className="text-xs text-muted-foreground">{((income.total / (top5IncomeTotal || 1)) * 100).toFixed(1)}% of top 5</div>
                       </div>
                       <div className="flex items-center gap-3">
@@ -608,6 +609,7 @@ function Inner() {
                         <ArrowRight className="h-4 w-4 text-muted-foreground" />
                       </div>
                     </Link>
+                    <ProcurementInfo name={income.name} persona="resident" />
                   </li>
                 ))}
               </ul>
@@ -633,7 +635,7 @@ function Inner() {
                 <BarChart data={top5} layout="vertical" margin={{ left: 20, right: 44 }}>
                   <CartesianGrid horizontal={false} strokeDasharray="3 3" opacity={0.3} />
                   <XAxis type="number" domain={[0, (max: number) => max * 1.12]} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} fontSize={11} />
-                  <YAxis type="category" dataKey="name" width={110} fontSize={12} />
+                  <YAxis type="category" dataKey="name" width={32} tickFormatter={(_, index) => `#${index + 1}`} fontSize={12} />
                   <Tooltip trigger={getTooltipTrigger()} cursor={{ fill: "var(--color-muted)", opacity: 0.35 }} content={<SmartTooltipContent labelPrefix="Category" valueFormatter={(v) => inr(v)} />} />
                   <Bar dataKey="total" radius={[0, 4, 4, 0]} className="cursor-pointer">
                     {top5.map((c) => (
@@ -649,14 +651,14 @@ function Inner() {
             ) : (
               <ul className="divide-y divide-border max-h-[240px] overflow-y-auto">
                 {top5.map((c) => (
-                  <li key={c.name}>
+                  <li key={c.name} className="flex items-center gap-2">
                     <Link
                       to="/resident/drilldown"
                       search={(((prev: any) => ({ ...prev, head: "expense", category: c.name, vendor: undefined, line: undefined })) as any)}
-                      className="flex items-center justify-between py-3 -mx-4 px-4 hover:bg-accent/40 rounded transition-colors"
+                      className="flex min-w-0 flex-1 items-center justify-between gap-2 py-3 hover:bg-accent/40 rounded transition-colors"
                     >
-                      <div>
-                        <div className="font-medium">{c.name}</div>
+                      <div className="min-w-0">
+                        <div className="font-medium break-words">{c.name}</div>
                         <div className="text-xs text-muted-foreground">{((c.total / (top5Total || 1)) * 100).toFixed(1)}% of top 5</div>
                       </div>
                       <div className="flex items-center gap-3">
@@ -664,6 +666,7 @@ function Inner() {
                         <ArrowRight className="h-4 w-4 text-muted-foreground" />
                       </div>
                     </Link>
+                    <ProcurementInfo name={c.name} persona="resident" />
                   </li>
                 ))}
               </ul>
@@ -702,13 +705,13 @@ function Inner() {
             ) : (
               <ul className="divide-y divide-border max-h-[240px] overflow-y-auto">
                 {top5Vendors.map((v) => (
-                  <li key={`${v.category}-${v.name}`}>
+                  <li key={`${v.category}-${v.name}`} className="flex items-center gap-2">
                     <Link
                       to="/resident/drilldown"
                       search={(((prev: any) => ({ ...prev, head: "expense", category: v.category, vendor: v.name, line: undefined })) as any)}
-                      className="flex items-center justify-between py-3 -mx-4 px-4 hover:bg-accent/40 rounded transition-colors"
+                      className="flex min-w-0 flex-1 items-center justify-between gap-2 py-3 hover:bg-accent/40 rounded transition-colors"
                     >
-                      <div>
+                      <div className="min-w-0 break-words">
                         <div className="font-medium">{v.name}</div>
                         <div className="text-xs text-muted-foreground">{v.category} · {((v.total / (top5VendorTotal || 1)) * 100).toFixed(1)}% of top 5 vendors</div>
                       </div>
@@ -717,6 +720,8 @@ function Inner() {
                         <ArrowRight className="h-4 w-4 text-muted-foreground" />
                       </div>
                     </Link>
+                    {v.name !== v.category && <ProcurementInfo name={v.name} persona="resident" />}
+                    <ProcurementInfo name={v.category} persona="resident" />
                   </li>
                 ))}
               </ul>

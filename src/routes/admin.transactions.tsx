@@ -14,6 +14,7 @@ import { inr, months12, expenseTree, incomeTree, type TxnRow } from "@/lib/finan
 import { useAdminTransactions, type AdminTxnRow } from "@/lib/hooks";
 import { Pencil, Plus, Trash2, Search, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
+import { ProcurementInfo } from "@/components/procurement-info";
 
 export const Route = createFileRoute("/admin/transactions")({
   component: Page,
@@ -216,7 +217,9 @@ function Inner() {
               <SelectContent>
                 <SelectItem value="period">Current period · {label}</SelectItem>
                 <SelectItem value="all">All months</SelectItem>
-                {monthOptions.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                {monthOptions.map((m) => (
+                  <SelectItem key={m} value={m}>{m}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <Select value={head} onValueChange={setHead}>
@@ -258,10 +261,21 @@ function Inner() {
                     <TableCell>
                       <Badge variant="outline" className={r.head === "income" ? "border-emerald-500/40 text-emerald-600" : "border-rose-500/40 text-rose-600"}>{r.head}</Badge>
                     </TableCell>
-                    <TableCell>{r.category}</TableCell>
+                    <TableCell>
+                      <div className="flex min-w-0 items-center gap-2">
+                        <span className="min-w-0 break-words">{r.category}</span>
+                        <ProcurementInfo name={r.category} persona="admin" />
+                      </div>
+                    </TableCell>
                     <TableCell className="text-xs">
-                      <div className="font-medium">{r.vendor ?? "—"}</div>
-                      <div className="text-muted-foreground">{r.lineItem}</div>
+                      <div className="flex min-w-0 items-center gap-1 font-medium">
+                        <span className="min-w-0 break-words">{r.vendor ?? "—"}</span>
+                        {r.vendor && <ProcurementInfo name={r.vendor} persona="admin" />}
+                      </div>
+                      <div className="flex min-w-0 items-center gap-1 text-muted-foreground">
+                        <span className="min-w-0 break-words">{r.lineItem}</span>
+                        <ProcurementInfo name={r.lineItem} persona="admin" />
+                      </div>
                     </TableCell>
                     <TableCell className="text-right font-mono">{inr(r.amount)}</TableCell>
                     <TableCell className="text-xs uppercase text-muted-foreground">{r.source}</TableCell>
@@ -318,52 +332,80 @@ function Inner() {
                 onValueChange={(id) => {
                   const opt = headOptions.find((h) => h.id === id);
                   if (!opt) return;
-                  setDraft({ ...draft, headId: opt.id, head: opt.name, direction: opt.name === "income" ? "C" : "D", categoryId: undefined, category: "" });
+                  setDraft({
+                    ...draft,
+                    headId: opt.id,
+                    head: opt.name,
+                    direction: opt.name === "income" ? "C" : "D",
+                    categoryId: undefined,
+                    category: "",
+                  });
                 }}
               >
                 <SelectTrigger><SelectValue placeholder="Select…" /></SelectTrigger>
-                <SelectContent>{headOptions.map((h) => <SelectItem key={h.id} value={h.id}>{h.name}</SelectItem>)}</SelectContent>
+                <SelectContent>
+                  {headOptions.map((h) => (
+                    <SelectItem key={h.id} value={h.id}>{h.name}</SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
             </Field>
             <Field label="Category">
-              <Select
-                value={draft.categoryId ?? ""}
-                onValueChange={(id) => {
-                  const opt = categoryOptions.find((c) => c.id === id);
-                  if (!opt) return;
-                  setDraft({ ...draft, categoryId: opt.id, category: opt.name });
-                }}
-              >
-                <SelectTrigger><SelectValue placeholder="Select…" /></SelectTrigger>
-                <SelectContent>
-                  {categoryOptions.filter((c) => !draft.headId || c.headId === draft.headId).map((c) => (
-                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex min-w-0 items-center gap-2">
+                <Select
+                  value={draft.categoryId ?? ""}
+                  onValueChange={(id) => {
+                    const opt = categoryOptions.find((c) => c.id === id);
+                    if (!opt) return;
+                    setDraft({ ...draft, categoryId: opt.id, category: opt.name });
+                  }}
+                >
+                  <SelectTrigger className="min-w-0 flex-1">
+                    <SelectValue placeholder="Select…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categoryOptions.filter((c) => !draft.headId || c.headId === draft.headId).map((c) => (
+                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {draft.category && <ProcurementInfo name={draft.category} persona="admin" />}
+              </div>
             </Field>
             <Field label="Vendor">
-              <Select
-                value={draft.vendorId ?? ""}
-                onValueChange={(id) => {
-                  const opt = vendorOptions.find((v) => v.id === id);
-                  setDraft({ ...draft, vendorId: opt?.id, vendor: opt?.name });
-                }}
-              >
-                <SelectTrigger><SelectValue placeholder="Select… (optional)" /></SelectTrigger>
-                <SelectContent>
-                  {vendorOptions.filter((v) => !draft.categoryId || v.categoryId === draft.categoryId).map((v) => (
-                    <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex min-w-0 items-center gap-2">
+                <Select
+                  value={draft.vendorId ?? ""}
+                  onValueChange={(id) => {
+                    const opt = vendorOptions.find((v) => v.id === id);
+                    setDraft({ ...draft, vendorId: opt?.id, vendor: opt?.name });
+                  }}
+                >
+                  <SelectTrigger className="min-w-0 flex-1"><SelectValue placeholder="Select… (optional)" /></SelectTrigger>
+                  <SelectContent>
+                    {vendorOptions.filter((v) => !draft.categoryId || v.categoryId === draft.categoryId).map((v) => (
+                      <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {draft.vendor && <ProcurementInfo name={draft.vendor} persona="admin" />}
+              </div>
             </Field>
-            <Field label="Line item" className="sm:col-span-2"><Input value={draft.lineItem} onChange={(e) => setDraft({ ...draft, lineItem: e.target.value })} /></Field>
+            <Field label="Line item" className="sm:col-span-2">
+              <div className="flex min-w-0 items-center gap-2">
+                <Input value={draft.lineItem} onChange={(e) => setDraft({ ...draft, lineItem: e.target.value })} />
+                <ProcurementInfo name={draft.lineItem} persona="admin" />
+              </div>
+            </Field>
             <Field label="Amount (₹)"><Input type="number" value={draft.amount} onChange={(e) => setDraft({ ...draft, amount: Number(e.target.value) })} /></Field>
             <Field label="Month">
               <Select value={draft.month} onValueChange={(v) => setDraft({ ...draft, month: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{monthOptions.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
+                <SelectContent>
+                  {monthOptions.map((m) => (
+                    <SelectItem key={m} value={m}>{m}</SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
             </Field>
             <Field label="Notes" className="sm:col-span-2"><Input value={draft.notes ?? ""} onChange={(e) => setDraft({ ...draft, notes: e.target.value })} /></Field>

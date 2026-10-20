@@ -15,6 +15,13 @@ server {
   listen 80;
   server_name ${DOMAIN};
 
+  # Compose probes this endpoint over HTTP; keep it off the HTTPS redirect.
+  location = /health {
+    access_log off;
+    add_header Content-Type application/json;
+    return 200 '{"ok":true,"service":"web"}';
+  }
+
   # Let certbot's webroot plugin write challenge files here during renewal.
   location /.well-known/acme-challenge/ {
     root /var/www/certbot;
