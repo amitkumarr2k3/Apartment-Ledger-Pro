@@ -195,12 +195,317 @@ EXPECTED_COLUMNS = [
 ]
 
 # -------------------------------------------------------
+# Process Collection / SQFT Report Files
+# -------------------------------------------------------
+
+for file in Path(INPUT_DIR).glob("*.xls*"):
+
+    name = file.name.lower()
+
+    if "collection" not in name and "sqft" not in name:
+        continue
+
+    try:
+        raw = pd.read_excel(file, header=None)
+
+        month_short = {
+            "jan": 1, "january": 1,
+            "feb": 2, "february": 2,
+            "mar": 3, "march": 3,
+            "apr": 4, "april": 4,
+            "may": 5,
+            "jun": 6, "june": 6,
+            "jul": 7, "july": 7,
+            "aug": 8, "august": 8,
+            "sep": 9, "sept": 9, "september": 9,
+            "oct": 10, "october": 10,
+            "nov": 11, "november": 11,
+            "dec": 12, "december": 12,
+        }
+
+        first_row = [str(x).strip() for x in raw.iloc[0].values if pd.notna(x)]
+
+        if first_row and norm(first_row[0]) == "month":
+            df = pd.read_excel(file, header=0)
+
+            as_of_match = re.search(
+                r"as\s*(?:of|on)?\s*([A-Za-z]+)\s*[-]?\s*(20\d{2}|\d{2})",
+                file.name,
+                re.IGNORECASE,
+            )
+
+            as_of_year = None
+            if as_of_match:
+                year_text = as_of_match.group(2)
+                as_of_year = int(year_text) if len(year_text) == 4 else int("20" + year_text)
+
+            month_col = df.columns[0]
+
+            for _, r in df.iterrows():
+                month_text = str(r[month_col]).strip()
+                month_info = re.match(r"([A-Za-z]+)", month_text)
+                month_num = None
+                year_num = None
+
+                raw_month_value = r[month_col]
+                if isinstance(raw_month_value, (pd.Timestamp, datetime)):
+                    month_num = raw_month_value.month
+                    year_num = raw_month_value.year
+
+                # Support exported date values such as Oct-25 and Oct 2025,
+                # in addition to plain month names.
+                month_match = re.match(
+                    r"([A-Za-z]{3,})[\s\-/']+(\d{2}|20\d{2})",
+                    month_text,
+                    re.IGNORECASE,
+                )
+
+                if month_match:
+                    month_key = month_match.group(1).lower()
+                    month_num = next(
+                        (num for key, num in month_short.items() if key.startswith(month_key[:3])),
+                        None,
+                    )
+                    year_text = month_match.group(2)
+                    year_num = int(year_text) if len(year_text) == 4 else int("20" + year_text)
+                elif month_info is not None:
+                    month_key = month_info.group(1).lower()
+                    month_num = next(
+                        (num for key, num in month_short.items() if key.startswith(month_key[:3])),
+                        None,
+                    )
+
+                    if month_num is None:
+                        continue
+
+                    if as_of_year is not None:
+                        year_num = as_of_year
+                    else:
+                        year_num = datetime.now().year
+
+                if month_num is None or year_num is None:
+                    continue
+
+                for col in df.columns[1:]:
+                    ledger = canonical_line_item(col)
+                    ledger_norm = norm(ledger)
+
+                    # Maintenance Charge is sourced only from the Income/Receipt report.
+                    if ledger_norm == "maintenance charge":
+                        continue
+
+                    amt = r.get(col)
+
+                    if pd.isna(amt):
+                        continue
+
+                    try:
+                        amount = float(str(amt).replace(",", "").strip())
+                    except (TypeError, ValueError):
+                        continue
+
+                    multiplier = cfg.get("collection_amount_multipliers", {}).get(ledger)
+                    if multiplier is not None:
+                        amount = amount * float(multiplier)
+
+                    category = income_map.get(ledger_norm)
+                    reference_category = cfg.get("collection_reference_categories", {}).get(ledger)
+
+                    if reference_category:
+                        head = "reference"
+                        category = reference_category
+                    elif category:
+                        head = "income"
+                    else:
+                        continue
+
+                    vendor_info = vendors.get(ledger, {})
+                    vendor = vendor_info.get("vendor", "Individual")
+                    vendor_kind = vendor_info.get("vendor_kind", "individual")
+
+                    flat_code = ""
+                    if ledger == "Previous Arrears Brought Forward":
+                        flat_code = f"OUT-BF-{year_num}-{month_num:02d}"
+                    elif ledger == "Current Month Unpaid Maintenance":
+                        flat_code = f"OUT-CUR-{year_num}-{month_num:02d}"
+
+                    date_value = f"{year_num}-{month_num:02d}-01"
+                    source_ref = ""
+                    if head == "income":
+                        source_ref = f"C|{category}|{vendor}|{ledger}|{year_num}-{month_num:02d}"
+
+                    rows.append({
+                        "date": date_value,
+                        "head": head,
+                        "category": category,
+                        "vendor": vendor,
+                        "vendor_kind": vendor_kind,
+                        "line_item": ledger,
+                        "amount": amount,
+                        "direction": "C",
+                        "flat_code": flat_code,
+                        "source_ref": source_ref,
+                    })
+
+            continue
+
+        fy = ""
+        for _, r in raw.iterrows():
+            txt = " ".join(str(x) for x in r if pd.notna(x))
+            if "Financial Year" in txt:
+                fy = txt
+                break
+
+        start_year = None
+        end_year = None
+        fy_match = re.search(r"(\d{4})-(\d{2,4})", fy)
+        if fy_match:
+            start_year = int(fy_match.group(1))
+            end_part = fy_match.group(2)
+            end_year = int(end_part) if len(end_part) == 4 else int(str(start_year)[:2] + end_part)
+
+        if start_year is None:
+            fname_fy = re.search(r"FY\s*(\d{4})[\s\-]+(\d{2,4})", file.name, re.IGNORECASE)
+            if fname_fy:
+                start_year = int(fname_fy.group(1))
+                end_part = fname_fy.group(2)
+                end_year = int(end_part) if len(end_part) == 4 else int(str(start_year)[:2] + end_part)
+
+        def parse_month_column(value):
+            text = re.sub(r"\s+", " ", str(value).strip()).lower()
+            month_num = None
+            for month_name, num in month_short.items():
+                if re.search(r"(?:^|[^a-z])" + re.escape(month_name) + r"(?:[^a-z]|$)", text):
+                    month_num = num
+                    break
+            if month_num is None:
+                return None
+
+            year_match = re.search(r"(?<!\d)(20\d{2}|\d{2})(?!\d)", text)
+            if year_match:
+                year_text = year_match.group(1)
+                year_num = int(year_text) if len(year_text) == 4 else int("20" + year_text)
+                return month_num, year_num
+
+            if start_year is not None:
+                year_num = start_year if month_num >= 9 else end_year
+                return month_num, year_num
+
+            as_of_text = " ".join(str(x) for x in raw.fillna("").to_numpy().ravel())
+            as_of_match = re.search(
+                r"(?:as\s*(?:of|on)|date)\s*[:\-]?\s*(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s*['\-]?\s*(20\d{2}|\d{2})",
+                as_of_text,
+                re.IGNORECASE,
+            )
+            if as_of_match:
+                month_text = as_of_match.group(1).lower()
+                month_num = next(num for key, num in month_short.items() if key.startswith(month_text[:3]))
+                year_text = as_of_match.group(2)
+                year_num = int(year_text) if len(year_text) == 4 else int("20" + year_text)
+                return month_num, year_num
+
+            return month_num, datetime.now().year
+
+        hdr = None
+        for i, r in raw.iterrows():
+            if any(parse_month_column(x) is not None for x in r.values if pd.notna(x)):
+                hdr = i
+                break
+
+        if hdr is None:
+            print(f"Skipping {file.name}: could not find month columns")
+            continue
+
+        df = pd.read_excel(file, header=hdr)
+        ledger_col = df.columns[0]
+        for _, r in df.iterrows():
+            ledger = str(r[ledger_col]).strip()
+            if not ledger or ledger.lower() == "nan" or ledger.lower() == "total":
+                continue
+
+            ledger = canonical_line_item(ledger)
+            ledger_norm = norm(ledger)
+
+            if ledger_norm == "maintenance charge":
+                continue
+
+            for col in df.columns:
+                month_info = parse_month_column(col)
+                if month_info is None:
+                    continue
+
+                month_num, year_num = month_info
+                amt = r.get(col)
+                if pd.isna(amt):
+                    continue
+
+                try:
+                    amount = float(str(amt).replace(",", "").strip())
+                except (TypeError, ValueError):
+                    continue
+
+                multiplier = cfg.get("collection_amount_multipliers", {}).get(ledger)
+                if multiplier is not None:
+                    amount = amount * float(multiplier)
+
+                category = income_map.get(ledger_norm, "Uncategorized")
+                head = "income"
+
+                reference_category = cfg.get("collection_reference_categories", {}).get(ledger)
+                if reference_category:
+                    category = reference_category
+                    head = "reference"
+
+                vendor_info = vendors.get(ledger, {})
+                vendor = vendor_info.get("vendor", "Individual")
+                vendor_kind = vendor_info.get("vendor_kind", "individual")
+
+                flat_code = ""
+                if ledger == "Previous Arrears Brought Forward":
+                    flat_code = f"OUT-BF-{year_num}-{month_num:02d}"
+                elif ledger == "Current Month Unpaid Maintenance":
+                    flat_code = f"OUT-CUR-{year_num}-{month_num:02d}"
+
+                date_value = f"{year_num}-{month_num:02d}-01"
+                source_ref = ""
+                if head == "income":
+                    source_ref = f"C|{category}|{vendor}|{ledger}|{year_num}-{month_num:02d}"
+
+                rows.append({
+                    "date": date_value,
+                    "head": head,
+                    "category": category,
+                    "vendor": vendor,
+                    "vendor_kind": vendor_kind,
+                    "line_item": ledger,
+                    "amount": amount,
+                    "direction": "C",
+                    "flat_code": flat_code,
+                    "source_ref": source_ref,
+                })
+
+    except Exception as ex:
+        print(f"Error processing collection report {file.name}: {ex}")
+
+    finally:
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        try:
+            shutil.move(str(file), f"{PROCESSED_DIR}/{file.stem}_{ts}{file.suffix}")
+        except Exception as move_ex:
+            print(f"Could not move {file.name} to processed: {move_ex}")
+
+# -------------------------------------------------------
 # Process Expense / Receipt Files
 # -------------------------------------------------------
 
 for file in Path(INPUT_DIR).glob("*.xls*"):
 
-    if "vendor" in file.name.lower():
+    name = file.name.lower()
+
+    if "vendor" in name:
+        continue
+
+    if "collection" in name or "sqft" in name:
         continue
 
     try:
@@ -451,34 +756,55 @@ output_df["date"] = pd.to_datetime(
     errors="coerce"
 ).dt.strftime("%Y-%m-%d")
 
+# Add configured final reference entries exactly once, at the end of the CSV.
+opening_balance_line = "True Opening Balance"
+output_df = output_df[
+    ~((output_df["line_item"] == opening_balance_line) &
+      (output_df["head"] == "reference"))
+].copy()
+
+for entry in cfg.get("final_reference_entries", []):
+    final_entry = {column: entry.get(column, "") for column in EXPECTED_COLUMNS}
+    output_df = pd.concat(
+        [output_df, pd.DataFrame([final_entry], columns=EXPECTED_COLUMNS)],
+        ignore_index=True,
+    )
+
 # CSV Export
 output_df.to_csv(
     OUTPUT_CSV,
     index=False
 )
 
-# Excel Export with date formatting
-with pd.ExcelWriter(
-    OUTPUT_XLSX,
-    engine="openpyxl"
-) as writer:
+# Excel Export with date formatting. Keep CSV generation successful even
+# if transactions.xlsx is currently open and locked by Excel.
+try:
+    with pd.ExcelWriter(
+        OUTPUT_XLSX,
+        engine="openpyxl"
+    ) as writer:
 
-    output_df.to_excel(
-        writer,
-        index=False,
-        sheet_name="Transactions"
+        output_df.to_excel(
+            writer,
+            index=False,
+            sheet_name="Transactions"
+        )
+
+        worksheet = writer.sheets["Transactions"]
+
+        # Find Date column
+        date_col_idx = output_df.columns.get_loc("date") + 1
+
+        for row in range(2, len(output_df) + 2):
+            worksheet.cell(
+                row=row,
+                column=date_col_idx
+            ).number_format = "yyyy-mm-dd"
+except PermissionError:
+    print(
+        f"Warning: could not update {OUTPUT_XLSX} because it is open or locked; "
+        "the CSV output was generated successfully."
     )
-
-    worksheet = writer.sheets["Transactions"]
-
-    # Find Date column
-    date_col_idx = output_df.columns.get_loc("date") + 1
-
-    for row in range(2, len(output_df) + 2):
-        worksheet.cell(
-            row=row,
-            column=date_col_idx
-        ).number_format = "yyyy-mm-dd"
 
 print(
     f"Generated {len(output_df)} rows"

@@ -8,6 +8,7 @@ Convert monthly Expense Analysis and Receipt Analysis sheets into transaction fo
 
 - Supports multiple expense files
 - Supports multiple receipt files
+- Supports Collection & SQFT reports
 - Configuration driven mapping
 - Generates consolidated output
 - Generates unmapped report
@@ -27,6 +28,7 @@ Expense-analysis-2026-2027.xls
 
 Receipt-analysis-2025-2026.xls
 Receipt-analysis-2026-2027.xls
+Collection & SQFT Report as of Nov26.xlsx
 
 ---
 
@@ -98,6 +100,23 @@ category = Uncategorized
 vendor = Individual
 
 vendor_kind = individual
+
+---
+
+## Collection and SQFT Rules
+
+Collection workbooks are detected by `Collection` or `SQFT` in the filename.
+Supported ledger mappings include:
+
+- Per Sqft Rate -> Cost Per Sqft x100
+- Actual Collection -> Maintenance Charge
+- Maintenance Deficit -> Current Month Unpaid Maintenance
+- Creche, Creaatio, Laundry Pro -> Commercial Income
+- Previous Arrears Brought Forward
+- Expected Collection
+- Corpus Fund Balance (Accumulated)
+
+Collection records use `head = income` or `head = reference`, with `direction = C`.
 
 ---
 

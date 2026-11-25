@@ -3,6 +3,17 @@ defaults:
   income_head: income
 
 line_item_aliases:
+  Per Sqft Rate: Cost Per Sqft x100
+  Actual Collection: Maintenance Charge
+  Maintenance Deficit: Current Month Unpaid Maintenance
+  Contingency Per Sqft: Contingency Per Sqft x100
+  Contingency Per Sqft Rate: Contingency Per Sqft x100
+  Contingency Fund: Contingency Per Sqft x100
+  Corpus Fund Balance: Corpus Fund Balance (Accumulated)
+  Opening Balance: True Opening Balance
+  Previous Arrears B/F: Previous Arrears Brought Forward
+  Cultural Event: Petty Cash - Cultural Event
+
   Flea Market: Flee Market
   Move In/Out Charges: Move in/out Charges
   Move In / Out (Manual): Move In/Out (Manual)
@@ -16,6 +27,11 @@ line_item_aliases:
 expense_categories:
 
   Utilities:
+    - Airtel Postpaid Connection
+    - Diesel
+    - Common Area Internet
+
+  Common Area Electricity:
     - BESCOM A Block
     - BESCOM B Block
     - BESCOM C Block
@@ -23,13 +39,17 @@ expense_categories:
     - BESCOM E Block
     - BESCOM F Block
     - BESCOM G Block
-    - Water Supply
-    - Airtel Postpaid Connection
-    - Diesel
 
-  Maintenance:
+  Water Tanker Supply:
+    - Water Supply
+
+  Lift Maintenance:
     - AMC (Lift)
+
+  AC Maintenance:
     - AMC (AC)
+
+  DG Maintenance:
     - AMC (DG)
     - DG Service
 
@@ -66,8 +86,9 @@ expense_categories:
 
   Cleaning:
     - Debris Disposal
+    - Cleaning
 
-  Water Treatment:
+  STP water collection (Sludge Removal):
     - STP water collection (Sludge Removal)
 
   Office Supplies:
@@ -85,12 +106,15 @@ expense_categories:
 
   Petty Cash:
     - Petty Cash - Consumables
+    - Petty Cash - Miscellaneous
     - Petty Cash - Electricals
     - Petty Cash - Hardware
     - Petty Cash - Office Supplies
     - Tools & Stationary
-    - One Time Operational Procurement
     - Petty Cash - Cultural Event
+
+  One Time Operational Procurement:
+    - One Time Operational Procurement
 
 
 income_categories:
@@ -112,6 +136,7 @@ income_categories:
     - Lift Advertisement
     - Digital Display
     - Standees
+    - Signage
     - Umbrella or Kiosk
 
   Penalties:
@@ -133,6 +158,7 @@ income_categories:
 
   Community Contributions:
     - Association Fund
+    - Engagement Fund
 
   Recreation & Wellness:
     - Fitness Trainers
@@ -144,6 +170,29 @@ income_categories:
     - Creche
     - Creaatio
     - Laundry Pro
+
+collection_reference_categories:
+  Cost Per Sqft x100: Maintenance Rate Reference
+  Contingency Per Sqft x100: Contingency Rate Reference
+  Expected Collection: Expected Collection Reference
+  Corpus Fund Balance (Accumulated): Corpus Fund Reference
+  True Opening Balance: Opening Balance Reference
+
+collection_amount_multipliers:
+  Cost Per Sqft x100: 100
+  Contingency Per Sqft x100: 100
+
+final_reference_entries:
+  - date: "2025-10-01"
+    head: reference
+    category: Opening Balance Reference
+    vendor: Rate Card
+    vendor_kind: company
+    line_item: True Opening Balance
+    amount: 706902
+    direction: C
+    flat_code: ""
+    source_ref: ""
 
 
 vendor_groups:
@@ -257,8 +306,20 @@ vendors:
     vendor_kind: internal
 
   One Time Operational Procurement:
-    vendor: Petty Cash
+    vendor: Individual
     vendor_kind: internal
+
+  Debris Disposal:
+    vendor: Individual
+    vendor_kind: individual
+
+  Cleaning:
+    vendor: Individual
+    vendor_kind: individual
+
+  Common Area Internet:
+    vendor: Individual
+    vendor_kind: individual
 
   Petty Cash - Consumables:
     vendor: Petty Cash
@@ -277,6 +338,10 @@ vendors:
     vendor_kind: internal
 
   Petty Cash - Cultural Event:
+    vendor: Petty Cash
+    vendor_kind: internal
+
+  Petty Cash - Miscellaneous:
     vendor: Petty Cash
     vendor_kind: internal
 
@@ -305,6 +370,34 @@ vendors:
     vendor: Apartment Owners
     vendor_kind: resident
 
+  Previous Arrears Brought Forward:
+    vendor: Apartment Owners
+    vendor_kind: resident
+
+  Current Month Unpaid Maintenance:
+    vendor: Apartment Owners
+    vendor_kind: resident
+
+  Cost Per Sqft x100:
+    vendor: Rate Card
+    vendor_kind: company
+
+  Contingency Per Sqft x100:
+    vendor: Rate Card
+    vendor_kind: company
+
+  Expected Collection:
+    vendor: Rate Card
+    vendor_kind: company
+
+  Corpus Fund Balance (Accumulated):
+    vendor: Rate Card
+    vendor_kind: company
+
+  True Opening Balance:
+    vendor: Rate Card
+    vendor_kind: company
+
   AV room:
     vendor: Amenities
     vendor_kind: internal
@@ -330,6 +423,10 @@ vendors:
     vendor_kind: income_stream
 
   Umbrella or Kiosk:
+    vendor: Advertising Revenue
+    vendor_kind: income_stream
+
+  Signage:
     vendor: Advertising Revenue
     vendor_kind: income_stream
 
@@ -370,6 +467,10 @@ vendors:
     vendor_kind: statutory
 
   Association Fund:
+    vendor: Residents
+    vendor_kind: resident
+
+  Engagement Fund:
     vendor: Residents
     vendor_kind: resident
 
