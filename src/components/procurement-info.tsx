@@ -4,6 +4,30 @@ import { defaultExpenseInfoSettings, useExpenseInfoSettings } from "@/lib/hooks"
 
 export const procurementCategory = "One Time Operational Procurement";
 
+export function useCategoryVendorText() {
+  const { data: settings = defaultExpenseInfoSettings } = useExpenseInfoSettings();
+  return (category: { name: string; vendors: { name: string }[] }) => {
+    const isProcurement = settings.procurementNames.some((a) => a.trim().toLowerCase() === category.name.trim().toLowerCase());
+    const names = category.vendors.map((v) => v.name);
+    if (isProcurement || names.length === 0) {
+      return {
+        short: "Non-recurring purchases",
+        detail: "Month-by-month total for this category over the selected range — this is the final level of detail available here",
+      };
+    }
+    if (names.length === 1) {
+      return {
+        short: names[0],
+        detail: `All transactions in this category are with ${names[0]}. Month-by-month total for the selected range — this is the final level of detail available here`,
+      };
+    }
+    return {
+      short: `${names.length} vendors`,
+      detail: `Sum of all ${names.length} vendors (${names.join(", ")}) under this category, per month, for the selected range — this is the final level of detail available here`,
+    };
+  };
+}
+
 export function ProcurementInfo({ name, persona = "resident" }: { name: string; persona?: "resident" | "admin" | "superadmin" }) {
   const { data: settings = defaultExpenseInfoSettings } = useExpenseInfoSettings();
   if (!settings.procurementNames.some((alias) => alias.trim().toLowerCase() === name.trim().toLowerCase())) return null;

@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { Tooltip, Bar, BarChart, CartesianGrid, ResponsiveContainer, XAxis, YAxis, Legend } from "recharts";
 import { SmartTooltipContent, getTooltipTrigger } from "@/components/smart-tooltip";
-import { ProcurementInfo } from "@/components/procurement-info";
+import { ProcurementInfo, useCategoryVendorText } from "@/components/procurement-info";
 import {
   inr, categoryMonthly, vendorMonthly, total,
 } from "@/lib/finance-mock";
@@ -30,6 +30,7 @@ function Page() {
 
 function Inner() {
   const navigate = useNavigate();
+  const vendorText = useCategoryVendorText();
   const { sliceMonthly, labels } = usePeriod();
   const search = useSearch({ strict: false }) as {
     head?: string; category?: string; vendor?: string; line?: string;
@@ -120,7 +121,7 @@ function Inner() {
                   <button onClick={() => update({ category: c.name })} className="min-w-0 flex-1 flex items-center justify-between gap-3 py-3 text-left">
                     <div className="min-w-0">
                       <div className="break-words font-medium">{c.name}</div>
-                      <div className="text-xs text-muted-foreground">{c.vendors.length} vendor{c.vendors.length > 1 ? "s" : ""}</div>
+                      <div className="text-xs text-muted-foreground">{vendorText(c).short}</div>
                     </div>
                     <div className="flex shrink-0 items-center gap-3">
                       <span className="font-mono text-sm">{inr(t)}</span>

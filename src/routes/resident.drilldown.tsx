@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { Tooltip, Bar, BarChart, CartesianGrid, ResponsiveContainer, XAxis, YAxis } from "recharts";
 import { SmartTooltipContent, getTooltipTrigger } from "@/components/smart-tooltip";
-import { ProcurementInfo } from "@/components/procurement-info";
+import { ProcurementInfo, useCategoryVendorText } from "@/components/procurement-info";
 import {
   inr, categoryMonthly, total,
 } from "@/lib/finance-mock";
@@ -40,6 +40,7 @@ function Page() {
 // /admin/drilldown (Admin · Dashboards nav).
 function Inner() {
   const navigate = useNavigate();
+  const vendorText = useCategoryVendorText();
   const { sliceMonthly, labels } = usePeriod();
   const search = useSearch({ strict: false }) as { head?: string; category?: string };
   const { data: expenseTree = [] } = useExpenseTree();
@@ -111,7 +112,7 @@ function Inner() {
                   <button onClick={() => update({ category: c.name })} className="min-w-0 flex-1 flex items-center justify-between gap-3 py-3 text-left">
                     <div className="min-w-0">
                       <div className="break-words font-medium">{c.name}</div>
-                      <div className="text-xs text-muted-foreground">{c.vendors.length} vendor{c.vendors.length > 1 ? "s" : ""}</div>
+                      <div className="text-xs text-muted-foreground">{vendorText(c).short}</div>
                     </div>
                     <div className="flex shrink-0 items-center gap-3">
                       <span className="font-mono text-sm">{inr(t)}</span>
@@ -135,7 +136,7 @@ function Inner() {
               <span>· Combined monthly trend</span>
             </CardTitle>
             <CardDescription>
-              Sum of all {category.vendors.length} vendor{category.vendors.length > 1 ? "s" : ""} under this category, per month, for the selected range — this is the final level of detail available here
+              {vendorText(category).detail}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -149,7 +150,7 @@ function Inner() {
               </BarChart>
             </ResponsiveContainer>
             <div className="mt-4 rounded-md border border-border p-3 flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">Total for selected period, all vendors combined</span>
+              <span className="text-xs text-muted-foreground">{category.vendors.length > 1 ? "Total for selected period, all vendors combined" : "Total for selected period"}</span>
               <span className="font-mono text-sm font-semibold">{inr(categoryTotal)}</span>
             </div>
           </CardContent>
