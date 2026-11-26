@@ -1,13 +1,17 @@
 import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router";
 import { PortalShell, usePeriod } from "@/components/portal-shell";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbList,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 import { Tooltip, Bar, BarChart, CartesianGrid, ResponsiveContainer, XAxis, YAxis } from "recharts";
 import { SmartTooltipContent, getTooltipTrigger } from "@/components/smart-tooltip";
-import { ProcurementInfo, useCategoryVendorText } from "@/components/procurement-info";
-import {
-  inr, categoryMonthly, total,
-} from "@/lib/finance-mock";
+import { ProcurementInfo } from "@/components/procurement-info";
+import { DrilldownLineItemSummary } from "@/components/drilldown-line-item-summary";
+import { inr, categoryMonthly, total } from "@/lib/finance-mock";
 import { useExpenseTree, useIncomeTree } from "@/lib/hooks";
 import { filterReportableIncomeCategories } from "@/lib/income-utils";
 import { ChevronRight } from "lucide-react";
@@ -40,59 +44,102 @@ function Page() {
 // /admin/drilldown (Admin · Dashboards nav).
 function Inner() {
   const navigate = useNavigate();
-  const vendorText = useCategoryVendorText();
   const { sliceMonthly, labels } = usePeriod();
   const search = useSearch({ strict: false }) as { head?: string; category?: string };
   const { data: expenseTree = [] } = useExpenseTree();
   const { data: incomeTree = [] } = useIncomeTree();
-  const head: Head | null = search.head === "expense" || search.head === "income" ? search.head : null;
+  const head: Head | null =
+    search.head === "expense" || search.head === "income" ? search.head : null;
   const reportableIncomeTree = filterReportableIncomeCategories(incomeTree);
-  const tree = head === "income" ? reportableIncomeTree : expenseTree;
-  const category = search.category ? tree.find((c) => c.name === search.category) ?? null : null;
+  const expenseCategories = expenseTree.filter(
+    (category) => total(sliceMonthly(categoryMonthly(category))) !== 0,
+  );
+  const incomeCategories = reportableIncomeTree.filter(
+    (category) => total(sliceMonthly(categoryMonthly(category))) !== 0,
+  );
+  const tree = head === "income" ? incomeCategories : expenseCategories;
+  const category = search.category ? (tree.find((c) => c.name === search.category) ?? null) : null;
 
   const update = (patch: { head?: Head | null; category?: string | null }) => {
     navigate({
       to: "/resident/drilldown",
-      search: (((prev: any) => ({
+      search: ((prev: any) => ({
         ...prev,
-        head: patch.head === null ? undefined : patch.head ?? prev.head,
-        category: patch.category === null ? undefined : patch.category ?? prev.category,
-      })) as any),
+        head: patch.head === null ? undefined : (patch.head ?? prev.head),
+        category: patch.category === null ? undefined : (patch.category ?? prev.category),
+      })) as any,
     });
   };
 
-  const expenseTotal = expenseTree.reduce((s, c) => s + total(sliceMonthly(categoryMonthly(c))), 0);
-  const incomeTotal = reportableIncomeTree.reduce((s, c) => s + total(sliceMonthly(categoryMonthly(c))), 0);
+  const expenseTotal = expenseCategories.reduce(
+    (s, c) => s + total(sliceMonthly(categoryMonthly(c))),
+    0,
+  );
+  const incomeTotal = incomeCategories.reduce(
+    (s, c) => s + total(sliceMonthly(categoryMonthly(c))),
+    0,
+  );
 
   const categoryMonthlySliced = category ? sliceMonthly(categoryMonthly(category)) : [];
   const categoryTotal = total(categoryMonthlySliced);
-  const categoryChartData = labels.map((m, i) => ({ month: m, value: categoryMonthlySliced[i] ?? 0 }));
+  const categoryChartData = labels.map((m, i) => ({
+    month: m,
+    value: categoryMonthlySliced[i] ?? 0,
+  }));
 
   return (
     <>
       <Breadcrumb>
         <BreadcrumbList>
           <BreadcrumbItem>
-            <button className="hover:text-foreground" onClick={() => update({ head: null, category: null })}>
+            <button
+              className="hover:text-foreground"
+              onClick={() => update({ head: null, category: null })}
+            >
               Heads
             </button>
           </BreadcrumbItem>
-          {head && (<><BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <button className="hover:text-foreground capitalize" onClick={() => update({ category: null })}>{head}</button>
-            </BreadcrumbItem></>)}
-          {category && (<><BreadcrumbSeparator />
-            <BreadcrumbItem className="min-w-0">
-              <span className="min-w-0 break-words text-foreground">{category.name}</span>
-              <ProcurementInfo name={category.name} persona="resident" />
-            </BreadcrumbItem></>)}
+          {head && (
+            <>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <button
+                  className="hover:text-foreground capitalize"
+                  onClick={() => update({ category: null })}
+                >
+                  {head}
+                </button>
+              </BreadcrumbItem>
+            </>
+          )}
+          {category && (
+            <>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem className="min-w-0">
+                <span className="min-w-0 break-words text-foreground">{category.name}</span>
+                <ProcurementInfo name={category.name} persona="resident" />
+              </BreadcrumbItem>
+            </>
+          )}
         </BreadcrumbList>
       </Breadcrumb>
 
       {!head && (
         <div className="grid gap-4 md:grid-cols-2">
-          <HeadCard label="Expense" total={expenseTotal} categories={expenseTree.length} onClick={() => update({ head: "expense" })} tone="rose" />
-          <HeadCard label="Income" total={incomeTotal} categories={reportableIncomeTree.length} onClick={() => update({ head: "income" })} tone="emerald" />
+          <HeadCard
+            label="Expense"
+            total={expenseTotal}
+            categories={expenseCategories.length}
+            onClick={() => update({ head: "expense" })}
+            tone="rose"
+          />
+          <HeadCard
+            label="Income"
+            total={incomeTotal}
+            categories={incomeCategories.length}
+            onClick={() => update({ head: "income" })}
+            tone="emerald"
+          />
         </div>
       )}
 
@@ -104,25 +151,33 @@ function Inner() {
           </CardHeader>
           <CardContent className="divide-y divide-border">
             {[...tree]
-              .sort((a, b) => total(sliceMonthly(categoryMonthly(b))) - total(sliceMonthly(categoryMonthly(a))))
+              .sort(
+                (a, b) =>
+                  total(sliceMonthly(categoryMonthly(b))) - total(sliceMonthly(categoryMonthly(a))),
+              )
               .map((c) => {
-              const t = total(sliceMonthly(categoryMonthly(c)));
-              return (
-                <div key={c.name} className="flex min-w-0 items-center gap-2 hover:bg-accent/40 -mx-4 px-4 rounded">
-                  <button onClick={() => update({ category: c.name })} className="min-w-0 flex-1 flex items-center justify-between gap-3 py-3 text-left">
-                    <div className="min-w-0">
-                      <div className="break-words font-medium">{c.name}</div>
-                      <div className="text-xs text-muted-foreground">{vendorText(c).short}</div>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-3">
-                      <span className="font-mono text-sm">{inr(t)}</span>
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                  </button>
-                  <ProcurementInfo name={c.name} persona="resident" />
-                </div>
-              );
-            })}
+                const t = total(sliceMonthly(categoryMonthly(c)));
+                return (
+                  <div
+                    key={c.name}
+                    className="flex min-w-0 items-center gap-2 hover:bg-accent/40 -mx-4 px-4 rounded"
+                  >
+                    <button
+                      onClick={() => update({ category: c.name })}
+                      className="min-w-0 flex-1 flex items-center justify-between gap-3 py-3 text-left"
+                    >
+                      <div className="min-w-0">
+                        <div className="break-words font-medium">{c.name}</div>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-3">
+                        <span className="font-mono text-sm">{inr(t)}</span>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                    </button>
+                    <ProcurementInfo name={c.name} persona="resident" />
+                  </div>
+                );
+              })}
           </CardContent>
         </Card>
       )}
@@ -136,7 +191,7 @@ function Inner() {
               <span>· Combined monthly trend</span>
             </CardTitle>
             <CardDescription>
-              {vendorText(category).detail}
+              <DrilldownLineItemSummary category={category} />
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -145,12 +200,21 @@ function Inner() {
                 <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                 <XAxis dataKey="month" fontSize={11} />
                 <YAxis tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} fontSize={11} />
-                <Tooltip trigger={getTooltipTrigger()} cursor={{ fill: "var(--color-muted)", opacity: 0.35 }} content={<SmartTooltipContent labelPrefix="Month" valueFormatter={(v) => inr(v)} />} />
+                <Tooltip
+                  trigger={getTooltipTrigger()}
+                  cursor={{ fill: "var(--color-muted)", opacity: 0.35 }}
+                  content={
+                    <SmartTooltipContent labelPrefix="Month" valueFormatter={(v) => inr(v)} />
+                  }
+                />
                 <Bar dataKey="value" fill="var(--color-chart-3)" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
             <div className="mt-4 rounded-md border border-border p-3 flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">{category.vendors.length > 1 ? "Total for selected period, all vendors combined" : "Total for selected period"}</span>
+              <span className="text-xs text-muted-foreground">
+                Total for selected period, all {head === "expense" ? "expense" : "income"} items
+                combined
+              </span>
               <span className="font-mono text-sm font-semibold">{inr(categoryTotal)}</span>
             </div>
           </CardContent>
@@ -160,13 +224,27 @@ function Inner() {
   );
 }
 
-function HeadCard({ label, total: t, categories, onClick, tone }: { label: string; total: number; categories: number; onClick: () => void; tone: "rose" | "emerald" }) {
+function HeadCard({
+  label,
+  total: t,
+  categories,
+  onClick,
+  tone,
+}: {
+  label: string;
+  total: number;
+  categories: number;
+  onClick: () => void;
+  tone: "rose" | "emerald";
+}) {
   return (
     <button onClick={onClick} className="text-left">
       <Card className="hover:border-foreground/40 transition-colors">
         <CardHeader>
           <div className="flex items-center gap-2 mb-2">
-            <span className={`h-2 w-2 rounded-full ${tone === "rose" ? "bg-rose-500" : "bg-emerald-500"}`} />
+            <span
+              className={`h-2 w-2 rounded-full ${tone === "rose" ? "bg-rose-500" : "bg-emerald-500"}`}
+            />
             <span className="text-xs uppercase tracking-wider text-muted-foreground">Head</span>
           </div>
           <CardTitle className="text-2xl">{label}</CardTitle>

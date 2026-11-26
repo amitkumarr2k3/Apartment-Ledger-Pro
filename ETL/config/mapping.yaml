@@ -1,7 +1,6 @@
 defaults:
   expense_head: expense
   income_head: income
-
 line_item_aliases:
   Per Sqft Rate: Cost Per Sqft x100
   Actual Collection: Maintenance Charge
@@ -13,7 +12,6 @@ line_item_aliases:
   Opening Balance: True Opening Balance
   Previous Arrears B/F: Previous Arrears Brought Forward
   Cultural Event: Petty Cash - Cultural Event
-
   Flea Market: Flee Market
   Move In/Out Charges: Move in/out Charges
   Move In / Out (Manual): Move In/Out (Manual)
@@ -22,486 +20,448 @@ line_item_aliases:
   Maintenance Outstanding: Maintenance Outstanding Amount
   Maintenance Arrears: Maintenance Outstanding Amount
   Defaulter Outstanding: Maintenance Outstanding Amount
-  Previous Arrears B/F: Previous Arrears Brought Forward
-
+  Creaatio: Salon
+  Creche: Day Care
+  Laundry Pro: Laundry
 expense_categories:
-
   Utilities:
-    - Airtel Postpaid Connection
-    - Diesel
-    - Common Area Internet
-
+  - Airtel Postpaid Connection
+  - Diesel
+  - Common Area Internet
+  - Tools & Stationary
   Common Area Electricity:
-    - BESCOM A Block
-    - BESCOM B Block
-    - BESCOM C Block
-    - BESCOM D Block
-    - BESCOM E Block
-    - BESCOM F Block
-    - BESCOM G Block
-
+  - BESCOM A Block
+  - BESCOM B Block
+  - BESCOM C Block
+  - BESCOM D Block
+  - BESCOM E Block
+  - BESCOM F Block
+  - BESCOM G Block
   Water Tanker Supply:
-    - Water Supply
-
-  Lift Maintenance:
-    - AMC (Lift)
-
-  AC Maintenance:
-    - AMC (AC)
-
-  DG Maintenance:
-    - AMC (DG)
-    - DG Service
-
+  - Water Supply
+  Equipment AMC & Maintenance:
+  - AMC (Lift)
+  - AMC (AC)
+  - AMC (DG)
+  - DG Service
   Facility Management:
-    - Facility Manager
-    - Help Desk Salary
-    - Management Fee
-    - Electricians Salary
-    - Plumbers Salary
-    - Gardeners Salary
-    - Gardening Supervisor Salary
-    - House Keeping Janitor Salary
-    - Housekeeping Supervisor Salary
-    - Security Supervisor Salary
-    - Security Guards Salary
-    - Security Lady Guards Salary
-    - STP/WTP Operators Salary
-    - Walkie Talkies
-    - Pest Control Services
-    - Swimming Pool Services
-    - Rental Charges Machinery
-    - Water Test Report
-    - Annual Compliance Expense
-    - HK Materials
-    - Repair Work
-    - Tank Cleaning Charges
-    - MST Salary
-
+  - Facility Manager
+  - Help Desk Salary
+  - Management Fee
+  - Electricians Salary
+  - Plumbers Salary
+  - Gardeners Salary
+  - Gardening Supervisor Salary
+  - House Keeping Janitor Salary
+  - Housekeeping Supervisor Salary
+  - Security Supervisor Salary
+  - Security Guards Salary
+  - Security Lady Guards Salary
+  - STP/WTP Operators Salary
+  - Walkie Talkies
+  - Pest Control Services
+  - Swimming Pool Services
+  - Rental Charges Machinery
+  - Water Test Report
+  - Annual Compliance Expense
+  - HK Materials
+  - Repair Work
+  - Tank Cleaning Charges
+  - MST Salary
   Housekeeping:
-    - Garbage removal
-
+  - Garbage removal
   Gardening:
-    - Garden Tools
-
+  - Garden Tools
   Cleaning:
-    - Debris Disposal
-    - Cleaning
-
+  - Debris Disposal
+  - Cleaning
   STP water collection (Sludge Removal):
-    - STP water collection (Sludge Removal)
-
+  - STP water collection (Sludge Removal)
   Office Supplies:
-    - Amazon Purchase
-
+  - Amazon Purchase
   Software & Subscriptions:
-    - Claude Subscription
-
+  - Claude Subscription
   Professional Services:
-    - Chartered Accountant
-    - Legal Consultant
-
+  - Chartered Accountant
+  - Legal Consultant
   Accounting Adjustments:
-    - Roundoff
-
+  - Roundoff
   Petty Cash:
-    - Petty Cash - Consumables
-    - Petty Cash - Miscellaneous
-    - Petty Cash - Electricals
-    - Petty Cash - Hardware
-    - Petty Cash - Office Supplies
-    - Tools & Stationary
-    - Petty Cash - Cultural Event
-
+  - Petty Cash - Consumables
+  - Petty Cash - Miscellaneous
+  - Petty Cash - Electricals
+  - Petty Cash - Hardware
+  - Petty Cash - Office Supplies
+  - Petty Cash - Cultural Event
   One Time Operational Procurement:
-    - One Time Operational Procurement
-
-
+  - One Time Operational Procurement
 income_categories:
-
   Maintenance Collection:
-    - Maintenance Charge
-
+  - Maintenance Charge
   Maintenance Outstanding:
-    - Maintenance Outstanding Amount
-    - Previous Arrears Brought Forward
-    - Current Month Unpaid Maintenance
-
+  - Maintenance Outstanding Amount
+  - Previous Arrears Brought Forward
+  - Current Month Unpaid Maintenance
   Facility Rental:
-    - AV room
-    - Business Center
-    - Multipurpose Party Hall/Club House
-
+  - AV room
+  - Business Center
+  - Multipurpose Party Hall/Club House
   Advertisement:
-    - Lift Advertisement
-    - Digital Display
-    - Standees
-    - Signage
-    - Umbrella or Kiosk
-
+  - Lift Advertisement
+  - Digital Display
+  - Standees
+  - Signage
+  - Umbrella or Kiosk
   Penalties:
-    - Late Payment Fine
-    - Common Area Violation
-    - Parking Violation
-
+  - Late Payment Fine
+  - Common Area Violation
+  - Parking Violation
   Move Charges:
-    - Move in/out Charges
-    - Move In/Out (Manual)
-
+  - Move in/out Charges
+  - Move In/Out (Manual)
   Events:
-    - Flee Market
-    - Community Curriculum Activities
-
+  - Flee Market
+  - Community Curriculum Activities
   Tax Collected (Liability):
-    - CGST Output
-    - SGST Output
-
+  - CGST Output
+  - SGST Output
   Community Contributions:
-    - Association Fund
-    - Engagement Fund
-
+  - Association Fund
+  - Engagement Fund
   Recreation & Wellness:
-    - Fitness Trainers
-
+  - Fitness Trainers
   Parking Revenue:
-    - Guest Parking Rent
-
+  - Guest Parking Rent
   Commercial Income:
-    - Creche
-    - Creaatio
-    - Laundry Pro
-
+  - Day Care
+  - Salon
+  - Laundry
 collection_reference_categories:
   Cost Per Sqft x100: Maintenance Rate Reference
   Contingency Per Sqft x100: Contingency Rate Reference
   Expected Collection: Expected Collection Reference
   Corpus Fund Balance (Accumulated): Corpus Fund Reference
   True Opening Balance: Opening Balance Reference
-
 collection_amount_multipliers:
   Cost Per Sqft x100: 100
   Contingency Per Sqft x100: 100
-
 final_reference_entries:
-  - date: "2025-10-01"
-    head: reference
-    category: Opening Balance Reference
-    vendor: Rate Card
-    vendor_kind: company
-    line_item: True Opening Balance
-    amount: 706902
-    direction: C
-    flat_code: ""
-    source_ref: ""
-
-
+- date: '2025-10-01'
+  head: reference
+  category: Opening Balance Reference
+  vendor: Rate Card
+  vendor_kind: company
+  line_item: True Opening Balance
+  amount: 706902
+  direction: C
+  flat_code: ''
+  source_ref: ''
 vendor_groups:
-
   EXOZEN:
-    - Facility Manager
-    - Help Desk Salary
-    - Management Fee
-    - Electricians Salary
-    - Plumbers Salary
-    - Gardeners Salary
-    - Gardening Supervisor Salary
-    - House Keeping Janitor Salary
-    - Housekeeping Supervisor Salary
-    - Security Supervisor Salary
-    - Security Guards Salary
-    - Security Lady Guards Salary
-    - STP/WTP Operators Salary
-    - Walkie Talkies
-    - Pest Control Services
-    - Swimming Pool Services
-    - Rental Charges Machinery
-    - Water Test Report
-    - Annual Compliance Expense
-    - HK Materials
-    - Repair Work
-    - Tank Cleaning Charges
-    - MST Salary
-
-
+  - Facility Manager
+  - Help Desk Salary
+  - Management Fee
+  - Electricians Salary
+  - Plumbers Salary
+  - Gardeners Salary
+  - Gardening Supervisor Salary
+  - House Keeping Janitor Salary
+  - Housekeeping Supervisor Salary
+  - Security Supervisor Salary
+  - Security Guards Salary
+  - Security Lady Guards Salary
+  - STP/WTP Operators Salary
+  - Walkie Talkies
+  - Pest Control Services
+  - Swimming Pool Services
+  - Rental Charges Machinery
+  - Water Test Report
+  - Annual Compliance Expense
+  - HK Materials
+  - Repair Work
+  - Tank Cleaning Charges
+  - MST Salary
 vendors:
-
-  # -------------------
-  # Expense Vendors
-  # -------------------
-
   Airtel Postpaid Connection:
     vendor: Airtel Postpaid
     vendor_kind: company
-
   Amazon Purchase:
     vendor: Amazon CG Boulevard RWA
-    vendor_kind: internal
-
+    vendor_kind: company
   BESCOM A Block:
     vendor: BESCOM
     vendor_kind: company
-
   BESCOM B Block:
     vendor: BESCOM
     vendor_kind: company
-
   BESCOM C Block:
     vendor: BESCOM
     vendor_kind: company
-
   BESCOM D Block:
     vendor: BESCOM
     vendor_kind: company
-
   BESCOM E Block:
     vendor: BESCOM
     vendor_kind: company
-
   BESCOM F Block:
     vendor: BESCOM
     vendor_kind: company
-
   BESCOM G Block:
     vendor: BESCOM
     vendor_kind: company
-
   Water Supply:
     vendor: BSN Water Supply
     vendor_kind: company
-
   Diesel:
-    vendor: Sai Krupa Petroleum
+    vendor: Multiple Vendors
     vendor_kind: company
-
   AMC (Lift):
     vendor: JOHNSON LIFTS Pvt Ltd
     vendor_kind: company
-
   AMC (AC):
     vendor: KNND ASSOCIATES PVT LTD
     vendor_kind: company
-
   AMC (DG):
     vendor: KIRLOSKAR OIL ENGINES LTD
     vendor_kind: company
-
   DG Service:
     vendor: KIRLOSKAR OIL ENGINES LTD
     vendor_kind: company
-
   Garbage removal:
     vendor: Sewa Waste Management
     vendor_kind: company
-
   Garden Tools:
-    vendor: Kavitha Enterprises
+    vendor: Multiple Vendors
     vendor_kind: company
-
   STP water collection (Sludge Removal):
     vendor: Sapthagiri Cleaner
     vendor_kind: company
-
   Tools & Stationary:
-    vendor: Petty Cash
-    vendor_kind: internal
-
+    vendor: Multiple Vendors
+    vendor_kind: company
   One Time Operational Procurement:
     vendor: Individual
     vendor_kind: internal
-
   Debris Disposal:
-    vendor: Individual
-    vendor_kind: individual
-
+    vendor: Multiple Vendors
+    vendor_kind: company
   Cleaning:
-    vendor: Individual
-    vendor_kind: individual
-
+    vendor: Multiple Vendors
+    vendor_kind: company
   Common Area Internet:
-    vendor: Individual
-    vendor_kind: individual
-
+    vendor: Act Internet
+    vendor_kind: company
   Petty Cash - Consumables:
     vendor: Petty Cash
     vendor_kind: internal
-
   Petty Cash - Electricals:
     vendor: Petty Cash
     vendor_kind: internal
-
   Petty Cash - Hardware:
     vendor: Petty Cash
     vendor_kind: internal
-
   Petty Cash - Office Supplies:
     vendor: Petty Cash
     vendor_kind: internal
-
   Petty Cash - Cultural Event:
     vendor: Petty Cash
     vendor_kind: internal
-
   Petty Cash - Miscellaneous:
     vendor: Petty Cash
     vendor_kind: internal
-
   Chartered Accountant:
-    vendor: Professional Consultant
-    vendor_kind: individual
-
+    vendor: Bevoor & Associates
+    vendor_kind: company
   Legal Consultant:
-    vendor: Professional Consultant
-    vendor_kind: individual
-
+    vendor: GB Legal
+    vendor_kind: company
   Roundoff:
     vendor: System Adjustment
     vendor_kind: system
-
   Claude Subscription:
     vendor: Anthropic
     vendor_kind: company
-
-
-  # -------------------
-  # Income Vendors
-  # -------------------
-
   Maintenance Charge:
     vendor: Apartment Owners
     vendor_kind: resident
-
   Previous Arrears Brought Forward:
     vendor: Apartment Owners
     vendor_kind: resident
-
   Current Month Unpaid Maintenance:
     vendor: Apartment Owners
     vendor_kind: resident
-
   Cost Per Sqft x100:
     vendor: Rate Card
     vendor_kind: company
-
   Contingency Per Sqft x100:
     vendor: Rate Card
     vendor_kind: company
-
   Expected Collection:
     vendor: Rate Card
     vendor_kind: company
-
   Corpus Fund Balance (Accumulated):
     vendor: Rate Card
     vendor_kind: company
-
   True Opening Balance:
     vendor: Rate Card
     vendor_kind: company
-
   AV room:
     vendor: Amenities
     vendor_kind: internal
-
   Business Center:
     vendor: Amenities
     vendor_kind: internal
-
   Multipurpose Party Hall/Club House:
     vendor: Amenities
     vendor_kind: internal
-
   Lift Advertisement:
     vendor: Advertising Revenue
     vendor_kind: income_stream
-
   Digital Display:
     vendor: Advertising Revenue
     vendor_kind: income_stream
-
   Standees:
     vendor: Advertising Revenue
     vendor_kind: income_stream
-
   Umbrella or Kiosk:
     vendor: Advertising Revenue
     vendor_kind: income_stream
-
   Signage:
     vendor: Advertising Revenue
     vendor_kind: income_stream
-
   Late Payment Fine:
     vendor: Resident Penalties
     vendor_kind: income_stream
-
   Common Area Violation:
     vendor: Resident Penalties
     vendor_kind: income_stream
-
   Parking Violation:
     vendor: Resident Penalties
     vendor_kind: income_stream
-
   Move In/Out (Manual):
     vendor: Resident Services
     vendor_kind: income_stream
-
   Move in/out Charges:
     vendor: Resident Services
     vendor_kind: income_stream
-
   Flee Market:
     vendor: Community Events
     vendor_kind: income_stream
-
   Community Curriculum Activities:
     vendor: Community Events
     vendor_kind: income_stream
-
   CGST Output:
     vendor: Tax Collection
     vendor_kind: statutory
-
   SGST Output:
     vendor: Tax Collection
     vendor_kind: statutory
-
   Association Fund:
     vendor: Residents
     vendor_kind: resident
-
   Engagement Fund:
     vendor: Residents
     vendor_kind: resident
-
   Fitness Trainers:
     vendor: Wellness Programs
     vendor_kind: income_stream
-
   Guest Parking Rent:
     vendor: Parking Services
     vendor_kind: income_stream
-
-  # Commercial tenants operating within the apartment premises (creche,
-  # boutique/store, laundry service). Each is its own external vendor --
-  # unlike the shared "Amenities"/"income_stream" buckets above, these are
-  # genuine companies paying rent, so vendor_kind is "company" and vendor
-  # is the tenant's own name (not a generic bucket).
   Creche:
     vendor: Creche
     vendor_kind: company
-
   Creaatio:
     vendor: Creaatio
     vendor_kind: company
-
   Laundry Pro:
     vendor: Laundry Pro
     vendor_kind: company
-
-
+  Facility Manager:
+    vendor: EXOZEN
+    vendor_kind: company
+  Help Desk Salary:
+    vendor: EXOZEN
+    vendor_kind: company
+  Management Fee:
+    vendor: EXOZEN
+    vendor_kind: company
+  Electricians Salary:
+    vendor: EXOZEN
+    vendor_kind: company
+  Plumbers Salary:
+    vendor: EXOZEN
+    vendor_kind: company
+  Gardeners Salary:
+    vendor: EXOZEN
+    vendor_kind: company
+  Gardening Supervisor Salary:
+    vendor: EXOZEN
+    vendor_kind: company
+  House Keeping Janitor Salary:
+    vendor: EXOZEN
+    vendor_kind: company
+  Housekeeping Supervisor Salary:
+    vendor: EXOZEN
+    vendor_kind: company
+  Security Supervisor Salary:
+    vendor: EXOZEN
+    vendor_kind: company
+  Security Guards Salary:
+    vendor: EXOZEN
+    vendor_kind: company
+  Security Lady Guards Salary:
+    vendor: EXOZEN
+    vendor_kind: company
+  STP/WTP Operators Salary:
+    vendor: EXOZEN
+    vendor_kind: company
+  Walkie Talkies:
+    vendor: EXOZEN
+    vendor_kind: company
+  Pest Control Services:
+    vendor: EXOZEN
+    vendor_kind: company
+  Swimming Pool Services:
+    vendor: EXOZEN
+    vendor_kind: company
+  Rental Charges Machinery:
+    vendor: EXOZEN
+    vendor_kind: company
+  Water Test Report:
+    vendor: EXOZEN
+    vendor_kind: company
+  Annual Compliance Expense:
+    vendor: EXOZEN
+    vendor_kind: company
+  HK Materials:
+    vendor: Multiple Vendors
+    vendor_kind: company
+  Repair Work:
+    vendor: EXOZEN
+    vendor_kind: company
+  Tank Cleaning Charges:
+    vendor: EXOZEN
+    vendor_kind: company
+  MST Salary:
+    vendor: EXOZEN
+    vendor_kind: company
 vendor_candidates:
-
   Debris Disposal:
-    - Kavitha Enterprises
-    - Sashi Kumar K
+  - Kavitha Enterprises
+  - Sashi Kumar K
+  Diesel:
+  - Sai Krupa Petroleum
+  - Sai Abhay Petroleum
+  - EXOZEN
+  Garden Tools:
+  - Plants Paradise
+  - EXOZEN
+  - SVA Biotek
+  - Kavitha Enterprises
+  Tools & Stationary:
+  - AM Computers INC
+  - EXOZEN
+  HK Materials:
+  - Pooja Chemicals
+  - EXOZEN

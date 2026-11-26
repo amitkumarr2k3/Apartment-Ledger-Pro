@@ -23,7 +23,7 @@ test("uploaded procurement rows stay visible as their own category and show info
   }));
 
   await page.goto("/admin/drilldown?head=expense");
-  const category = page.getByRole("button", { name: new RegExp(`${originalName} 1 vendor`) });
+  const category = page.getByRole("button", { name: new RegExp(`${originalName}.*₹3,69,872`) });
   await expect(category).toBeVisible();
   await expect(category).toContainText("₹3,69,872");
   await expect(page.getByRole("button", { name: /Petty Cash/ })).toBeVisible();
@@ -50,7 +50,7 @@ test("mapped procurement name shows info when it is a vendor", async ({ page }) 
   }));
 
   await page.goto("/admin/drilldown?head=expense");
-  await page.getByRole("button", { name: /Petty Cash 1 vendor/ }).click();
+  await page.getByRole("button", { name: /Petty Cash.*₹/ }).click();
   const vendorInfo = page.getByRole("button", { name: `About ${originalName}`, exact: true }).last();
   await expect(vendorInfo).toBeVisible();
   await vendorInfo.click();

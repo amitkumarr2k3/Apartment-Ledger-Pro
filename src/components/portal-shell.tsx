@@ -256,7 +256,7 @@ function HelpChat({ persona, currentView, onClose }: { persona: "resident" | "ad
 }
 
 
-export type PeriodValue = "month-prev" | "range-3m" | "range-6m" | "range-12m" | "fy" | "fy-prev";
+export type PeriodValue = "all-months" | "month-prev" | "range-3m" | "range-6m" | "range-12m" | "fy" | "fy-prev";
 
 // Format like "Jul '26" — matches finance-mock months12 and hooks.isoMonthToLabel
 const MONTH_ABBRS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -293,6 +293,7 @@ type PeriodMeta = { label: string; count: number };
 // rolling windows, current FY, prior FY); now just the 3 that are actually
 // wanted: last 12 months, and the two named fiscal years.
 const periodConfig: Record<PeriodValue, PeriodMeta> = {
+  "all-months": { label: "All available months", count: Number.MAX_SAFE_INTEGER },
   "range-12m": { label: "Last 12 months", count: 12 },
   "fy": { label: FY_LABEL, count: 12 },
   "fy-prev": { label: PREV_FY_LABEL, count: 12 },
@@ -326,6 +327,7 @@ function anchorIndex(labels: string[]): number {
 }
 
 function selectIndices(period: PeriodValue, labels: string[]): number[] {
+  if (period === "all-months") return labels.map((_, index) => index);
   const anchor = anchorIndex(labels);
   if (anchor < 0) return [];
 

@@ -99,18 +99,30 @@ function Inner() {
    * no code change needed to update the portion for a new month.
    */
   const contingencyCategory = safeIncomeTree.find((c) => isContingencyRateReference(c.name));
-  // Full, UNSLICED 12-month series -- the headline "Contingency Cash" figure
-  // intentionally ignores whatever period filter is selected on the
-  // dashboard and always reflects the latest maintenance-collection cycle
-  // month for which a rate has been defined.
   const contingencyFullMonthly = contingencyCategory ? categoryMonthly(contingencyCategory) : [];
-  // Cumulative across EVERY month recorded so far, deliberately NOT sliced by
-  // the dashboard's period filter -- this is the running contingency reserve
-  // built up since inception, not a single month's contribution.
-  const contingencyCash = contingencyFullMonthly.reduce(
-    (sum, storedVal) => sum + ((storedVal || 0) / 100) * TOTAL_SQFT,
-    0,
-  );
+  const maintenanceRateCategory = safeIncomeTree.find((c) => isMaintenanceRateReference(c.name));
+  const maintenanceRateFullMonthly = maintenanceRateCategory ? categoryMonthly(maintenanceRateCategory) : [];
+  const collectedMaintenanceFullMonthly = safeIncomeTree.reduce<number[]>((result, c) => {
+    (c.vendors || []).forEach((v) => {
+      (v.items || []).forEach((item) => {
+        if (isMaintenanceChargeExact(c.name) || isMaintenanceChargeExact(v.name) || isMaintenanceChargeExact(item.name)) {
+          (item.monthly || []).forEach((value, index) => {
+            result[index] = (result[index] || 0) + (value || 0);
+          });
+        }
+      });
+    });
+    return result;
+  }, []);
+  // Allocate only the contingency portion of maintenance that was actually
+  // received. A rate-reference target is not cash, so multiplying every
+  // month's ₹/sqft target by the whole society area would overstate reserves
+  // when residents have outstanding dues.
+  const contingencyCash = contingencyFullMonthly.reduce((sum, contingencyStored, index) => {
+    const maintenanceStored = maintenanceRateFullMonthly[index] || 0;
+    if (maintenanceStored <= 0 || contingencyStored <= 0) return sum;
+    return sum + (collectedMaintenanceFullMonthly[index] || 0) * (contingencyStored / maintenanceStored);
+  }, 0);
 
   /**
    * COLLECTED MAINTENANCE
@@ -134,6 +146,7 @@ function Inner() {
     }, 0);
     return acc + catSum;
   }, 0);
+  const collectionTargetDifference = collectedMaintenance - expectedCollection;
   
   /**
    * OTHER INCOME (COMMUNITY INCOME)
@@ -434,7 +447,7 @@ function Inner() {
               label="Maintenance collected"
               value={collectedMaintenance}
               max={expectedCollection}
-              valueLabel={`${inr(collectedMaintenance)} of ${inr(expectedCollection)} expected`}
+              valueLabel={`${inr(collectedMaintenance)} of ${inr(expectedCollection)} expected · ${collectionTargetDifference >= 0 ? `${inr(collectionTargetDifference)} above target` : `${inr(Math.abs(collectionTargetDifference))} shortfall`}`}
               tone="blue"
             />
             <div className="text-[11px] text-amber-600 font-medium mt-3">
@@ -453,10 +466,13 @@ function Inner() {
             used on the Bank Balance card in the Reserves tab, just
             surfaced here too since "do we have money saved up" is a
             top-of-mind question for most residents. */}
-        {isWidgetVisible("overview.summaryReserves") && <div className="rounded-xl border border-slate-200 bg-white p-5">
-          <div className="flex items-center justify-between mb-3">
-            <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Reserves &middot; Bank Balance</div>
-            <div className="text-sm font-bold text-slate-900">{inr(bankBalance)}</div>
+        {isWidgetVisible("overview.summaryReserves") && <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/60 p-5">
+          <div className="flex items-start justify-between mb-3">
+            <div>
+              <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Reserves &middot; Bank Balance</div>
+              <div className="mt-1 text-sm font-bold text-slate-900">{inr(bankBalance)}</div>
+            </div>
+            <span className="inline-block rounded bg-slate-200 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-slate-600">All-time</span>
           </div>
           <div className="h-2.5 w-full rounded-full overflow-hidden flex bg-gray-100">
             <div className="h-full bg-pink-400" style={{ width: `${contingencyShareOfBank}%` }} title={`Contingency reserve (ring-fenced): ${inr(contingencyCash)}`} />
@@ -464,9 +480,19 @@ function Inner() {
           </div>
           <div className="flex items-center justify-between w-full mt-2 text-[11px] text-slate-500">
             <span>&#9679; <span className="text-pink-500 font-medium">Contingency</span> {inr(contingencyCash)}</span>
-            <span>Corpus (accumulated) <span className="font-medium text-orange-600">{corpusValue}</span></span>
+            <span>Corpus (separate) <span className="font-medium text-orange-600">{corpusValue}</span></span>
             <span><span className="text-yellow-600 font-medium">Unrestricted</span> {inr(unrestrictedCash)} &#9679;</span>
           </div>
+          <details className="mt-3 rounded-md bg-slate-50 px-3 py-2 text-xs text-slate-600">
+            <summary className="cursor-pointer font-medium text-slate-700">How these balances are calculated</summary>
+            <div className="mt-2 space-y-1.5">
+              <p><strong>Bank balance:</strong> Opening balance {inr(trueOpeningAnchor)} + all-time received income {inr(allTimeCollection)} − all-time expense {inr(allTimeExpense)} = {inr(bankBalance)}.</p>
+              <p><strong>Contingency {inr(contingencyCash)}:</strong> the contingency-rate share of maintenance actually collected. It is already included within the bank balance, not added again.</p>
+              <p><strong>Unrestricted cash {inr(unrestrictedCash)}:</strong> bank balance less the ring-fenced contingency amount.</p>
+              <p><strong>Corpus {corpusValue}:</strong> the latest accumulated Corpus Fund Reference snapshot. It is shown separately and is not included in the bank-balance calculation.</p>
+              <p className="text-slate-500">Reference entries, outstanding receivables and collected GST liabilities are excluded from bank receipts because they are not available cash income.</p>
+            </div>
+          </details>
         </div>}
       </TabsContent>
 
@@ -1196,16 +1222,17 @@ function ProgressBar({ label, value, max, valueLabel, tone = "blue" }: {
   valueLabel: string;
   tone?: "blue" | "emerald" | "rose";
 }) {
-  const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0;
+  const pct = max > 0 ? (value / max) * 100 : 0;
+  const barPct = Math.min(100, Math.max(0, pct));
   const barColor = tone === "emerald" ? "bg-emerald-500" : tone === "rose" ? "bg-rose-500" : "bg-blue-500";
   return (
     <div>
       <div className="flex items-center justify-between text-xs mb-1.5">
         <span className="font-medium text-slate-600">{label}</span>
-        <span className="font-semibold text-slate-800">{pct.toFixed(0)}%</span>
+        <span className="font-semibold text-slate-800">{pct.toFixed(1)}%</span>
       </div>
       <div className="h-2.5 w-full bg-gray-100 rounded-full overflow-hidden">
-        <div className={`h-full rounded-full ${barColor}`} style={{ width: `${pct}%` }} />
+        <div className={`h-full rounded-full ${barColor}`} style={{ width: `${barPct}%` }} />
       </div>
       <div className="text-[11px] text-slate-400 mt-1">{valueLabel}</div>
     </div>

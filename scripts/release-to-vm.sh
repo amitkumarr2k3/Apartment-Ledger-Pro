@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Copyright (C) Siemens AG 2026. All rights reserved. Confidential.
 set -euo pipefail
 
 # End-to-end image deployment to a VM with one command.
@@ -33,6 +34,8 @@ Notes:
   - Recommended for prod: keep a separate untracked file (for example, .env.prod)
     and pass it via --env-file .env.prod.
   - This script does not copy source code; only images + compose/env runtime files.
+  - Before starting, stale app containers are removed and database volumes are preserved.
+  - Old release archives and superseded app image tags are pruned only after health checks pass.
 EOF
 }
 
@@ -196,14 +199,164 @@ scp "${SSH_OPTS[@]}" "$ENV_FILE" "$HOST:~/$REMOTE_DIR/.env"
 echo "[4/7] Loading images on VM..."
 ssh "${SSH_OPTS[@]}" "$HOST" "cd \"\$HOME/$REMOTE_DIR\" && docker load -i \"$RELEASE_TAR\""
 
-echo "[5/7] Removing leftover MailHog container/image (no longer used)..."
-ssh "${SSH_OPTS[@]}" "$HOST" "docker rm -f \$(docker ps -aq --filter 'name=mailhog') 2>/dev/null; docker rmi -f \$(docker images -q 'mailhog/mailhog') 2>/dev/null; true"
+echo "[5/7] Removing stale app containers and MailHog..."
+ssh "${SSH_OPTS[@]}" "$HOST" bash -s -- "$PROJECT_NAME" <<'REMOTE'
+set -euo pipefail
+PROJECT_NAME="$1"
 
-echo "[6/7] Starting stack on VM (mode=$MODE)..."
-ssh "${SSH_OPTS[@]}" "$HOST" "cd \"\$HOME/$REMOTE_DIR\" && if COMPOSE_PROJECT_NAME=\"$PROJECT_NAME\" APP_IMAGE_TAG=\"$TAG\" docker compose $COMPOSE_ARGS ps --status running -q db | grep -q .; then echo 'DB service is running -> updating app services only (api, ssr, web)'; COMPOSE_PROJECT_NAME=\"$PROJECT_NAME\" APP_IMAGE_TAG=\"$TAG\" docker compose $COMPOSE_ARGS up -d --no-deps --remove-orphans api ssr web; else echo 'DB missing or stopped -> bringing full stack up'; COMPOSE_PROJECT_NAME=\"$PROJECT_NAME\" APP_IMAGE_TAG=\"$TAG\" docker compose $COMPOSE_ARGS up -d --remove-orphans; fi"
+# Remove containers from a previous Compose project, including containers
+# that publish the ports needed by this application.
+for project in "deploy" "$PROJECT_NAME"; do
+  container_ids="$(docker ps -aq --filter "label=com.docker.compose.project=$project")"
+  if [[ -n "$container_ids" ]]; then
+    docker rm -f $container_ids >/dev/null
+  fi
+done
 
-echo "[7/7] Deployment status"
-ssh "${SSH_OPTS[@]}" "$HOST" "cd \"\$HOME/$REMOTE_DIR\" && COMPOSE_PROJECT_NAME=\"$PROJECT_NAME\" APP_IMAGE_TAG=\"$TAG\" docker compose $COMPOSE_ARGS ps"
+for name_pattern in 'deploy-*' 'apartment-ledger-pro-*'; do
+  container_ids="$(docker ps -aq --filter "name=$name_pattern")"
+  if [[ -n "$container_ids" ]]; then
+    docker rm -f $container_ids >/dev/null
+  fi
+done
+
+for port in 80 443 4010 5442; do
+  container_ids="$(docker ps -aq --filter "publish=$port")"
+  if [[ -n "$container_ids" ]]; then
+    docker rm -f $container_ids >/dev/null
+  fi
+done
+
+mailhog_ids="$(docker ps -aq --filter 'name=mailhog')"
+if [[ -n "$mailhog_ids" ]]; then
+  docker rm -f $mailhog_ids >/dev/null 2>&1 || true
+fi
+mailhog_images="$(docker images -q 'mailhog/mailhog')"
+if [[ -n "$mailhog_images" ]]; then
+  docker rmi -f $mailhog_images >/dev/null 2>&1 || true
+fi
+REMOTE
+
+echo "[6/7] Starting and validating stack on VM (mode=$MODE)..."
+ssh "${SSH_OPTS[@]}" "$HOST" bash -s -- "$PROJECT_NAME" "$TAG" "$REMOTE_DIR" "$MODE" <<'REMOTE'
+set -euo pipefail
+PROJECT_NAME="$1"
+TAG="$2"
+REMOTE_DIR="$3"
+MODE="$4"
+
+cd "$HOME/$REMOTE_DIR"
+export COMPOSE_PROJECT_NAME="$PROJECT_NAME"
+export APP_IMAGE_TAG="$TAG"
+
+compose_args=(-f docker-compose.yml -f docker-compose.images.yml)
+if [[ "$MODE" == "prod" ]]; then
+  compose_args+=(-f docker-compose.prod.yml -f docker-compose.https.yml)
+fi
+
+# Start only the database first, wait for it, then run migrations and seed.
+docker compose "${compose_args[@]}" up -d --force-recreate --remove-orphans db
+for attempt in $(seq 1 60); do
+  if docker compose "${compose_args[@]}" exec -T db pg_isready -U apf -d apartment_finance >/dev/null 2>&1; then
+    break
+  fi
+  if [[ "$attempt" == "60" ]]; then
+    echo "Database did not become ready" >&2
+    docker compose "${compose_args[@]}" logs db --tail=100 >&2 || true
+    exit 1
+  fi
+  sleep 1
+done
+
+docker compose "${compose_args[@]}" run --rm --no-deps migrate
+docker compose "${compose_args[@]}" run --rm --no-deps seed
+
+# Start application services with no stale containers left behind.
+docker compose "${compose_args[@]}" up -d --force-recreate --remove-orphans api ssr web
+
+for attempt in $(seq 1 60); do
+  if curl -fsS http://127.0.0.1/health >/dev/null 2>&1 && curl -fsS http://127.0.0.1:4010/ready >/dev/null 2>&1; then
+    echo "Stack health checks passed"
+    docker compose "${compose_args[@]}" ps
+    break
+  fi
+  if [[ "$attempt" == "60" ]]; then
+    echo "Stack failed health checks" >&2
+    docker compose "${compose_args[@]}" ps >&2 || true
+    docker compose "${compose_args[@]}" logs api web ssr db --tail=100 >&2 || true
+    exit 1
+  fi
+  sleep 2
+done
+REMOTE
+
+echo "[7/7] Deployment succeeded — removing superseded releases and images..."
+ssh "${SSH_OPTS[@]}" "$HOST" bash -s -- "$PROJECT_NAME" "$TAG" "$REMOTE_DIR" "$MODE" <<'REMOTE'
+set -euo pipefail
+PROJECT_NAME="$1"
+TAG="$2"
+REMOTE_DIR="$3"
+MODE="$4"
+
+cd "$HOME/$REMOTE_DIR"
+export COMPOSE_PROJECT_NAME="$PROJECT_NAME"
+export APP_IMAGE_TAG="$TAG"
+
+compose_args=(-f docker-compose.yml -f docker-compose.images.yml)
+if [[ "$MODE" == "prod" ]]; then
+  compose_args+=(-f docker-compose.prod.yml -f docker-compose.https.yml)
+fi
+
+# Re-check the complete stack before deleting any recovery artifacts.  Using
+# the same compose files is important: a bare `docker compose ps` can silently
+# omit overlay-defined services or resolve a different image tag.
+for service in db api ssr web; do
+  container_id="$(docker compose "${compose_args[@]}" ps --status running -q "$service")"
+  if [[ -z "$container_id" ]]; then
+    echo "Refusing cleanup: required service is not running: $service" >&2
+    docker compose "${compose_args[@]}" ps >&2 || true
+    docker compose "${compose_args[@]}" logs "$service" --tail=100 >&2 || true
+    exit 1
+  fi
+done
+
+# Keep only the just-installed release archive and checksum.
+find . -maxdepth 1 -type f -name 'release-*.tar' ! -name "release-$TAG.tar" -delete
+find . -maxdepth 1 -type f -name 'release-*.tar.sha256' ! -name "release-$TAG.tar.sha256" -delete
+
+# Remove superseded tags only when no container references them. Never force
+# image removal: old and new tags can point to the same image ID, and a forced
+# removal can make diagnosis/recovery impossible.
+for repository in apf-backend apf-ssr apf-web; do
+  while read -r old_tag; do
+    [[ -z "$old_tag" || "$old_tag" == "$TAG" ]] && continue
+    image_ref="${repository}:${old_tag}"
+    if [[ -n "$(docker ps -aq --filter "ancestor=$image_ref")" ]]; then
+      echo "Retaining in-use image: $image_ref"
+      continue
+    fi
+    docker rmi "$image_ref" >/dev/null 2>&1 || true
+  done < <(docker images "$repository" --format '{{.Tag}}')
+done
+
+# Only remove genuinely dangling images. Do not sweep all unused tagged images:
+# those tags are needed for a safe rollback after a failed deployment.
+
+# Remove only the legacy deploy network if Docker reports it unused.
+docker network rm "deploy_default" >/dev/null 2>&1 || true
+
+# Confirm cleanup did not disturb any required service and print status using
+# the exact compose model used for this release.
+for service in db api ssr web; do
+  if [[ -z "$(docker compose "${compose_args[@]}" ps --status running -q "$service")" ]]; then
+    echo "Required service stopped after cleanup: $service" >&2
+    exit 1
+  fi
+done
+
+echo "Release retained: release-$TAG.tar"
+docker compose "${compose_args[@]}" ps
+REMOTE
 
 echo
 echo "Release complete."

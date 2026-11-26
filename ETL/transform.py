@@ -3,6 +3,7 @@ import yaml
 import re
 import shutil
 
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path
 from datetime import datetime
 
@@ -20,6 +21,24 @@ with open(CONFIG_FILE, "r") as f:
     cfg = yaml.safe_load(f)
 
 vendors = cfg.get("vendors", {}).copy()
+vendor_candidates = cfg.get("vendor_candidates", {}).copy()
+
+
+def resolve_vendor_label(line_item, configured_vendor):
+    candidates = vendor_candidates.get(line_item, [])
+    if len(candidates) == 1:
+        return candidates[0]
+
+    if configured_vendor != "Multiple Vendors":
+        return configured_vendor
+
+    if len(candidates) == 1:
+        return candidates[0]
+    if len(candidates) > 1:
+        return "Multiple Vendors (" + " / ".join(candidates) + ")"
+    return "Multiple Vendors"
+
+
 line_item_aliases = {
     norm_key: str(canonical).strip()
     for norm_key, canonical in {
@@ -44,11 +63,36 @@ for grp, items in cfg.get("vendor_groups", {}).items():
 # Process Vendor Bill Report First
 # -------------------------------------------------------
 
+all_vendor_mapping_gaps = []
+processed_vendor_reports = []
+
 for vf in Path(INPUT_DIR).glob("*Vendor*"):
 
     try:
 
-        df = pd.read_excel(vf)
+        header_preview = pd.read_excel(vf, header=None)
+        header_row = next(
+            (
+                row_index
+                for row_index, row in header_preview.iterrows()
+                if "expense a/c" in {
+                    re.sub(r"\s+", " ", str(value).strip()).lower()
+                    for value in row.tolist()
+                }
+                and "vendor name" in {
+                    re.sub(r"\s+", " ", str(value).strip()).lower()
+                    for value in row.tolist()
+                }
+            ),
+            None,
+        )
+
+        if header_row is None:
+            raise ValueError(
+                "Vendor report must contain 'Expense A/C' and 'Vendor Name' columns"
+            )
+
+        df = pd.read_excel(vf, header=header_row)
 
         if (
             "Expense A/C" in df.columns
@@ -59,10 +103,11 @@ for vf in Path(INPUT_DIR).glob("*Vendor*"):
                 "vendor_candidates",
                 {}
             )
+            vendor_mapping_gaps = []
 
             for _, r in df.iterrows():
 
-                acct = str(
+                raw_accts = str(
                     r.get("Expense A/C", "")
                 ).strip()
 
@@ -71,8 +116,8 @@ for vf in Path(INPUT_DIR).glob("*Vendor*"):
                 ).strip()
 
                 if (
-                    not acct
-                    or acct.lower() == "nan"
+                    not raw_accts
+                    or raw_accts.lower() == "nan"
                 ):
                     continue
 
@@ -82,25 +127,56 @@ for vf in Path(INPUT_DIR).glob("*Vendor*"):
                 ):
                     continue
 
-                lst = cand.setdefault(
-                    acct,
-                    []
-                )
+                accounts = list(dict.fromkeys(
+                    acct.strip()
+                    for acct in raw_accts.split(",")
+                    if acct.strip()
+                    and acct.strip().lower() != "nan"
+                ))
 
-                if vendor_name not in lst:
-                    lst.append(vendor_name)
+                for acct in accounts:
+                    lst = cand.setdefault(acct, [])
 
-                # auto-add only if deterministic
-                if (
-                    acct not in vendors
-                    and len(lst) == 1
-                ):
-                    vendors[acct] = {
-                        "vendor": vendor_name,
-                        "vendor_kind": "company"
-                    }
+                    if vendor_name not in lst:
+                        lst.append(vendor_name)
+
+                    existing_vendor = vendors.get(acct, {})
+                    existing_name = existing_vendor.get("vendor")
+                    existing_kind = existing_vendor.get("vendor_kind")
+
+                    if len(lst) == 1:
+                        resolved_vendor = lst[0]
+                        vendors[acct] = {
+                            "vendor": resolved_vendor,
+                            "vendor_kind": "company"
+                        }
+                    else:
+                        resolved_vendor = "Multiple Vendors"
+                        vendors[acct] = {
+                            "vendor": resolved_vendor,
+                            "vendor_kind": "company"
+                        }
+                        vendor_candidates[acct] = list(lst)
+                        cfg["vendor_candidates"] = vendor_candidates
+
+                    if (
+                        existing_name != resolved_vendor
+                        or existing_kind != "company"
+                    ):
+                        vendor_mapping_gaps.append({
+                            "source_file": vf.name,
+                            "expense_account": acct,
+                            "vendor_name": " / ".join(lst),
+                            "previous_vendor": existing_name or "",
+                            "previous_vendor_kind": existing_kind or "",
+                            "resolved_vendor": resolved_vendor,
+                            "resolved_vendor_kind": "company",
+                            "classification": "UPDATED_FROM_VENDOR_REPORT"
+                        })
 
             cfg["vendors"] = vendors
+
+            all_vendor_mapping_gaps.extend(vendor_mapping_gaps)
 
             with open(CONFIG_FILE, "w") as f:
                 yaml.safe_dump(
@@ -109,6 +185,16 @@ for vf in Path(INPUT_DIR).glob("*Vendor*"):
                     sort_keys=False,
                     allow_unicode=True
                 )
+
+            with open(CONFIG_FILE, "r") as f:
+                cfg = yaml.safe_load(f)
+            vendors = cfg.get("vendors", {}).copy()
+            vendor_candidates = cfg.get("vendor_candidates", {}).copy()
+            processed_vendor_reports.append(vf.name)
+        else:
+            raise ValueError(
+                "Vendor report must contain 'Expense A/C' and 'Vendor Name' columns"
+            )
 
         ts = datetime.now().strftime(
             "%Y%m%d_%H%M%S"
@@ -123,6 +209,46 @@ for vf in Path(INPUT_DIR).glob("*Vendor*"):
         print(
             f"Vendor processing error: {vf} -> {ex}"
         )
+        all_vendor_mapping_gaps.append({
+            "source_file": vf.name,
+            "expense_account": "",
+            "vendor_name": "",
+            "previous_vendor": "",
+            "previous_vendor_kind": "",
+            "resolved_vendor": "",
+            "resolved_vendor_kind": "",
+            "classification": "VENDOR_REPORT_PARSE_ERROR",
+        })
+
+# Always produce the reconciliation report, including when vendor reports
+# are absent or no mapping change is detected.
+if not processed_vendor_reports and not all_vendor_mapping_gaps:
+    all_vendor_mapping_gaps.append({
+        "source_file": "",
+        "expense_account": "",
+        "vendor_name": "",
+        "previous_vendor": "",
+        "previous_vendor_kind": "",
+        "resolved_vendor": "",
+        "resolved_vendor_kind": "",
+        "classification": "NO_VENDOR_REPORTS_FOUND",
+    })
+
+vendor_gap_file = Path("output/vendor_mapping_gaps.csv")
+vendor_gap_file.parent.mkdir(exist_ok=True)
+pd.DataFrame(
+    all_vendor_mapping_gaps,
+    columns=[
+        "source_file",
+        "expense_account",
+        "vendor_name",
+        "previous_vendor",
+        "previous_vendor_kind",
+        "resolved_vendor",
+        "resolved_vendor_kind",
+        "classification",
+    ]
+).to_csv(vendor_gap_file, index=False)
 
 # -------------------------------------------------------
 # Normalize Helper
@@ -180,6 +306,19 @@ months = {
 }
 
 rows = []
+
+
+def normalize_amount(value):
+    try:
+        numeric = Decimal(str(value).replace(",", "").strip())
+    except (InvalidOperation, AttributeError, ValueError):
+        return value
+
+    rounded = numeric.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    if rounded == rounded.to_integral_value():
+        return int(rounded)
+    return float(rounded)
+
 
 EXPECTED_COLUMNS = [
     "date",
@@ -287,7 +426,8 @@ for file in Path(INPUT_DIR).glob("*.xls*"):
                     continue
 
                 for col in df.columns[1:]:
-                    ledger = canonical_line_item(col)
+                    source_ledger = str(col).strip()
+                    ledger = canonical_line_item(source_ledger)
                     ledger_norm = norm(ledger)
 
                     # Maintenance Charge is sourced only from the Income/Receipt report.
@@ -307,6 +447,7 @@ for file in Path(INPUT_DIR).glob("*.xls*"):
                     multiplier = cfg.get("collection_amount_multipliers", {}).get(ledger)
                     if multiplier is not None:
                         amount = amount * float(multiplier)
+                    amount = normalize_amount(amount)
 
                     category = income_map.get(ledger_norm)
                     reference_category = cfg.get("collection_reference_categories", {}).get(ledger)
@@ -319,8 +460,11 @@ for file in Path(INPUT_DIR).glob("*.xls*"):
                     else:
                         continue
 
-                    vendor_info = vendors.get(ledger, {})
-                    vendor = vendor_info.get("vendor", "Individual")
+                    vendor_info = vendors.get(source_ledger, vendors.get(ledger, {}))
+                    vendor = resolve_vendor_label(
+                        source_ledger,
+                        vendor_info.get("vendor", "Individual")
+                    )
                     vendor_kind = vendor_info.get("vendor_kind", "individual")
 
                     flat_code = ""
@@ -419,11 +563,11 @@ for file in Path(INPUT_DIR).glob("*.xls*"):
         df = pd.read_excel(file, header=hdr)
         ledger_col = df.columns[0]
         for _, r in df.iterrows():
-            ledger = str(r[ledger_col]).strip()
-            if not ledger or ledger.lower() == "nan" or ledger.lower() == "total":
+            source_ledger = str(r[ledger_col]).strip()
+            if not source_ledger or source_ledger.lower() == "nan" or source_ledger.lower() == "total":
                 continue
 
-            ledger = canonical_line_item(ledger)
+            ledger = canonical_line_item(source_ledger)
             ledger_norm = norm(ledger)
 
             if ledger_norm == "maintenance charge":
@@ -447,6 +591,7 @@ for file in Path(INPUT_DIR).glob("*.xls*"):
                 multiplier = cfg.get("collection_amount_multipliers", {}).get(ledger)
                 if multiplier is not None:
                     amount = amount * float(multiplier)
+                amount = normalize_amount(amount)
 
                 category = income_map.get(ledger_norm, "Uncategorized")
                 head = "income"
@@ -456,8 +601,11 @@ for file in Path(INPUT_DIR).glob("*.xls*"):
                     category = reference_category
                     head = "reference"
 
-                vendor_info = vendors.get(ledger, {})
-                vendor = vendor_info.get("vendor", "Individual")
+                vendor_info = vendors.get(source_ledger, vendors.get(ledger, {}))
+                vendor = resolve_vendor_label(
+                    source_ledger,
+                    vendor_info.get("vendor", "Individual")
+                )
                 vendor_kind = vendor_info.get("vendor_kind", "individual")
 
                 flat_code = ""
@@ -620,14 +768,14 @@ for file in Path(INPUT_DIR).glob("*.xls*"):
 
         for _, r in df.iterrows():
 
-            ledger = str(
+            source_ledger = str(
                 r[ledger_col]
             ).strip()
 
-            if ledger.lower() == "total":
+            if source_ledger.lower() == "total":
                 continue
 
-            ledger = canonical_line_item(ledger)
+            ledger = canonical_line_item(source_ledger)
 
             ledger_norm = norm(ledger)
 
@@ -660,16 +808,18 @@ for file in Path(INPUT_DIR).glob("*.xls*"):
                 )
 
                 vendor_info = {}
+                source_ledger_norm = norm(source_ledger)
 
                 for k, vv in vendors.items():
 
-                    if norm(k) == ledger_norm:
+                    if norm(k) in {source_ledger_norm, ledger_norm}:
                         vendor_info = vv
-                        break
+                        if norm(k) == source_ledger_norm:
+                            break
 
-                vendor = vendor_info.get(
-                    "vendor",
-                    "Individual"
+                vendor = resolve_vendor_label(
+                    source_ledger,
+                    vendor_info.get("vendor", "Individual")
                 )
 
                 vendor_kind = vendor_info.get(
@@ -698,7 +848,7 @@ for file in Path(INPUT_DIR).glob("*.xls*"):
                             ledger,
 
                         "amount":
-                            amt,
+                            normalize_amount(amt),
 
                         "direction":
                             direction,
@@ -765,6 +915,7 @@ output_df = output_df[
 
 for entry in cfg.get("final_reference_entries", []):
     final_entry = {column: entry.get(column, "") for column in EXPECTED_COLUMNS}
+    final_entry["amount"] = normalize_amount(final_entry["amount"])
     output_df = pd.concat(
         [output_df, pd.DataFrame([final_entry], columns=EXPECTED_COLUMNS)],
         ignore_index=True,
