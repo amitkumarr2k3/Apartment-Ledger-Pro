@@ -86,6 +86,12 @@ if [[ "$MODE" != "local" && "$MODE" != "prod" ]]; then
   exit 1
 fi
 
+if [[ ! "$PROJECT_NAME" =~ ^[a-z0-9][a-z0-9_-]*$ ]]; then
+  echo "Invalid --project-name '$PROJECT_NAME'." >&2
+  echo "Use only lowercase letters, digits, hyphens, and underscores; start with a letter or digit." >&2
+  exit 1
+fi
+
 # WSL convenience: if key path is missing, try matching by filename under
 # /mnt/c/Users/*/.ssh/ (common when users pass ~/.ssh but key is in Windows home).
 if [[ ! -f "$KEY" ]]; then
@@ -246,33 +252,37 @@ REMOTE_DIR="$3"
 MODE="$4"
 
 cd "$HOME/$REMOTE_DIR"
-export COMPOSE_PROJECT_NAME="$PROJECT_NAME"
 export APP_IMAGE_TAG="$TAG"
 
-compose_args=(-f docker-compose.yml -f docker-compose.images.yml)
+compose_args=(-p "$PROJECT_NAME" -f docker-compose.yml -f docker-compose.images.yml)
 if [[ "$MODE" == "prod" ]]; then
   compose_args+=(-f docker-compose.prod.yml -f docker-compose.https.yml)
 fi
 
-# Start only the database first, wait for it, then run migrations and seed.
-docker compose "${compose_args[@]}" up -d --force-recreate --remove-orphans db
-for attempt in $(seq 1 60); do
-  if docker compose "${compose_args[@]}" exec -T db pg_isready -U apf -d apartment_finance >/dev/null 2>&1; then
-    break
-  fi
-  if [[ "$attempt" == "60" ]]; then
-    echo "Database did not become ready" >&2
-    docker compose "${compose_args[@]}" logs db --tail=100 >&2 || true
-    exit 1
-  fi
-  sleep 1
+# Let Docker Compose own dependency ordering: db -> migrate -> seed -> api -> ssr -> web.
+echo "Starting database, migrations, seed, and application services..."
+if ! docker compose "${compose_args[@]}" up -d --force-recreate --remove-orphans; then
+  echo "Compose stack startup failed" >&2
+  docker compose "${compose_args[@]}" ps -a >&2 || true
+  docker compose "${compose_args[@]}" logs db migrate seed api ssr web --tail=200 >&2 || true
+  exit 1
+fi
+
+for service in db api ssr web; do
+  for attempt in $(seq 1 60); do
+    container_id="$(docker compose "${compose_args[@]}" ps --status running -q "$service")"
+    if [[ -n "$container_id" ]]; then
+      break
+    fi
+    if [[ "$attempt" == "60" ]]; then
+      echo "Required service is not running: $service" >&2
+      docker compose "${compose_args[@]}" ps -a >&2 || true
+      docker compose "${compose_args[@]}" logs db migrate seed api ssr web --tail=200 >&2 || true
+      exit 1
+    fi
+    sleep 2
+  done
 done
-
-docker compose "${compose_args[@]}" run --rm --no-deps migrate
-docker compose "${compose_args[@]}" run --rm --no-deps seed
-
-# Start application services with no stale containers left behind.
-docker compose "${compose_args[@]}" up -d --force-recreate --remove-orphans api ssr web
 
 for attempt in $(seq 1 60); do
   if curl -fsS http://127.0.0.1/health >/dev/null 2>&1 && curl -fsS http://127.0.0.1:4010/ready >/dev/null 2>&1; then
@@ -299,10 +309,9 @@ REMOTE_DIR="$3"
 MODE="$4"
 
 cd "$HOME/$REMOTE_DIR"
-export COMPOSE_PROJECT_NAME="$PROJECT_NAME"
 export APP_IMAGE_TAG="$TAG"
 
-compose_args=(-f docker-compose.yml -f docker-compose.images.yml)
+compose_args=(-p "$PROJECT_NAME" -f docker-compose.yml -f docker-compose.images.yml)
 if [[ "$MODE" == "prod" ]]; then
   compose_args+=(-f docker-compose.prod.yml -f docker-compose.https.yml)
 fi

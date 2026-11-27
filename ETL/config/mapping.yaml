@@ -225,7 +225,7 @@ vendors:
     vendor: KIRLOSKAR OIL ENGINES LTD
     vendor_kind: company
   DG Service:
-    vendor: KIRLOSKAR OIL ENGINES LTD
+    vendor: Multiple Vendors
     vendor_kind: company
   Garbage removal:
     vendor: Sewa Waste Management
@@ -237,7 +237,7 @@ vendors:
     vendor: Sapthagiri Cleaner
     vendor_kind: company
   Tools & Stationary:
-    vendor: Multiple Vendors
+    vendor: AM Computers INC
     vendor_kind: company
   One Time Operational Procurement:
     vendor: Individual
@@ -446,6 +446,11 @@ vendors:
   MST Salary:
     vendor: EXOZEN
     vendor_kind: company
+vendor_exclusions:
+  Diesel:
+  - EXOZEN
+  Tools & Stationary:
+  - EXOZEN
 vendor_candidates:
   Debris Disposal:
   - Kavitha Enterprises
@@ -453,7 +458,6 @@ vendor_candidates:
   Diesel:
   - Sai Krupa Petroleum
   - Sai Abhay Petroleum
-  - EXOZEN
   Garden Tools:
   - Plants Paradise
   - EXOZEN
@@ -461,7 +465,75 @@ vendor_candidates:
   - Kavitha Enterprises
   Tools & Stationary:
   - AM Computers INC
-  - EXOZEN
   HK Materials:
   - Pooja Chemicals
   - EXOZEN
+  BESCOM A Block:
+  - BESCOM
+  BESCOM B Block:
+  - BESCOM
+  BESCOM E Block:
+  - BESCOM
+  BESCOM G Block:
+  - BESCOM
+  STP water collection (Sludge Removal):
+  - Sapthagiri Cleaner
+  AMC (Lift):
+  - JOHNSON LIFTS Pvt Ltd
+  Airtel Postpaid Connection:
+  - Airtel Postpaid
+  Amazon Purchase:
+  - Amazon CG Boulevard RWA
+  AMC (AC):
+  - KNND ASSOCIATES PVT LTD
+  Gardeners Salary:
+  - EXOZEN
+  Facility Manager:
+  - EXOZEN
+  Water Test Report:
+  - EXOZEN
+  Repair Work:
+  - EXOZEN
+  Rental Charges Machinery:
+  - EXOZEN
+  Electricians Salary:
+  - EXOZEN
+  Plumbers Salary:
+  - EXOZEN
+  STP/WTP Operators Salary:
+  - EXOZEN
+  Security Supervisor Salary:
+  - EXOZEN
+  Security Guards Salary:
+  - EXOZEN
+  Security Lady Guards Salary:
+  - EXOZEN
+  Walkie Talkies:
+  - EXOZEN
+  Pest Control Services:
+  - EXOZEN
+  Swimming Pool Services:
+  - EXOZEN
+  Management Fee:
+  - EXOZEN
+  Help Desk Salary:
+  - EXOZEN
+  Gardening Supervisor Salary:
+  - EXOZEN
+  Housekeeping Supervisor Salary:
+  - EXOZEN
+  House Keeping Janitor Salary:
+  - EXOZEN
+  Garbage removal:
+  - Sewa Waste Management
+  Water Supply:
+  - BSN Water Supply
+  Chartered Accountant:
+  - Bevoor & Associates
+  Legal Consultant:
+  - GB Legal
+  DG Service:
+  - Surya Power Service
+  - KIRLOSKAR OIL ENGINES LTD
+  AMC (DG):
+  - KIRLOSKAR OIL ENGINES LTD

@@ -42,6 +42,12 @@ Execute
 
 python transform.py
 
+Run the regression suite from the repository root:
+
+python -m unittest ETL.test_transform -v
+
+The integration tests copy the available current and backup Excel reports into temporary directories, run the real transformer, and verify mappings, aliases, vendor exclusions, reprocessing, CSV/Excel parity, invalid vendor reports, zero-value filtering, and deterministic output. Source input files and mapping configuration are never modified by the tests.
+
 ---
 
 ## Output

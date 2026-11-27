@@ -7,7 +7,8 @@ import {
   BreadcrumbList,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import { Tooltip, Bar, BarChart, CartesianGrid, ResponsiveContainer, XAxis, YAxis } from "recharts";
+import { Tooltip, Bar, BarChart, CartesianGrid, LabelList, ResponsiveContainer, XAxis, YAxis } from "recharts";
+import { useChartAnnotations } from "@/components/chart-annotations";
 import { SmartTooltipContent, getTooltipTrigger } from "@/components/smart-tooltip";
 import { ProcurementInfo } from "@/components/procurement-info";
 import { DrilldownLineItemSummary } from "@/components/drilldown-line-item-summary";
@@ -59,6 +60,8 @@ function Inner() {
   );
   const tree = head === "income" ? incomeCategories : expenseCategories;
   const category = search.category ? (tree.find((c) => c.name === search.category) ?? null) : null;
+
+  const chartAnnotations = useChartAnnotations(category ? `drilldown:${head ?? ""}:${category.name}` : null, labels);
 
   const update = (patch: { head?: Head | null; category?: string | null }) => {
     navigate({
@@ -192,6 +195,8 @@ function Inner() {
             </CardTitle>
             <CardDescription>
               <DrilldownLineItemSummary category={category} />
+              {chartAnnotations.isSuperAdmin && <span className="mt-2 block text-amber-700">💡 Click the pencil on any month to add an explanation. Click an existing note to edit or delete it.</span>}
+              {!chartAnnotations.isSuperAdmin && chartAnnotations.hasComments && <span className="mt-2 block text-amber-700">ℹ This period contains an explanation. Click the note symbol to read it.</span>}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -207,7 +212,9 @@ function Inner() {
                     <SmartTooltipContent labelPrefix="Month" valueFormatter={(v) => inr(v)} />
                   }
                 />
-                <Bar dataKey="value" fill="var(--color-chart-3)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="value" fill="var(--color-chart-3)" radius={[4, 4, 0, 0]}>
+                  <LabelList content={chartAnnotations.label} />
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
             <div className="mt-4 rounded-md border border-border p-3 flex items-center justify-between">
@@ -220,6 +227,7 @@ function Inner() {
           </CardContent>
         </Card>
       )}
+      {chartAnnotations.dialog}
     </>
   );
 }

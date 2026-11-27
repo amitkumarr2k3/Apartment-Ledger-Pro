@@ -20,6 +20,7 @@ import { routes as adminAuditRoutes } from "./routes/admin.audit";
 import { routes as adminImportsRoutes } from "./routes/admin.imports";
 import { routes as adminETLRoutes } from "./routes/admin.etl";
 import { routes as assistantRoutes } from "./routes/assistant";
+import { routes as annotationRoutes } from "./routes/annotations";
 import { pool } from "./db";
 
 export async function buildApp() {
@@ -114,6 +115,7 @@ export async function buildApp() {
   await app.register(adminImportsRoutes, { prefix: "/api/admin/imports" });
   await app.register(adminETLRoutes, { prefix: "/api/admin/etl" });
   await app.register(assistantRoutes, { prefix: "/api/assistant" });
+  await app.register(annotationRoutes, { prefix: "/api/annotations" });
 
   return app;
 }

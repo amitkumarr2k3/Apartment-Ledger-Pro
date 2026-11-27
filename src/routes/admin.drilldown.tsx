@@ -18,7 +18,9 @@ import {
   XAxis,
   YAxis,
   Legend,
+  LabelList,
 } from "recharts";
+import { useChartAnnotations } from "@/components/chart-annotations";
 import { SmartTooltipContent, getTooltipTrigger } from "@/components/smart-tooltip";
 import { ProcurementInfo } from "@/components/procurement-info";
 import { DrilldownLineItemSummary } from "@/components/drilldown-line-item-summary";
@@ -82,6 +84,8 @@ function Inner() {
       : null;
   const line =
     vendor && search.line ? (vendor.items.find((it) => it.name === search.line) ?? null) : null;
+  const vendorAnnotations = useChartAnnotations(vendor && !line ? `drilldown:${head ?? ""}:${category?.name ?? ""}:${vendor.name}` : null, labels);
+  const lineAnnotations = useChartAnnotations(line ? `drilldown:${head ?? ""}:${category?.name ?? ""}:${vendor?.name ?? ""}:${line.name}` : null, labels);
 
   const update = (patch: {
     head?: Head | null;
@@ -292,7 +296,11 @@ function Inner() {
                 <ProcurementInfo name={vendor.name} persona="admin" />
                 <span>· Monthly trend</span>
               </CardTitle>
-              <CardDescription>Total spend per month before drilling into items</CardDescription>
+              <CardDescription>
+                Total spend per month before drilling into items
+                {vendorAnnotations.isSuperAdmin && <span className="mt-1 block text-amber-700">💡 Click the pencil on any month to add an explanation. Click an existing note to edit or delete it.</span>}
+                {!vendorAnnotations.isSuperAdmin && vendorAnnotations.hasComments && <span className="mt-1 block text-amber-700">ℹ This period contains an explanation. Click the note symbol to read it.</span>}
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={220}>
@@ -312,7 +320,9 @@ function Inner() {
                       <SmartTooltipContent labelPrefix="Month" valueFormatter={(v) => inr(v)} />
                     }
                   />
-                  <Bar dataKey="value" fill="var(--color-chart-3)" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="value" fill="var(--color-chart-3)" radius={[4, 4, 0, 0]}>
+                    <LabelList content={vendorAnnotations.label} />
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
@@ -366,7 +376,11 @@ function Inner() {
               <ProcurementInfo name={line.name} persona="admin" />
               <span>· Monthly trend</span>
             </CardTitle>
-            <CardDescription>Selected-period bar chart · Absent months = ₹0</CardDescription>
+            <CardDescription>
+              Selected-period bar chart · Absent months = ₹0
+              {lineAnnotations.isSuperAdmin && <span className="mt-1 block text-amber-700">💡 Click the pencil on any month to add an explanation. Click an existing note to edit or delete it.</span>}
+              {!lineAnnotations.isSuperAdmin && lineAnnotations.hasComments && <span className="mt-1 block text-amber-700">ℹ This period contains an explanation. Click the note symbol to read it.</span>}
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
@@ -389,7 +403,9 @@ function Inner() {
                   name={line.name}
                   fill="var(--color-chart-4)"
                   radius={[4, 4, 0, 0]}
-                />
+                >
+                  <LabelList content={lineAnnotations.label} />
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
             <div className="mt-4 grid grid-cols-3 gap-4 text-sm">
@@ -403,6 +419,8 @@ function Inner() {
           </CardContent>
         </Card>
       )}
+      {vendorAnnotations.dialog}
+      {lineAnnotations.dialog}
     </>
   );
 }

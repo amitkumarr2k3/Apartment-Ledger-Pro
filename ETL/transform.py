@@ -22,10 +22,27 @@ with open(CONFIG_FILE, "r") as f:
 
 vendors = cfg.get("vendors", {}).copy()
 vendor_candidates = cfg.get("vendor_candidates", {}).copy()
+vendor_exclusions = {
+    re.sub(r"\s+", " ", str(line_item).strip()).lower(): {
+        re.sub(r"\s+", " ", str(vendor).strip()).lower()
+        for vendor in excluded_vendors
+    }
+    for line_item, excluded_vendors in cfg.get("vendor_exclusions", {}).items()
+}
+
+
+def is_vendor_excluded(line_item, vendor_name):
+    line_item_key = re.sub(r"\s+", " ", str(line_item).strip()).lower()
+    vendor_key = re.sub(r"\s+", " ", str(vendor_name).strip()).lower()
+    return vendor_key in vendor_exclusions.get(line_item_key, set())
 
 
 def resolve_vendor_label(line_item, configured_vendor):
-    candidates = vendor_candidates.get(line_item, [])
+    candidates = [
+        vendor
+        for vendor in vendor_candidates.get(line_item, [])
+        if not is_vendor_excluded(line_item, vendor)
+    ]
     if len(candidates) == 1:
         return candidates[0]
 
@@ -46,6 +63,27 @@ line_item_aliases = {
         for k, v in cfg.get("line_item_aliases", {}).items()
     }.items()
 }
+
+for line_item, candidates in list(vendor_candidates.items()):
+    filtered_candidates = [
+        vendor
+        for vendor in candidates
+        if not is_vendor_excluded(line_item, vendor)
+    ]
+    vendor_candidates[line_item] = filtered_candidates
+    if len(filtered_candidates) == 1:
+        vendors[line_item] = {
+            "vendor": filtered_candidates[0],
+            "vendor_kind": vendors.get(line_item, {}).get("vendor_kind", "company"),
+        }
+    elif len(filtered_candidates) > 1:
+        vendors[line_item] = {
+            "vendor": "Multiple Vendors",
+            "vendor_kind": vendors.get(line_item, {}).get("vendor_kind", "company"),
+        }
+
+cfg["vendor_candidates"] = vendor_candidates
+cfg["vendors"] = vendors
 
 # -------------------------------------------------------
 # Expand Vendor Groups (EXOZEN, etc.)
@@ -136,6 +174,14 @@ for vf in Path(INPUT_DIR).glob("*Vendor*"):
 
                 for acct in accounts:
                     lst = cand.setdefault(acct, [])
+                    lst[:] = [
+                        candidate
+                        for candidate in lst
+                        if not is_vendor_excluded(acct, candidate)
+                    ]
+
+                    if is_vendor_excluded(acct, vendor_name):
+                        continue
 
                     if vendor_name not in lst:
                         lst.append(vendor_name)

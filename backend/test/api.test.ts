@@ -272,3 +272,104 @@ describe("dashboard settings RBAC", () => {
     expect(db.withTx).not.toHaveBeenCalled();
   });
 });
+
+describe("chart annotations", () => {
+  const annotation = {
+    chartKey: "drilldown:expense:One Time Operational Procurement",
+    pointKey: "Aug '26",
+    title: "Emergency repair",
+    comment: "One-time replacement after monsoon damage.",
+    visibility: "all",
+  };
+
+  it("restricts writes and deletes to superadmin", async () => {
+    for (const headers of [resident(), admin()]) {
+      const put = await app.inject({ method: "PUT", url: "/api/annotations", headers, payload: annotation });
+      const del = await app.inject({ method: "DELETE", url: "/api/annotations", headers, payload: { chartKey: annotation.chartKey, pointKey: annotation.pointKey } });
+      expect(put.statusCode).toBe(403);
+      expect(del.statusCode).toBe(403);
+    }
+    expect(db.query).not.toHaveBeenCalled();
+  });
+
+  it("filters visible annotations for resident and admin readers", async () => {
+    await app.inject({ method: "GET", url: `/api/annotations?chartKey=${encodeURIComponent(annotation.chartKey)}`, headers: resident() });
+    expect(db.query.mock.calls.at(-1)?.[1]).toEqual([COMMUNITY, annotation.chartKey, "resident"]);
+
+    await app.inject({ method: "GET", url: `/api/annotations?chartKey=${encodeURIComponent(annotation.chartKey)}`, headers: admin() });
+    expect(db.query.mock.calls.at(-1)?.[1]).toEqual([COMMUNITY, annotation.chartKey, "admin"]);
+  });
+
+  it("saves annotations independently from transaction imports", async () => {
+    db.query.mockResolvedValueOnce({ rows: [{ id: "annotation-1", ...annotation }], rowCount: 1 });
+    const res = await app.inject({ method: "PUT", url: "/api/annotations", headers: superadmin(), payload: annotation });
+    expect(res.statusCode).toBe(200);
+    const sql = String(db.query.mock.calls[0][0]);
+    expect(sql).toContain("INSERT INTO chart_annotations");
+    expect(sql).toContain("ON CONFLICT");
+    expect(db.query.mock.calls[0][1]).toEqual(expect.arrayContaining([COMMUNITY, annotation.chartKey, annotation.pointKey, annotation.title, annotation.comment, annotation.visibility]));
+  });
+
+  it("accepts exact maximum lengths and all supported visibility values", async () => {
+    for (const visibility of ["all", "resident", "admin"]) {
+      db.query.mockResolvedValueOnce({ rows: [{ id: "annotation-1" }], rowCount: 1 });
+      const res = await app.inject({
+        method: "PUT",
+        url: "/api/annotations",
+        headers: superadmin(),
+        payload: {
+          ...annotation,
+          chartKey: "c".repeat(500),
+          pointKey: "p".repeat(120),
+          title: "t".repeat(160),
+          comment: "m".repeat(4000),
+          visibility,
+        },
+      });
+      expect(res.statusCode).toBe(200);
+    }
+  });
+
+  it.each([
+    ["blank title", { title: "   " }],
+    ["blank comment", { comment: "   " }],
+    ["title over limit", { title: "t".repeat(161) }],
+    ["comment over limit", { comment: "m".repeat(4001) }],
+    ["chart key over limit", { chartKey: "c".repeat(501) }],
+    ["point key over limit", { pointKey: "p".repeat(121) }],
+    ["invalid visibility", { visibility: "public" }],
+    ["missing title", { title: undefined }],
+  ])("rejects %s with a 400 without querying the database", async (_name, patch) => {
+    const res = await app.inject({ method: "PUT", url: "/api/annotations", headers: superadmin(), payload: { ...annotation, ...patch } });
+    expect(res.statusCode).toBe(400);
+    expect(db.query).not.toHaveBeenCalled();
+  });
+
+  it("rejects anonymous annotation reads and writes", async () => {
+    const read = await app.inject({ method: "GET", url: `/api/annotations?chartKey=${encodeURIComponent(annotation.chartKey)}` });
+    const write = await app.inject({ method: "PUT", url: "/api/annotations", payload: annotation });
+    expect(read.statusCode).toBe(401);
+    expect(write.statusCode).toBe(401);
+  });
+
+  it("rejects missing and oversized chart query keys", async () => {
+    const missing = await app.inject({ method: "GET", url: "/api/annotations", headers: resident() });
+    const oversized = await app.inject({ method: "GET", url: `/api/annotations?chartKey=${"c".repeat(501)}`, headers: resident() });
+    expect(missing.statusCode).toBe(400);
+    expect(oversized.statusCode).toBe(400);
+    expect(db.query).not.toHaveBeenCalled();
+  });
+
+  it("returns 404 when deleting a comment that does not exist", async () => {
+    db.query.mockResolvedValueOnce({ rows: [], rowCount: 0 });
+    const res = await app.inject({ method: "DELETE", url: "/api/annotations", headers: superadmin(), payload: { chartKey: annotation.chartKey, pointKey: annotation.pointKey } });
+    expect(res.statusCode).toBe(404);
+  });
+
+  it("deletes by community, chart and point to preserve other users' data", async () => {
+    db.query.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+    const res = await app.inject({ method: "DELETE", url: "/api/annotations", headers: superadmin(), payload: { chartKey: annotation.chartKey, pointKey: annotation.pointKey } });
+    expect(res.statusCode).toBe(200);
+    expect(db.query.mock.calls[0][1]).toEqual([COMMUNITY, annotation.chartKey, annotation.pointKey]);
+  });
+});

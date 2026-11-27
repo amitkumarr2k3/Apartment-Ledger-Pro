@@ -146,7 +146,23 @@ function Inner() {
     }, 0);
     return acc + catSum;
   }, 0);
-  const collectionTargetDifference = collectedMaintenance - expectedCollection;
+  const selectedCurrentMonthUnpaid = safeIncomeTree.reduce((sum, category) => {
+    (category.vendors || []).forEach((vendor) => {
+      (vendor.items || []).forEach((item) => {
+        if ((item.name || "").trim().toLowerCase() === "current month unpaid maintenance") {
+          sum += total(sliceMonthly(item.monthly || []));
+        }
+      });
+    });
+    return sum;
+  }, 0);
+  // Maintenance Collection can include old arrears paid during the period.
+  // For a meaningful target comparison, current-period dues collected are
+  // derived from the current billing target less the current-month unpaid
+  // amount. Actual bank receipts remain unchanged in Total Received Income.
+  const currentPeriodDuesCollected = Math.max(0, expectedCollection - selectedCurrentMonthUnpaid);
+  const collectionTargetDifference = currentPeriodDuesCollected - expectedCollection;
+  const additionalMaintenanceReceipts = Math.max(0, collectedMaintenance - currentPeriodDuesCollected);
   
   /**
    * OTHER INCOME (COMMUNITY INCOME)
@@ -292,9 +308,11 @@ function Inner() {
   const corpusFundCategory = safeIncomeTree.find((c) => isCorpusFundReference(c.name));
   const corpusFundFullMonthly = corpusFundCategory ? categoryMonthly(corpusFundCategory) : [];
   let corpusFundValue = 0;
+  let corpusSnapshotLabel = "latest available month";
   for (let idx = corpusFundFullMonthly.length - 1; idx >= 0; idx--) {
     if (corpusFundFullMonthly[idx]) {
       corpusFundValue = corpusFundFullMonthly[idx];
+      corpusSnapshotLabel = safeMonthlyTotals[idx]?.month ?? corpusSnapshotLabel;
       break;
     }
   }
@@ -315,10 +333,19 @@ function Inner() {
   const openingBalanceCategory = safeIncomeTree.find((c) => isOpeningBalanceReference(c.name));
   const openingBalanceFullMonthly = openingBalanceCategory ? categoryMonthly(openingBalanceCategory) : [];
   let trueOpeningAnchor = 0;
+  let openingBalanceLabel = "start of available records";
   for (let idx = 0; idx < openingBalanceFullMonthly.length; idx++) {
-    if (openingBalanceFullMonthly[idx]) { trueOpeningAnchor = openingBalanceFullMonthly[idx]; break; }
+    if (openingBalanceFullMonthly[idx]) {
+      trueOpeningAnchor = openingBalanceFullMonthly[idx];
+      openingBalanceLabel = safeMonthlyTotals[idx]?.month ?? openingBalanceLabel;
+      break;
+    }
   }
   const bankBalance = trueOpeningAnchor + allTimeCollection - allTimeExpense;
+  const allTimeStartLabel = safeMonthlyTotals[0]?.month ?? openingBalanceLabel;
+  const allTimeEndLabel = safeMonthlyTotals[safeMonthlyTotals.length - 1]?.month ?? "latest month";
+  const allTimePeriodLabel = allTimeStartLabel === allTimeEndLabel ? allTimeStartLabel : `${allTimeStartLabel} to ${allTimeEndLabel}`;
+  const totalAcrossBankAccounts = bankBalance + corpusFundValue;
   /**
    * OPENING BALANCE (PERIOD-FILTERED)
    * Mirrors the exact calculation already used on the Opening & Closing
@@ -342,6 +369,7 @@ function Inner() {
   // Bank Balance card so that relationship is visually unmistakable.
   const unrestrictedCash = Math.max(0, bankBalance - contingencyCash);
   const contingencyShareOfBank = bankBalance > 0 ? Math.min(100, (contingencyCash / bankBalance) * 100) : 0;
+  const unrestrictedShareOfBank = 100 - contingencyShareOfBank;
   
   // Final Financial Metrics
   const totalIncome = collectedMaintenance + communityIncome;
@@ -444,10 +472,10 @@ function Inner() {
           {isWidgetVisible("overview.summaryCollection") && <div className="rounded-xl border border-slate-200 bg-white p-5">
             <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-3">Collection Progress</div>
             <ProgressBar
-              label="Maintenance collected"
-              value={collectedMaintenance}
+              label="Current-period maintenance dues collected"
+              value={currentPeriodDuesCollected}
               max={expectedCollection}
-              valueLabel={`${inr(collectedMaintenance)} of ${inr(expectedCollection)} expected · ${collectionTargetDifference >= 0 ? `${inr(collectionTargetDifference)} above target` : `${inr(Math.abs(collectionTargetDifference))} shortfall`}`}
+              valueLabel={`${inr(currentPeriodDuesCollected)} of ${inr(expectedCollection)} current-period target · ${inr(Math.abs(collectionTargetDifference))} shortfall. ${inr(additionalMaintenanceReceipts)} additional maintenance receipts include arrears paid in this period.`}
               tone="blue"
             />
             <div className="text-[11px] text-amber-600 font-medium mt-3">
@@ -462,36 +490,83 @@ function Inner() {
           </div>}
         </div>
 
-        {/* Reserves at a glance -- same composition-bar language already
-            used on the Bank Balance card in the Reserves tab, just
-            surfaced here too since "do we have money saved up" is a
-            top-of-mind question for most residents. */}
-        {isWidgetVisible("overview.summaryReserves") && <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/60 p-5">
-          <div className="flex items-start justify-between mb-3">
+        {isWidgetVisible("overview.summaryReserves") && <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="mb-4 flex items-start justify-between gap-4">
             <div>
-              <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Reserves &middot; Bank Balance</div>
-              <div className="mt-1 text-sm font-bold text-slate-900">{inr(bankBalance)}</div>
+              <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Reserves &middot; Bank Accounts</div>
+              <div className="mt-1 text-xs text-slate-500">Two separate accounts, each showing its balance and permitted use.</div>
             </div>
-            <span className="inline-block rounded bg-slate-200 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-slate-600">All-time</span>
+            <span className="inline-block rounded-full bg-slate-200 px-2 py-1 text-[9px] font-bold uppercase tracking-wide text-slate-600">All-time</span>
           </div>
-          <div className="h-2.5 w-full rounded-full overflow-hidden flex bg-gray-100">
-            <div className="h-full bg-pink-400" style={{ width: `${contingencyShareOfBank}%` }} title={`Contingency reserve (ring-fenced): ${inr(contingencyCash)}`} />
-            <div className="h-full bg-yellow-400" style={{ width: `${100 - contingencyShareOfBank}%` }} title={`Unrestricted / freely usable: ${inr(unrestrictedCash)}`} />
+
+          <div className="grid gap-4 lg:grid-cols-[1.35fr_1fr]">
+            <div className="rounded-xl border border-t-4 border-slate-200 border-t-amber-400 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Account 1</div>
+                  <div className="mt-1 font-semibold text-slate-800">Operating Bank Account</div>
+                </div>
+                <span className="rounded-full bg-pink-50 px-2 py-1 text-[10px] font-semibold text-pink-700">Contingency + Unrestricted</span>
+              </div>
+              <div className="mt-3 text-2xl font-bold tracking-tight text-slate-900">{inr(bankBalance)}</div>
+              <div className="mt-1 text-xs text-slate-500">Cash available in the society’s regular operating account.</div>
+              <div className="mt-4 flex h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
+                <div className="h-full bg-pink-400" style={{ width: `${contingencyShareOfBank}%` }} title={`Ring-fenced contingency: ${contingencyShareOfBank.toFixed(1)}%`} />
+                <div className="h-full bg-yellow-400" style={{ width: `${unrestrictedShareOfBank}%` }} title={`Unrestricted operating cash: ${unrestrictedShareOfBank.toFixed(1)}%`} />
+              </div>
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                <div className="rounded-lg border border-slate-100 bg-slate-50 p-2.5">
+                  <div className="text-[11px] text-slate-500">● Ring-fenced contingency</div>
+                  <div className="mt-1 font-semibold text-slate-800">{inr(contingencyCash)} <span className="text-[11px] text-pink-600">{contingencyShareOfBank.toFixed(1)}%</span></div>
+                </div>
+                <div className="rounded-lg border border-slate-100 bg-slate-50 p-2.5">
+                  <div className="text-[11px] text-slate-500">● Unrestricted operating cash</div>
+                  <div className="mt-1 font-semibold text-slate-800">{inr(unrestrictedCash)} <span className="text-[11px] text-yellow-700">{unrestrictedShareOfBank.toFixed(1)}%</span></div>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-t-4 border-slate-200 border-t-violet-500 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Account 2</div>
+                  <div className="mt-1 font-semibold text-slate-800">Corpus Account</div>
+                </div>
+                <span className="rounded-full bg-violet-50 px-2 py-1 text-[10px] font-semibold text-violet-700">Separate account</span>
+              </div>
+              <div className="mt-3 text-2xl font-bold tracking-tight text-slate-900">{corpusValue}</div>
+              <div className="mt-1 text-xs text-slate-500">Latest accumulated corpus snapshot for {corpusSnapshotLabel}.</div>
+              <div className="mt-4 rounded-lg bg-violet-50 p-3 text-xs text-violet-900">
+                <div className="font-semibold">Long-term, protected corpus</div>
+                <div className="mt-1 text-violet-700">Kept untouched and separate from the operating account. It is not used in the contingency/unrestricted split.</div>
+              </div>
+            </div>
           </div>
-          <div className="flex items-center justify-between w-full mt-2 text-[11px] text-slate-500">
-            <span>&#9679; <span className="text-pink-500 font-medium">Contingency</span> {inr(contingencyCash)}</span>
-            <span>Corpus (separate) <span className="font-medium text-orange-600">{corpusValue}</span></span>
-            <span><span className="text-yellow-600 font-medium">Unrestricted</span> {inr(unrestrictedCash)} &#9679;</span>
+
+          <div className="mt-4 flex items-center justify-between gap-4 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3">
+            <div>
+              <div className="text-xs font-semibold text-slate-700">Total funds across both bank accounts</div>
+              <div className="text-[11px] text-slate-500">Combined reference only; the funds remain in separate accounts.</div>
+            </div>
+            <div className="text-lg font-bold text-slate-900">{inr(totalAcrossBankAccounts)}</div>
           </div>
-          <details className="mt-3 rounded-md bg-slate-50 px-3 py-2 text-xs text-slate-600">
+
+          <details className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
             <summary className="cursor-pointer font-medium text-slate-700">How these balances are calculated</summary>
-            <div className="mt-2 space-y-1.5">
-              <p><strong>Bank balance:</strong> Opening balance {inr(trueOpeningAnchor)} + all-time received income {inr(allTimeCollection)} − all-time expense {inr(allTimeExpense)} = {inr(bankBalance)}.</p>
-              <p><strong>Contingency {inr(contingencyCash)}:</strong> the contingency-rate share of maintenance actually collected. It is already included within the bank balance, not added again.</p>
-              <p><strong>Unrestricted cash {inr(unrestrictedCash)}:</strong> bank balance less the ring-fenced contingency amount.</p>
-              <p><strong>Corpus {corpusValue}:</strong> the latest accumulated Corpus Fund Reference snapshot. It is shown separately and is not included in the bank-balance calculation.</p>
-              <p className="text-slate-500">Reference entries, outstanding receivables and collected GST liabilities are excluded from bank receipts because they are not available cash income.</p>
+            <div className="mt-3 grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <div className="font-semibold text-slate-800">Account 1 · Operating Bank Account</div>
+                <p className="rounded bg-slate-100 p-2">Opening balance {inr(trueOpeningAnchor)} ({openingBalanceLabel}) + received income {inr(allTimeCollection)} ({allTimePeriodLabel}) − expenses {inr(allTimeExpense)} ({allTimePeriodLabel}) = <strong>{inr(bankBalance)}</strong>.</p>
+                <p>Contingency of <strong>{inr(contingencyCash)}</strong> is the applicable share of maintenance actually collected during {allTimePeriodLabel}. It is already within the operating account.</p>
+                <p>{inr(bankBalance)} − {inr(contingencyCash)} contingency = <strong>{inr(unrestrictedCash)}</strong> unrestricted operating cash.</p>
+              </div>
+              <div className="space-y-2">
+                <div className="font-semibold text-slate-800">Account 2 · Corpus Account</div>
+                <p className="rounded bg-violet-50 p-2">Latest Corpus Fund Reference = <strong>{corpusValue}</strong> (snapshot: {corpusSnapshotLabel}).</p>
+                <p>The corpus figure is an accumulated balance snapshot, not operating income. It remains separate and is not included in the operating-account calculation.</p>
+              </div>
             </div>
+            <p className="mt-3 text-slate-500">Reference entries, unpaid maintenance and GST liabilities are excluded from operating income because they are not available cash income.</p>
           </details>
         </div>}
       </TabsContent>
@@ -512,9 +587,9 @@ function Inner() {
             icon={<Target className="h-5 w-5 text-blue-500" />}
           />
           <MetricCard 
-            label="COLLECTED MAINTENANCE" 
+            label="MAINTENANCE RECEIPTS" 
             value={inr(collectedMaintenance)} 
-            subText={`MAINTENANCE RECEIVED FOR ${periodLabel}`} 
+            subText={`RECEIVED FOR ${periodLabel} · INCLUDES ARREARS PAYMENTS`} 
             icon={<CheckCircle2 className="h-5 w-5 text-green-500" />}
           />
           <MetricCard 
